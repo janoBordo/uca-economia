@@ -57,37 +57,54 @@ export default function Inicio() {
   const { data } = useData();
   const orden = materiasPorProximidad(data);
   if (!orden.length) return null;
-  const proximo = orden.find(m => new Date(m.examen).getTime() > Date.now()) ?? orden[0];
-  const resto   = orden.filter(m => m.id !== proximo.id);
-  const fechaProximo = new Date(proximo.examen).toLocaleDateString("es-AR", { weekday:"long", day:"numeric", month:"long" });
+
+  const ahora = Date.now();
+  const proximo = orden.find(m => new Date(m.examen).getTime() > ahora);
+  const todoRendido = !proximo;
+  const resto = todoRendido ? orden : orden.filter(m => m.id !== proximo!.id);
+  const fechaProximo = proximo
+    ? new Date(proximo.examen).toLocaleDateString("es-AR", { weekday:"long", day:"numeric", month:"long" })
+    : "";
 
   return (
     <section className="flex-1 w-full max-w-4xl mx-auto px-6 sm:px-8 py-16 sm:py-24 flex flex-col">
-      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex items-center gap-3 mb-8">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-ocre/40 bg-ocre/8">
-          <div className="w-1.5 h-1.5 rounded-full bg-ocre animate-pulse" />
-          <span className="text-ocre text-xs font-semibold uppercase tracking-widest">Próximo examen</span>
-        </div>
-        <span className="text-navy/40 text-sm capitalize">{fechaProximo}</span>
-      </motion.div>
 
-      <motion.h1 initial={{ opacity:0, y:24 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.1, duration:0.6, ease:[0.22,1,0.36,1] }}
-        className="font-black text-navy leading-[0.9] mb-12" style={{ fontSize:"clamp(2.5rem,8vw,5.5rem)", letterSpacing:"-0.04em" }}>
-        {proximo.nombre}
-      </motion.h1>
+      {todoRendido ? (
+        <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} className="mb-16">
+          <h1 className="font-black text-navy leading-[0.9] mb-6" style={{ fontSize:"clamp(2.5rem,8vw,5.5rem)", letterSpacing:"-0.04em" }}>
+            Sin exámenes<br/>próximos
+          </h1>
+          <p className="text-navy/40 text-base">Anotá nuevas fechas cuando las tengas.</p>
+        </motion.div>
+      ) : (
+        <>
+          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex items-center gap-3 mb-8">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-ocre/40 bg-ocre/8">
+              <div className="w-1.5 h-1.5 rounded-full bg-ocre animate-pulse" />
+              <span className="text-ocre text-xs font-semibold uppercase tracking-widest">Próximo examen</span>
+            </div>
+            <span className="text-navy/40 text-sm capitalize">{fechaProximo}</span>
+          </motion.div>
 
-      <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.2 }}>
-        <CountdownHero materia={proximo} />
-      </motion.div>
+          <motion.h1 initial={{ opacity:0, y:24 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.1, duration:0.6, ease:[0.22,1,0.36,1] }}
+            className="font-black text-navy leading-[0.9] mb-12" style={{ fontSize:"clamp(2.5rem,8vw,5.5rem)", letterSpacing:"-0.04em" }}>
+            {proximo!.nombre}
+          </motion.h1>
 
-      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.35 }} className="flex gap-3 mt-10">
-        <Link href="/timer" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-navy text-canvas text-sm font-semibold hover:bg-navy-soft transition-colors">
-          <span>▶</span> Iniciar foco
-        </Link>
-        <Link href="/configuracion" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-navy/20 text-navy/60 text-sm font-medium hover:border-navy/40 hover:text-navy transition-colors">
-          Editar fechas
-        </Link>
-      </motion.div>
+          <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.2 }}>
+            <CountdownHero materia={proximo!} />
+          </motion.div>
+
+          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.35 }} className="flex gap-3 mt-10">
+            <Link href="/timer" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-navy text-canvas text-sm font-semibold hover:bg-navy-soft transition-colors">
+              <span>▶</span> Iniciar foco
+            </Link>
+            <Link href="/configuracion" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-navy/20 text-navy/60 text-sm font-medium hover:border-navy/40 hover:text-navy transition-colors">
+              Editar fechas
+            </Link>
+          </motion.div>
+        </>
+      )}
 
       <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.4 }} className="mt-16 mb-2 flex items-center gap-3">
         <span className="text-navy/30 text-xs uppercase tracking-widest font-medium">Todas las materias</span>
