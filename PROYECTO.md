@@ -1,0 +1,100 @@
+# UCA · Economía — Estado del proyecto
+
+Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva versión: 6.3, 6.4, 7.0, lo que sea), se agrega una entrada nueva ARRIBA DE TODO, debajo de este encabezado, con el formato de abajo. La entrada más reciente = el estado actual de la app. Nunca se borran entradas viejas — quedan como historia debajo.
+
+**Regla para Claude Code**: al terminar cualquier cambio que el usuario pida, ANTES de dar la tarea por terminada, agregar una entrada nueva acá arriba con el changelog de qué cambió Y, si corresponde, actualizar la sección "ESTADO ACTUAL" más abajo para que siga reflejando la realidad (stack, hosting, servicios externos, modelo de datos). Esto incluye cambios de infraestructura: si se migra de Vercel a otro hosting, de Vercel KV a Supabase, se compra un dominio, se agrega login, etc. — todo eso se documenta acá, no solo cambios visuales.
+
+---
+
+## Versión 6.2 — (última conocida al migrar a Claude Code)
+Ver detalle completo de v2 a v6.2 en la sección "Historia completa" al final de este archivo.
+
+---
+
+# ESTADO ACTUAL (se reescribe cada vez que algo de esto cambia)
+
+## Qué es
+App personal de Jano (estudiante de Economía, UCA Buenos Aires, primer año) para gestionar el semestre: fechas de examen, horas de estudio, plan diario, lectura de apuntes en voz.
+
+## Infraestructura (ESTO PUEDE CAMBIAR — mantener actualizado)
+- **Hosting**: Vercel
+- **Repo**: GitHub `janoBordo/uca-economia`, branch `main`
+- **Base de datos**: Vercel KV (Upstash Redis), una sola key `uca_data`
+- **Dominio**: el que da Vercel por defecto (sin dominio propio comprado)
+- **Auth/login**: no tiene — uso personal de un solo usuario, sin cuentas
+- **Servicios externos pagos**: ninguno
+
+## Stack técnico
+- Next.js 14 (App Router), TypeScript, Tailwind CSS
+- Framer Motion (animaciones)
+- Recharts (gráfico de métricas)
+- pdfjs-dist + mammoth (lectura PDF/Word en TTS)
+- Web Speech API nativa del navegador (TTS, sin servidor ni costo)
+
+## Modelo de datos (`app/lib/types.ts` → `AppData`)
+```ts
+type AppData = {
+  materias: Materia[];                    // nombre, examen (ISO), metaHoras
+  sesiones: Record<string, number>;       // materiaId -> minutos estudiados
+  preparacion: Record<string, number>;    // materiaId -> 0..100
+  semestres: SemestreArchivado[];         // historial archivado
+  planEstudio: Record<string, string[]>;  // "YYYY-MM-DD" -> materiaId[]
+  notas: string[];                        // notas rápidas del calendario
+}
+```
+Todo pasa por `/api/db` (GET trae todo, POST hace merge parcial).
+
+## Rutas actuales
+- `/` — countdown próximo examen + lista de materias
+- `/timer` — Pomodoro + Cronómetro, persiste en localStorage al navegar
+- `/metricas` — horas vs meta + sliders de preparación
+- `/calendario` — grilla mensual, exámenes, plan de estudio, notas rápidas
+- `/semestre` — config de materias + cierre/archivo de semestres + historial
+- `/tts` — lectura de texto/PDF/Word por voz
+- `/configuracion` — redirect a `/semestre` (legacy)
+
+## Reglas de diseño fijas
+- Paleta: navy `#0B1F4D`, ocre `#C9A227`, canvas `#F5F4F0`
+- 8 colores fijos para materias: `#6B9FD4 #7BC47F #E07B6B #B088C9 #E8A838 #5BB8B0 #D4956A #8FA86E`
+- Tipografía Inter, títulos `font-black`, un foco visual por vista, sin dashboards saturados
+- Mobile: fechas SIEMPRE como `type="date"` + `type="time"` separados (nunca `datetime-local`)
+- Acciones destructivas: SIEMPRE confirmación inline (Sí/No)
+
+## Cómo le gusta trabajar a Jano
+Directo, sin relleno. Decisiones técnicas en una línea, no preguntar de más. Evitar servicios pagos o API keys nuevas si hay alternativa gratis. Avisar antes de cambios grandes de infraestructura (cambiar de hosting, de DB, agregar login) — eso no se decide solo.
+
+---
+
+# Historia completa (de vieja a nueva, no se borra nunca)
+
+### v2
+Rediseño completo: tipografía Inter Black, paleta navy/ocre/canvas. Countdown en vivo, timer Pomodoro con anillo SVG, métricas con Recharts, calendario custom, configuración de fechas. Persistencia en localStorage.
+
+### v3
+Persistencia en la nube: localStorage → Vercel KV (Upstash). API `/api/db` unificada. Fix bug: sumar minutos sin pisar otras materias.
+
+### v4
+Timer con 4 modos + alarma sonora + guardado automático. Agregar/quitar materias desde la UI. Página de semestres con archivo histórico. TTS con soporte PDF/Word y descarga MP3 (ElevenLabs).
+
+### v5
+Configuración fusionada en Semestres. Grid 3 columnas desktop. Semestre activo con 3 KPIs. Numeración automática de semestres. Calendario: barras de plan de estudio por materia (8 colores fijos), modal con checkboxes.
+
+### v5.1
+Reordenado `/semestre`: Materias y fechas → Guardar → Zona peligrosa → Semestre activo → Historial. Dots de examen restaurados en calendario. Barras de plan con ancho fijo.
+
+### v5.2
+Zona peligrosa con 2 botones separados (borrar horas / limpiar plan) con confirmación inline. Eliminar materia con confirmación. Redirect `/configuracion` → `/semestre`.
+
+### v6
+Exámenes pasados semitransparentes en calendario. TTS reemplazado: ElevenLabs → Web Speech API (gratis, sin límite, sin servidor). Pausa/reanuda/detiene, selector voz, velocidad, grabación MP3 en Chrome. Tarjetas de materias con sombra y profundidad.
+
+### v6.1
+Timer persiste al navegar entre páginas (localStorage). Fix bug métricas: materias rendidas no muestran meta invertida. KPIs mobile más chicos (iPhone 13). Nota Safari en TTS.
+
+### v6.2
+Fecha examen en mobile: `datetime-local` → `date` + `time` separados (fix iOS). Confirmación inline para cerrar semestre. Favicon con la U navy/ocre. Notas rápidas en calendario (máx 144 chars, efecto inset sutil).
+
+### Migración a Claude Code
+Se migró el desarrollo de claude.ai (chat web) a Claude Code, trabajando directo sobre el repo local conectado a GitHub/Vercel. Este archivo (`PROYECTO.md`) reemplaza la necesidad de releer conversaciones pasadas — es la fuente de verdad única y acumulativa.
+
+<!-- A partir de acá, cada nueva versión agrega su entrada DEBAJO de esta línea, en orden cronológico -->
