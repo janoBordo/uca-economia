@@ -15,17 +15,13 @@ export default function Metricas() {
 
   // Para el gráfico: si el examen ya pasó, solo mostrar horas estudiadas (sin meta)
   const chartData = materias.map(m => {
-    const horas    = +((sesiones[m.id]||0)/60).toFixed(1);
-    const rendida  = new Date(m.examen).getTime() < ahora;
-    return {
-      id:      m.id,
-      corto:   m.nombre.split(" ")[0],
-      horas,
-      // Si ya rendida: meta = 0 para no mostrar barra de meta
-      meta:    rendida ? 0 : m.metaHoras,
-      rendida,
-      pct:     rendida ? 100 : Math.min(100, Math.round(horas / m.metaHoras * 100)),
-    };
+    const horas   = +((sesiones[m.id]||0)/60).toFixed(1);
+    const rendida = new Date(m.examen).getTime() < ahora;
+    const meta    = rendida ? 0 : m.metaHoras;
+    const pct     = rendida ? 100 : Math.min(100, Math.round(horas / m.metaHoras * 100));
+    // Resto = lo que falta para llegar a meta (apilado encima de horas)
+    const resto   = rendida ? 0 : Math.max(0, +(meta - horas).toFixed(1));
+    return { id: m.id, corto: m.nombre.split(" ")[0], horas, meta, resto, rendida, pct };
   });
 
   const totalHoras = chartData.reduce((a,d) => a+d.horas, 0);
@@ -49,7 +45,7 @@ export default function Metricas() {
     return (
       <div className="bg-navy text-canvas px-4 py-3 rounded-xl shadow-xl text-sm">
         <p className="font-semibold mb-1">{label}</p>
-        <p className="text-ocre">{payload[0]?.value || payload[1]?.value}h estudiado</p>
+        <p className="text-ocre">{item?.horas}h estudiado</p>
         {!item?.rendida && <p className="text-canvas/50">Meta: {item?.meta}h</p>}
         {item?.rendida && <p className="text-canvas/40 text-xs">Examen rendido</p>}
       </div>
@@ -90,7 +86,7 @@ export default function Metricas() {
           <h3 className="font-bold text-navy text-xl sm:text-2xl" style={{ letterSpacing:"-0.03em" }}>Horas por materia</h3>
           <div className="flex items-center gap-4 text-xs text-navy/40">
             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-ocre inline-block"/>Estudiado</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded inline-block" style={{ background:"rgba(11,31,77,0.15)" }}/>Meta pendiente</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded inline-block" style={{ background:"rgba(11,31,77,0.15)" }}/>Restante</span>
           </div>
         </div>
         <div className="h-72 w-full">
@@ -100,13 +96,13 @@ export default function Metricas() {
                 tick={{ fill:"rgba(11,31,77,0.4)", fontSize:11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill:"rgba(11,31,77,0.3)", fontSize:10 }} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} cursor={{ fill:"rgba(11,31,77,0.03)" }} />
-              {/* Meta solo si no está rendida */}
-              <Bar dataKey="meta" fill="rgba(11,31,77,0.1)" radius={[6,6,0,0]} maxBarSize={36} />
-              <Bar dataKey="horas" radius={[6,6,0,0]} maxBarSize={36}>
+              {/* Horas estudiadas (abajo) + resto hasta meta (arriba) apilados */}
+              <Bar dataKey="horas" stackId="a" radius={[0,0,0,0]} maxBarSize={36}>
                 {chartData.map((d,i) => (
                   <Cell key={i} fill={d.rendida ? "rgba(11,31,77,0.3)" : d.pct>=100 ? "#0B1F4D" : "#C9A227"} />
                 ))}
               </Bar>
+              <Bar dataKey="resto" stackId="a" fill="rgba(11,31,77,0.1)" radius={[6,6,0,0]} maxBarSize={36} />
             </BarChart>
           </ResponsiveContainer>
         </div>

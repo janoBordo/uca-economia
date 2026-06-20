@@ -214,8 +214,7 @@ export default function Timer() {
               transition={{ ease:"linear", duration:0.4 }} />
           )}
           {modo==="cronometro" && corriendo && (
-            <circle cx="150" cy="150" r={R} fill="none" stroke="#C9A227" strokeWidth="10"
-              strokeDasharray="12 8" strokeLinecap="round" />
+            <circle cx="150" cy="150" r={R} fill="none" stroke="#C9A227" strokeWidth="10" />
           )}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
