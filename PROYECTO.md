@@ -98,3 +98,8 @@ Fecha examen en mobile: `datetime-local` → `date` + `time` separados (fix iOS)
 Se migró el desarrollo de claude.ai (chat web) a Claude Code, trabajando directo sobre el repo local conectado a GitHub/Vercel. Este archivo (`PROYECTO.md`) reemplaza la necesidad de releer conversaciones pasadas — es la fuente de verdad única y acumulativa.
 
 <!-- A partir de acá, cada nueva versión agrega su entrada DEBAJO de esta línea, en orden cronológico -->
+
+### v6.3
+- **Timer**: círculo del cronómetro era una cadena de puntos (`strokeDasharray="12 8"`) → ahora es círculo sólido dorado igual al Pomodoro.
+- **Métricas**: barras del gráfico cambiadas de agrupadas (lado a lado) a apiladas (`stackId="a"`): horas estudiadas abajo (ocre/navy) + restante hasta meta arriba (gris). Elimina la mezcla visual entre ambas.
+- **Tooltip métricas**: corregido para mostrar horas reales estudiadas (antes tomaba `payload[0]` que era el campo `meta`).
