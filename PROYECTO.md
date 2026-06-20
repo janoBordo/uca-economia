@@ -101,5 +101,6 @@ Se migró el desarrollo de claude.ai (chat web) a Claude Code, trabajando direct
 
 ### v6.3
 - **Timer**: círculo del cronómetro era una cadena de puntos (`strokeDasharray="12 8"`) → ahora es círculo sólido dorado igual al Pomodoro.
-- **Métricas**: barras del gráfico cambiadas de agrupadas (lado a lado) a apiladas (`stackId="a"`): horas estudiadas abajo (ocre/navy) + restante hasta meta arriba (gris). Elimina la mezcla visual entre ambas.
+- **Métricas**: barras del gráfico cambiadas de agrupadas (lado a lado) a apiladas (`stackId="a"`): horas estudiadas abajo (ocre/navy) + restante hasta meta arriba (gris). Elimina la mezcla visual entre ambas. Esquinas de barras con radio sutil `[4,4,0,0]`.
 - **Tooltip métricas**: corregido para mostrar horas reales estudiadas (antes tomaba `payload[0]` que era el campo `meta`).
+- **Home**: cuando todos los exámenes ya pasaron ya no cae en `orden[0]` mostrando un examen rendido como próximo — muestra "Sin exámenes próximos / Anotá nuevas fechas cuando las tengas" y la lista de materias abajo.
