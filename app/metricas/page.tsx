@@ -97,7 +97,7 @@ export default function Metricas() {
               <YAxis tick={{ fill:"rgba(11,31,77,0.3)", fontSize:10 }} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} cursor={{ fill:"rgba(11,31,77,0.03)" }} />
               {/* Horas estudiadas (abajo) + resto hasta meta (arriba) apilados */}
-              <Bar dataKey="horas" stackId="a" radius={[0,0,0,0]} maxBarSize={36}>
+              <Bar dataKey="horas" stackId="a" radius={[4,4,0,0]} maxBarSize={36}>
                 {chartData.map((d,i) => (
                   <Cell key={i} fill={d.rendida ? "rgba(11,31,77,0.3)" : d.pct>=100 ? "#0B1F4D" : "#C9A227"} />
                 ))}
