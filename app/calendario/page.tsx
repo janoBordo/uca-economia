@@ -5,6 +5,7 @@ import { useData } from "../lib/useData";
 import { saveMaterias, savePlanEstudio, saveNotas } from "../lib/api";
 import type { Materia } from "../lib/types";
 import { COLORES_MATERIAS } from "../lib/types";
+import { GlassButton, GlassInput, GlassModal } from "../components/glass";
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const DIAS  = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
@@ -113,9 +114,9 @@ export default function Calendario() {
           <span className="text-navy/35 font-medium text-lg">{vista.y}</span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => mover(-1)} className="w-10 h-10 rounded-full border border-navy/15 text-navy/50 hover:bg-navy hover:text-canvas transition-all flex items-center justify-center text-lg">‹</button>
-          <button onClick={() => setVista({ y:hoy.getFullYear(), m:hoy.getMonth() })} className="px-4 h-10 rounded-full border border-navy/15 text-navy/50 hover:bg-navy hover:text-canvas transition-all text-sm font-medium">Hoy</button>
-          <button onClick={() => mover(1)} className="w-10 h-10 rounded-full border border-navy/15 text-navy/50 hover:bg-navy hover:text-canvas transition-all flex items-center justify-center text-lg">›</button>
+          <GlassButton onClick={() => mover(-1)} className="w-10 h-10 rounded-full border border-navy/15 text-navy/50 hover:bg-navy hover:text-canvas transition-all flex items-center justify-center text-lg">‹</GlassButton>
+          <GlassButton onClick={() => setVista({ y:hoy.getFullYear(), m:hoy.getMonth() })} className="px-4 h-10 rounded-full border border-navy/15 text-navy/50 hover:bg-navy hover:text-canvas transition-all text-sm font-medium">Hoy</GlassButton>
+          <GlassButton onClick={() => mover(1)} className="w-10 h-10 rounded-full border border-navy/15 text-navy/50 hover:bg-navy hover:text-canvas transition-all flex items-center justify-center text-lg">›</GlassButton>
         </div>
       </div>
 
@@ -219,7 +220,7 @@ export default function Calendario() {
         {/* Input con efecto inset sutil */}
         <div className="flex gap-2 mb-5">
           <div className="flex-1 relative">
-            <input
+            <GlassInput
               ref={inputRef}
               value={notaInput}
               onChange={e => setNotaInput(e.target.value.slice(0, MAX_NOTA))}
@@ -238,10 +239,10 @@ export default function Calendario() {
               </span>
             )}
           </div>
-          <button onClick={agregarNota} disabled={guardandoNota || !notaInput.trim()}
+          <GlassButton onClick={agregarNota} disabled={guardandoNota || !notaInput.trim()}
             className="px-4 py-3 rounded-xl bg-navy text-canvas text-sm font-semibold hover:bg-navy-soft transition-colors disabled:opacity-40 shrink-0">
             {guardandoNota ? "◌" : "+"}
-          </button>
+          </GlassButton>
         </div>
 
         {/* Lista notas */}
@@ -276,7 +277,7 @@ export default function Calendario() {
             initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
             onClick={() => setModal(null)}>
             <div className="absolute inset-0 bg-navy/30 backdrop-blur-sm" />
-            <motion.div initial={{ opacity:0, scale:0.94, y:16 }} animate={{ opacity:1, scale:1, y:0 }} exit={{ opacity:0, scale:0.94 }}
+            <GlassModal initial={{ opacity:0, scale:0.94, y:16 }} animate={{ opacity:1, scale:1, y:0 }} exit={{ opacity:0, scale:0.94 }}
               onClick={e => e.stopPropagation()}
               className="relative bg-canvas rounded-3xl p-7 w-full max-w-md shadow-2xl border border-navy/10 max-h-[90vh] overflow-y-auto">
 
@@ -329,17 +330,17 @@ export default function Calendario() {
               </div>
 
               <div className="flex gap-3 mt-7">
-                <button onClick={guardarModal} disabled={guardandoPlan}
+                <GlassButton onClick={guardarModal} disabled={guardandoPlan}
                   className="flex-1 py-3 rounded-xl bg-navy text-canvas font-semibold hover:bg-navy-soft transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                   {guardandoPlan && <span className="animate-spin text-ocre">◌</span>}
                   {guardandoPlan ? "Guardando…" : "Guardar"}
-                </button>
-                <button onClick={() => setModal(null)}
+                </GlassButton>
+                <GlassButton onClick={() => setModal(null)}
                   className="px-5 py-3 rounded-xl border border-navy/15 text-navy/50 hover:border-navy/30 transition-colors">
                   Cerrar
-                </button>
+                </GlassButton>
               </div>
-            </motion.div>
+            </GlassModal>
           </motion.div>
         )}
       </AnimatePresence>

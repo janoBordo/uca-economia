@@ -1,5 +1,5 @@
 "use client";
-import type { ReactNode } from "react";
+import { forwardRef, type ReactNode } from "react";
 import { motion, type HTMLMotionProps } from "framer-motion";
 
 /* ── Sistema Liquid Glass ──
@@ -24,17 +24,20 @@ export function GlassButton({ className, tint, ...props }: HTMLMotionProps<"butt
   return <motion.button className={cx("glass-button", tintClass(tint), className)} {...props} />;
 }
 
-export function GlassInput({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cx("glass-input", className)} {...props} />;
-}
+export const GlassInput = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
+  function GlassInput({ className, ...props }, ref) {
+    return <input ref={ref} className={cx("glass-input", className)} {...props} />;
+  });
 
-export function GlassSelect({ className, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { children?: ReactNode }) {
-  return <select className={cx("glass-input", className)} {...props}>{children}</select>;
-}
+export const GlassSelect = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement> & { children?: ReactNode }>(
+  function GlassSelect({ className, children, ...props }, ref) {
+    return <select ref={ref} className={cx("glass-input", className)} {...props}>{children}</select>;
+  });
 
-export function GlassTextarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cx("glass-input", className)} {...props} />;
-}
+export const GlassTextarea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
+  function GlassTextarea({ className, ...props }, ref) {
+    return <textarea ref={ref} className={cx("glass-input", className)} {...props} />;
+  });
 
 export function GlassModal({ className, ...props }: HTMLMotionProps<"div">) {
   return <motion.div className={cx("glass-modal", className)} {...props} />;
