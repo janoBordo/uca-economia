@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip,
 import { useData } from "../lib/useData";
 import { savePreparacion } from "../lib/api";
 import { COLORES_MATERIAS } from "../lib/types";
+import { GlassCard, GlassPanel } from "../components/glass";
 
 const UMBRAL_SOLIDO = 70; // valor de referencia "sólido" (mismo umbral que los sliders)
 
@@ -112,7 +113,7 @@ export default function Metricas() {
             { label:"Progreso global",  val:`${totalMeta>0?Math.round(totalHoras/totalMeta*100):100}%`,  sub:"materias pendientes" },
             { label:"Prep. media",      val:`${avgPrep}/100`,            sub:"autopercibida" },
           ].map((k,i) => (
-            <motion.div key={k.label} initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
+            <GlassCard key={k.label} initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
               transition={{ delay:i*0.07 }}
               className="rounded-2xl p-3 sm:p-6 flex flex-col gap-1 min-w-0"
               style={{ background:"rgba(11,31,77,0.04)", border:"1px solid rgba(11,31,77,0.07)" }}>
@@ -120,7 +121,7 @@ export default function Metricas() {
               <span className="text-navy/40 text-[10px] sm:text-xs uppercase tracking-wide font-medium leading-tight">{k.label}</span>
               <span className="font-black text-navy text-lg sm:text-3xl leading-tight" style={{ letterSpacing:"-0.03em" }}>{k.val}</span>
               <span className="text-navy/40 text-[10px] sm:text-xs leading-tight">{k.sub}</span>
-            </motion.div>
+            </GlassCard>
           ))}
         </div>
       </div>
@@ -134,7 +135,7 @@ export default function Metricas() {
             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded inline-block" style={{ background:"rgba(11,31,77,0.15)" }}/>Restante</span>
           </div>
         </div>
-        <div className="h-72 w-full">
+        <GlassPanel className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top:0, right:0, left:-24, bottom:40 }} barGap={2}>
               <XAxis dataKey="corto" angle={-35} textAnchor="end" interval={0}
@@ -150,7 +151,7 @@ export default function Metricas() {
               <Bar dataKey="resto" stackId="a" fill="rgba(11,31,77,0.1)" radius={[6,6,0,0]} maxBarSize={36} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </GlassPanel>
       </div>
 
       {/* Matriz de Confianza (radar) */}
@@ -161,7 +162,7 @@ export default function Metricas() {
           <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-navy inline-block"/>Tu confianza</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-0 border-t border-dashed border-navy/40 inline-block"/>Umbral sólido ({UMBRAL_SOLIDO})</span>
         </div>
-        <div className="h-[360px] w-full">
+        <GlassPanel className="h-[360px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <RadarChart data={radarData} outerRadius="70%" margin={{ top:20, right:60, bottom:20, left:60 }}>
               <PolarGrid stroke="rgba(11,31,77,0.10)" />
@@ -174,7 +175,7 @@ export default function Metricas() {
               <Tooltip content={<RadarTooltip />} />
             </RadarChart>
           </ResponsiveContainer>
-        </div>
+        </GlassPanel>
       </div>
 
       {/* Sliders preparación */}

@@ -82,9 +82,10 @@ html[data-theme="glass"] body {
     background: var(--gl-gloss);
   }
 
-  /* Paneles y modales: un poco más de cuerpo y blur */
+  /* Paneles y modales: un poco más de cuerpo y blur, esquinas redondeadas */
   html[data-theme="glass"] :is(.glass-panel, .glass-modal) {
     background-color: var(--gl-bg-panel) !important;
+    border-radius: 20px;
     -webkit-backdrop-filter: blur(30px) saturate(190%);
     backdrop-filter: blur(30px) saturate(190%);
   }
