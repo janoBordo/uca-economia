@@ -29,8 +29,8 @@ html[data-theme="glass"] {
   --gl-bg:      rgba(255,255,255,0.18);    /* lámina neutra translúcida */
   --gl-bg-soft: rgba(255,255,255,0.14);    /* inputs */
   --gl-bg-panel:rgba(255,255,255,0.22);    /* paneles/modales */
-  --gl-navy:    rgba(11,31,77,0.60);       /* tinte navy translúcido (liquid glass); legibilidad vía text-shadow */
-  --gl-ocre:    rgba(201,162,39,0.62);     /* tinte ocre dorado translúcido */
+  --gl-navy:    rgba(11,31,77,0.74);       /* tinte navy translúcido: con color (no slate gris) pero glass */
+  --gl-ocre:    rgba(201,162,39,0.70);     /* tinte ocre dorado translúcido */
   --gl-red:     rgba(220,38,38,0.30);      /* tinte peligro */
   --gl-edge:    rgba(255,255,255,0.58);    /* borde de cristal brillante */
   --gl-gloss:   linear-gradient(130deg, rgba(255,255,255,0.50) 0%, rgba(255,255,255,0.12) 26%, rgba(255,255,255,0) 50%);
@@ -146,6 +146,11 @@ html[data-theme="glass"] body {
   }
   html[data-theme="glass"] :is(.glass-tint-ocre, .bg-ocre) {
     text-shadow: 0 1px 1px rgba(255,255,255,0.35);
+  }
+  /* Gloss más tenue sobre cristal de color: el velo blanco fuerte lo desaturaba
+     hacia gris; con menos blanco el navy/ocre se leen más vivos. */
+  html[data-theme="glass"] :is(.glass-tint-navy, .bg-navy, .glass-tint-ocre, .bg-ocre)::before {
+    background: linear-gradient(130deg, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.06) 26%, rgba(255,255,255,0) 50%);
   }
 
   /* El logo (U) se mantiene navy sólido y crujiente, no translúcido */
