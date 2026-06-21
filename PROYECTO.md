@@ -113,7 +113,7 @@ Se migró el desarrollo de claude.ai (chat web) a Claude Code, trabajando direct
 
 ### v7
 Dos cambios grandes.
-- **Modo Vidrio 3D (glassmorphism)**: nuevo toggle "Clásico 2D / Vidrio 3D" al final de Inicio. El modo Vidrio agrega blur, brillo superior y profundidad a las cards y botones de TODAS las páginas, manteniendo colores y formas. Implementado con `data-theme="glass"` en `<html>` + CSS global scopeado (apunta a `rounded-2xl/3xl` y `rounded-full`), preferencia en `localStorage` (`uca_theme`), y script anti-flash en el layout. Nuevo componente `app/components/ThemeToggle.tsx`.
+- **Modo Vidrio 3D (glassmorphism)**: nuevo toggle "Clásico 2D / Vidrio 3D" al final de Inicio. El modo Vidrio agrega frost translúcido (veil esmerilado), borde brillante (rim), gloss superior/inferior y halo de profundidad a las cards y botones de TODAS las páginas, manteniendo colores y formas. Intensidad calibrada: presente y notorio, pero no tan exagerado como los mockups de glass extremos. Implementado con `data-theme="glass"` en `<html>` + CSS global scopeado (apunta a `rounded-2xl/3xl` y `rounded-full`), preferencia en `localStorage` (`uca_theme`), y script anti-flash en el layout. Nuevo componente `app/components/ThemeToggle.tsx`.
 - **Matriz de Confianza (radar) en Métricas**: gráfico de radar minimalista que muestra la preparación subjetiva por materia (mismos datos que los sliders). Polígono navy = confianza actual; polígono punteado = umbral "sólido" (70). Puntos de color por materia en cada eje + tooltip con nombre completo. Va arriba de los sliders de Preparación subjetiva.
 
 ### v6.3
