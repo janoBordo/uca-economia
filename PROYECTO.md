@@ -6,6 +6,11 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## Versión actual: v7
+Ver changelog completo abajo. Cambios clave: modo Vidrio 3D (glassmorphism, toggle en Inicio) y Matriz de Confianza (radar) en Métricas.
+
+---
+
 ## Versión 6.2 — (última conocida al migrar a Claude Code)
 Ver detalle completo de v2 a v6.2 en la sección "Historia completa" al final de este archivo.
 
@@ -27,9 +32,16 @@ App personal de Jano (estudiante de Economía, UCA Buenos Aires, primer año) pa
 ## Stack técnico
 - Next.js 14 (App Router), TypeScript, Tailwind CSS
 - Framer Motion (animaciones)
-- Recharts (gráfico de métricas)
+- Recharts (gráfico de barras de métricas + radar "Matriz de Confianza")
 - pdfjs-dist + mammoth (lectura PDF/Word en TTS)
 - Web Speech API nativa del navegador (TTS, sin servidor ni costo)
+
+## Temas visuales (desde v7)
+- Dos modos: **Clásico 2D** (default, look de siempre) y **Vidrio 3D** (glassmorphism sutil).
+- Se cambia con el toggle al final de la home (`app/components/ThemeToggle.tsx`).
+- Preferencia guardada en `localStorage` key `uca_theme` ("normal" | "glass") — NO va a la DB.
+- Implementado con `html[data-theme="glass"]` + CSS global en `globals.css` que apunta a `.rounded-2xl/3xl` (cards) y `.rounded-full` (botones). No hace falta tocar cada componente.
+- Script anti-flash en `layout.tsx` aplica el tema antes del primer paint.
 
 ## Modelo de datos (`app/lib/types.ts` → `AppData`)
 ```ts
@@ -98,6 +110,11 @@ Fecha examen en mobile: `datetime-local` → `date` + `time` separados (fix iOS)
 Se migró el desarrollo de claude.ai (chat web) a Claude Code, trabajando directo sobre el repo local conectado a GitHub/Vercel. Este archivo (`PROYECTO.md`) reemplaza la necesidad de releer conversaciones pasadas — es la fuente de verdad única y acumulativa.
 
 <!-- A partir de acá, cada nueva versión agrega su entrada DEBAJO de esta línea, en orden cronológico -->
+
+### v7
+Dos cambios grandes.
+- **Modo Vidrio 3D (glassmorphism)**: nuevo toggle "Clásico 2D / Vidrio 3D" al final de Inicio. El modo Vidrio agrega blur, brillo superior y profundidad a las cards y botones de TODAS las páginas, manteniendo colores y formas. Implementado con `data-theme="glass"` en `<html>` + CSS global scopeado (apunta a `rounded-2xl/3xl` y `rounded-full`), preferencia en `localStorage` (`uca_theme`), y script anti-flash en el layout. Nuevo componente `app/components/ThemeToggle.tsx`.
+- **Matriz de Confianza (radar) en Métricas**: gráfico de radar minimalista que muestra la preparación subjetiva por materia (mismos datos que los sliders). Polígono navy = confianza actual; polígono punteado = umbral "sólido" (70). Puntos de color por materia en cada eje + tooltip con nombre completo. Va arriba de los sliders de Preparación subjetiva.
 
 ### v6.3
 - **Timer**: círculo del cronómetro era una cadena de puntos (`strokeDasharray="12 8"`) → ahora es círculo sólido dorado igual al Pomodoro.
