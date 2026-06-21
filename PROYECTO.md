@@ -118,6 +118,7 @@ Se reemplazó el glass "pegado" por un **sistema de material coherente** aplicad
 - **Primitivos React reutilizables** (`app/components/glass.tsx`): `GlassCard`, `GlassPanel`, `GlassButton`, `GlassInput`, `GlassSelect`, `GlassTextarea`, `GlassModal`, `GlassTabs`. Wrappers finos sobre `framer-motion` que conservan props/animaciones/ref; el modo Clásico 2D queda idéntico.
 - **Migración de las 7 vistas** a los primitivos: Inicio/ThemeToggle, Timer, Métricas, Calendario, Semestres, Lectura.
 - Mantiene paleta, layout, estructura y funcionalidad: sólo cambia el material visual.
+- **Fixes de legibilidad/performance**: el selector maestro del material usa `:where()` (especificidad 0) para que los tintes navy/ocre SIEMPRE ganen — esto arregla el blanco-sobre-blanco en botones y hace que los días de examen se vean dorados glass. Barras de "materias a estudiar" del calendario como varillas de vidrio (`.glass-plan-bar`). Logo U navy sólido y nítido (`.glass-solid`). Inputs más redondeados (14/18px). Performance: blur bajado a 12px, celdas del calendario sin `backdrop-filter` (lo caro cuando hay ~35), sin `background-attachment:fixed`.
 
 ### v7
 Dos cambios grandes.
