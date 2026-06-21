@@ -24,29 +24,29 @@ input[type="range"]::-moz-range-thumb { width:24px; height:24px; border-radius:5
    NADA quede en 2D. Calibrado al ~70% de las referencias. */
 
 html[data-theme="glass"] {
-  --gl-blur:    22px;
-  --gl-sat:     180%;
-  --gl-bg:      rgba(255,255,255,0.12);   /* lámina neutra translúcida */
-  --gl-bg-soft: rgba(255,255,255,0.08);   /* inputs */
-  --gl-bg-panel:rgba(255,255,255,0.16);   /* paneles/modales */
-  --gl-navy:    rgba(11,31,77,0.42);      /* tinte navy de vidrio */
-  --gl-ocre:    rgba(201,162,39,0.44);    /* tinte ocre de vidrio */
-  --gl-red:     rgba(220,38,38,0.28);     /* tinte peligro */
-  --gl-edge:    rgba(255,255,255,0.60);   /* borde de cristal brillante */
-  --gl-gloss:   linear-gradient(130deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.14) 26%, rgba(255,255,255,0) 50%);
-  --gl-float:   0 24px 50px -20px rgba(11,31,77,0.40), 0 8px 22px -14px rgba(11,31,77,0.28);
-  --gl-inset:   inset 0 1px 1.5px rgba(255,255,255,0.92), inset 0 -10px 22px -14px rgba(255,255,255,0.30);
+  --gl-blur:    14px;                      /* blur moderado = legible y rápido */
+  --gl-sat:     140%;
+  --gl-bg:      rgba(255,255,255,0.16);    /* lámina neutra translúcida */
+  --gl-bg-soft: rgba(255,255,255,0.12);    /* inputs */
+  --gl-bg-panel:rgba(255,255,255,0.20);    /* paneles/modales */
+  --gl-navy:    rgba(11,31,77,0.86);       /* tinte navy: opaco para texto claro legible */
+  --gl-ocre:    rgba(201,162,39,0.82);     /* tinte ocre: dorado claro y legible */
+  --gl-red:     rgba(220,38,38,0.30);      /* tinte peligro */
+  --gl-edge:    rgba(255,255,255,0.60);    /* borde de cristal brillante */
+  --gl-gloss:   linear-gradient(130deg, rgba(255,255,255,0.50) 0%, rgba(255,255,255,0.12) 26%, rgba(255,255,255,0) 50%);
+  --gl-float:   0 14px 32px -16px rgba(11,31,77,0.34), 0 4px 12px -8px rgba(11,31,77,0.22);
+  --gl-inset:   inset 0 1px 1px rgba(255,255,255,0.85), inset 0 -8px 18px -14px rgba(255,255,255,0.28);
 }
 
-/* Fondo de escena: degradés de la paleta para que el frost tenga qué difuminar */
+/* Fondo de escena: degradés de la paleta para que el frost tenga qué difuminar.
+   Sin background-attachment:fixed (causaba jank al hacer scroll). */
 html[data-theme="glass"] body {
   background:
-    linear-gradient(135deg, rgba(255,255,255,0.50) 0%, transparent 32%),
-    radial-gradient(1100px 760px at 8% -12%, rgba(201,162,39,0.18), transparent 56%),
-    radial-gradient(1100px 760px at 100% -2%, rgba(11,31,77,0.16), transparent 54%),
-    radial-gradient(900px 900px at 50% 122%, rgba(91,184,176,0.12), transparent 60%),
+    linear-gradient(135deg, rgba(255,255,255,0.45) 0%, transparent 32%),
+    radial-gradient(1100px 760px at 8% -12%, rgba(201,162,39,0.16), transparent 56%),
+    radial-gradient(1100px 760px at 100% -2%, rgba(11,31,77,0.14), transparent 54%),
+    radial-gradient(900px 900px at 50% 122%, rgba(91,184,176,0.10), transparent 60%),
     #ECEBE5;
-  background-attachment: fixed;
 }
 
 @supports ((-webkit-backdrop-filter: blur(2px)) or (backdrop-filter: blur(2px))) {
@@ -86,8 +86,19 @@ html[data-theme="glass"] body {
   html[data-theme="glass"] :is(.glass-panel, .glass-modal) {
     background-color: var(--gl-bg-panel) !important;
     border-radius: 20px;
-    -webkit-backdrop-filter: blur(30px) saturate(190%);
-    backdrop-filter: blur(30px) saturate(190%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    backdrop-filter: blur(20px) saturate(150%);
+  }
+
+  /* ── PERFORMANCE: celdas del calendario (≈35) sin blur propio ──
+     Mantienen vidrio (translúcido + borde + gloss) pero sin backdrop-filter,
+     que es lo caro cuando hay muchas. Mucho más fluido, sobre todo en mobile. */
+  html[data-theme="glass"] .aspect-square {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.65),
+      0 4px 10px -6px rgba(11,31,77,0.22) !important;
   }
 
   /* ── Inputs / selects / textarea: vidrio cóncavo con foco ocre ── */
