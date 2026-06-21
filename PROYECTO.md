@@ -6,8 +6,8 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
-## Versión actual: v7
-Ver changelog completo abajo. Cambios clave: modo Vidrio 3D (glassmorphism, toggle en Inicio) y Matriz de Confianza (radar) en Métricas.
+## Versión actual: v7.1
+Ver changelog completo abajo. Cambios clave: **sistema Liquid Glass completo** (material centralizado + primitivos React `Glass*` en todas las vistas, toggle Clásico 2D ↔ Vidrio en Inicio) y Matriz de Confianza (radar) en Métricas.
 
 ---
 
@@ -36,12 +36,13 @@ App personal de Jano (estudiante de Economía, UCA Buenos Aires, primer año) pa
 - pdfjs-dist + mammoth (lectura PDF/Word en TTS)
 - Web Speech API nativa del navegador (TTS, sin servidor ni costo)
 
-## Temas visuales (desde v7)
-- Dos modos: **Clásico 2D** (default, look de siempre) y **Vidrio 3D** (glassmorphism sutil).
-- Se cambia con el toggle al final de la home (`app/components/ThemeToggle.tsx`).
+## Temas visuales (desde v7 / sistema Liquid Glass en v7.1)
+- Dos modos: **Clásico 2D** (default, look de siempre) y **Vidrio 3D / Liquid Glass**.
+- Se cambia con el toggle al final de la home (`app/components/ThemeToggle.tsx`, usa `GlassTabs`).
 - Preferencia guardada en `localStorage` key `uca_theme` ("normal" | "glass") — NO va a la DB.
-- Implementado con `html[data-theme="glass"]` + CSS global en `globals.css` que apunta a `.rounded-2xl/3xl` (cards) y `.rounded-full` (botones). No hace falta tocar cada componente.
 - Script anti-flash en `layout.tsx` aplica el tema antes del primer paint.
+- **Sistema de material** (v7.1): el material Liquid Glass vive centralizado en `globals.css` bajo `html[data-theme="glass"]` (tokens `--gl-*` + cobertura de cards, botones, inputs, selects, textarea, tabs, paneles, modales y header). Transparencia real, blur fuerte, borde de cristal, reflejo gloss (`::before`), glow de color y profundidad flotante. Calibrado ~70% de las referencias.
+- **Primitivos React** (`app/components/glass.tsx`): `GlassCard`, `GlassPanel`, `GlassButton`, `GlassInput`, `GlassSelect`, `GlassTextarea`, `GlassModal`, `GlassTabs`. Son wrappers finos sobre `framer-motion` que sólo agregan la clase marcadora `.glass-*` y reenvían props/animaciones/ref. En modo Clásico no agregan estilos → look idéntico al actual. Todas las vistas usan estos primitivos.
 
 ## Modelo de datos (`app/lib/types.ts` → `AppData`)
 ```ts
@@ -110,6 +111,13 @@ Fecha examen en mobile: `datetime-local` → `date` + `time` separados (fix iOS)
 Se migró el desarrollo de claude.ai (chat web) a Claude Code, trabajando directo sobre el repo local conectado a GitHub/Vercel. Este archivo (`PROYECTO.md`) reemplaza la necesidad de releer conversaciones pasadas — es la fuente de verdad única y acumulativa.
 
 <!-- A partir de acá, cada nueva versión agrega su entrada DEBAJO de esta línea, en orden cronológico -->
+
+### v7.1 — Sistema Liquid Glass completo
+Se reemplazó el glass "pegado" por un **sistema de material coherente** aplicado a TODA la UI (cards, botones, inputs, selects, textarea, tabs, paneles, modales, métricas, header).
+- **Material centralizado** en `globals.css` (`html[data-theme="glass"]`, tokens `--gl-*`): transparencia real (los sólidos navy/ocre pasan a tintes translúcidos), backdrop-blur fuerte (22px), borde de cristal brillante, reflejo especular (gloss `::before` detrás del texto), glow de color con la paleta y profundidad flotante. Calibrado ~70% de las referencias de Pinterest.
+- **Primitivos React reutilizables** (`app/components/glass.tsx`): `GlassCard`, `GlassPanel`, `GlassButton`, `GlassInput`, `GlassSelect`, `GlassTextarea`, `GlassModal`, `GlassTabs`. Wrappers finos sobre `framer-motion` que conservan props/animaciones/ref; el modo Clásico 2D queda idéntico.
+- **Migración de las 7 vistas** a los primitivos: Inicio/ThemeToggle, Timer, Métricas, Calendario, Semestres, Lectura.
+- Mantiene paleta, layout, estructura y funcionalidad: sólo cambia el material visual.
 
 ### v7
 Dos cambios grandes.
