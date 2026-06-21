@@ -6,8 +6,8 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
-## Versión actual: v7.1
-Ver changelog completo abajo. Cambios clave: **sistema Liquid Glass completo** (material centralizado + primitivos React `Glass*` en todas las vistas, toggle Clásico 2D ↔ Vidrio en Inicio) y Matriz de Confianza (radar) en Métricas.
+## Versión actual: v7.2
+Ver changelog completo abajo. Cambios clave: **sistema Liquid Glass completo** (material centralizado + primitivos React `Glass*` en todas las vistas, toggle Clásico 2D ↔ Vidrio en Inicio), Matriz de Confianza (radar) en Métricas, y **feedback de hover** en ambos modos (escala/elevación/brillo en botones, "encendido" del cristal en cards).
 
 ---
 
@@ -111,6 +111,10 @@ Fecha examen en mobile: `datetime-local` → `date` + `time` separados (fix iOS)
 Se migró el desarrollo de claude.ai (chat web) a Claude Code, trabajando directo sobre el repo local conectado a GitHub/Vercel. Este archivo (`PROYECTO.md`) reemplaza la necesidad de releer conversaciones pasadas — es la fuente de verdad única y acumulativa.
 
 <!-- A partir de acá, cada nueva versión agrega su entrada DEBAJO de esta línea, en orden cronológico -->
+
+### v7.2 — Hover interactivo + botones más "liquid glass"
+- **Feedback de hover en ambos modos** (`@media (hover:hover)`, sólo con mouse real para no dejar estados pegados en touch): botones/pills (`.rounded-full`) crecen (`scale 1.06`), se elevan y se aclaran (`brightness`), y se hunden al click (`scale .95`). En modo Vidrio, las cards se "encienden" al pasar el mouse (borde más brillante, más saturación, sombra más profunda); los botones de acento navy/ocre intensifican su glow de color. En Clásico 2D las cards ganan sombra/borde. El `scale` se limita a pills y al primitivo `GlassButton` (vía `whileHover`) para no recortar botones full-width ni pelear con el `transform` inline de framer-motion.
+- **Botones de vidrio más translúcidos (liquid glass real)**: los tintes pasaron de opacidad alta (navy 0.88 / ocre 0.80, que se veían como "navy opaco 3D") a translúcidos (`--gl-navy 0.60`, `--gl-ocre 0.62`) con más frost (blur 16px) y gloss. Para no perder legibilidad (la razón por la que en v7.1 estaban tan opacos), se agregó `text-shadow` sutil al texto sobre cristal de color.
 
 ### v7.1 — Sistema Liquid Glass completo
 Se reemplazó el glass "pegado" por un **sistema de material coherente** aplicado a TODA la UI (cards, botones, inputs, selects, textarea, tabs, paneles, modales, métricas, header).
