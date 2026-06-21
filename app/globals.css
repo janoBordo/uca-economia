@@ -13,3 +13,36 @@ input[type="range"]::-moz-range-thumb { width:24px; height:24px; border-radius:5
 ::-webkit-scrollbar { width:4px; }
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:rgba(11,31,77,0.15); border-radius:99px; }
+
+/* ───────── Modo Vidrio 3D (glassmorphism sutil) ─────────
+   Se activa con data-theme="glass" en <html> (toggle en Inicio).
+   No cambia colores ni formas: agrega blur, brillo superior y profundidad.
+   Apunta a los patrones de card (rounded-2xl/3xl) y botón (rounded-full)
+   que ya usan todas las páginas, así el efecto es global y consistente. */
+html[data-theme="glass"] body {
+  background:
+    radial-gradient(900px 620px at 12% -8%, rgba(201,162,39,0.07), transparent 60%),
+    radial-gradient(900px 620px at 100% 2%, rgba(11,31,77,0.06), transparent 55%),
+    #F5F4F0;
+  background-attachment: fixed;
+}
+@supports ((-webkit-backdrop-filter: blur(2px)) or (backdrop-filter: blur(2px))) {
+  /* Cards: panel esmerilado translúcido */
+  html[data-theme="glass"] :is(.rounded-2xl, .rounded-3xl) {
+    -webkit-backdrop-filter: blur(10px) saturate(130%);
+    backdrop-filter: blur(10px) saturate(130%);
+    box-shadow:
+      0 10px 34px -16px rgba(11,31,77,0.32),
+      inset 0 1px 0 rgba(255,255,255,0.55) !important;
+    border-color: rgba(255,255,255,0.5) !important;
+  }
+  /* Botones y pills: profundidad + brillo, conservan su color base */
+  html[data-theme="glass"] button.rounded-full,
+  html[data-theme="glass"] a.rounded-full {
+    -webkit-backdrop-filter: blur(6px) saturate(120%);
+    backdrop-filter: blur(6px) saturate(120%);
+    box-shadow:
+      0 8px 20px -10px rgba(11,31,77,0.40),
+      inset 0 1px 0 rgba(255,255,255,0.28) !important;
+  }
+}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useData } from "./lib/useData";
 import { materiasPorProximidad } from "./lib/api";
 import type { Materia } from "./lib/types";
+import ThemeToggle from "./components/ThemeToggle";
 
 function useDiff(target: string) {
   const calc = useCallback(() => {
@@ -112,6 +113,8 @@ export default function Inicio() {
       </motion.div>
 
       <ul>{resto.map((m,i) => <RowItem key={m.id} m={m} index={i} />)}</ul>
+
+      <ThemeToggle />
     </section>
   );
 }
