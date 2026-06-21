@@ -19,7 +19,7 @@ export default function Nav() {
       style={{ background:"rgba(245,244,240,0.85)", backdropFilter:"blur(16px)" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2 shrink-0">
-          <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center">
+          <div className="glass-solid w-8 h-8 rounded-lg bg-navy flex items-center justify-center">
             <span className="text-ocre font-black text-sm">U</span>
           </div>
           <span className="font-bold text-navy text-sm tracking-tight hidden sm:block">UCA · Economía</span>

@@ -24,17 +24,17 @@ input[type="range"]::-moz-range-thumb { width:24px; height:24px; border-radius:5
    NADA quede en 2D. Calibrado al ~70% de las referencias. */
 
 html[data-theme="glass"] {
-  --gl-blur:    14px;                      /* blur moderado = legible y rápido */
-  --gl-sat:     140%;
-  --gl-bg:      rgba(255,255,255,0.16);    /* lámina neutra translúcida */
-  --gl-bg-soft: rgba(255,255,255,0.12);    /* inputs */
-  --gl-bg-panel:rgba(255,255,255,0.20);    /* paneles/modales */
-  --gl-navy:    rgba(11,31,77,0.86);       /* tinte navy: opaco para texto claro legible */
-  --gl-ocre:    rgba(201,162,39,0.82);     /* tinte ocre: dorado claro y legible */
+  --gl-blur:    12px;                      /* blur liviano = legible y rápido */
+  --gl-sat:     130%;
+  --gl-bg:      rgba(255,255,255,0.18);    /* lámina neutra translúcida */
+  --gl-bg-soft: rgba(255,255,255,0.14);    /* inputs */
+  --gl-bg-panel:rgba(255,255,255,0.22);    /* paneles/modales */
+  --gl-navy:    rgba(11,31,77,0.88);       /* tinte navy: legible con texto claro */
+  --gl-ocre:    rgba(201,162,39,0.80);     /* tinte ocre dorado, legible */
   --gl-red:     rgba(220,38,38,0.30);      /* tinte peligro */
-  --gl-edge:    rgba(255,255,255,0.60);    /* borde de cristal brillante */
+  --gl-edge:    rgba(255,255,255,0.58);    /* borde de cristal brillante */
   --gl-gloss:   linear-gradient(130deg, rgba(255,255,255,0.50) 0%, rgba(255,255,255,0.12) 26%, rgba(255,255,255,0) 50%);
-  --gl-float:   0 14px 32px -16px rgba(11,31,77,0.34), 0 4px 12px -8px rgba(11,31,77,0.22);
+  --gl-float:   0 14px 32px -16px rgba(11,31,77,0.32), 0 4px 12px -8px rgba(11,31,77,0.20);
   --gl-inset:   inset 0 1px 1px rgba(255,255,255,0.85), inset 0 -8px 18px -14px rgba(255,255,255,0.28);
 }
 
@@ -51,9 +51,10 @@ html[data-theme="glass"] body {
 
 @supports ((-webkit-backdrop-filter: blur(2px)) or (backdrop-filter: blur(2px))) {
 
-  /* ── Selector maestro: todo lo que es "vidrio" ──
-     primitivos .glass-* + patrones estructurales (cards, pills, día) */
-  html[data-theme="glass"] :is(
+  /* ── Material maestro: todo lo que es "vidrio" ──
+     :where() = especificidad 0, así los TINTES y reglas específicas SIEMPRE ganan
+     (clave: días de examen dorados, botones navy legibles, no blanco-sobre-blanco). */
+  html[data-theme="glass"] :where(
     .glass-card, .glass-panel, .glass-button, .glass-modal, .glass-tab,
     .rounded-2xl, .rounded-3xl, .rounded-xl,
     button.rounded-full, a.rounded-full
@@ -68,7 +69,7 @@ html[data-theme="glass"] body {
   }
 
   /* Reflejo especular (gloss) — pseudo-elemento DETRÁS del texto */
-  html[data-theme="glass"] :is(
+  html[data-theme="glass"] :where(
     .glass-card, .glass-panel, .glass-button, .glass-modal, .glass-tab,
     .rounded-2xl, .rounded-3xl, .rounded-xl,
     button.rounded-full, a.rounded-full
@@ -82,12 +83,12 @@ html[data-theme="glass"] body {
     background: var(--gl-gloss);
   }
 
-  /* Paneles y modales: un poco más de cuerpo y blur, esquinas redondeadas */
+  /* Paneles y modales: más cuerpo, más blur, esquinas redondeadas */
   html[data-theme="glass"] :is(.glass-panel, .glass-modal) {
     background-color: var(--gl-bg-panel) !important;
-    border-radius: 20px;
-    -webkit-backdrop-filter: blur(20px) saturate(150%);
-    backdrop-filter: blur(20px) saturate(150%);
+    border-radius: 22px;
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    backdrop-filter: blur(18px) saturate(140%);
   }
 
   /* ── PERFORMANCE: celdas del calendario (≈35) sin blur propio ──
@@ -98,24 +99,26 @@ html[data-theme="glass"] body {
     backdrop-filter: none !important;
     box-shadow:
       inset 0 1px 0 rgba(255,255,255,0.65),
-      0 4px 10px -6px rgba(11,31,77,0.22) !important;
+      0 4px 10px -6px rgba(11,31,77,0.20) !important;
   }
 
-  /* ── Inputs / selects / textarea: vidrio cóncavo con foco ocre ── */
+  /* ── Inputs / selects / textarea: vidrio cóncavo, redondeado, con foco ocre ── */
   html[data-theme="glass"] :is(
     .glass-input,
     input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
     select, textarea
   ) {
     position: relative;
-    -webkit-backdrop-filter: blur(16px) saturate(160%);
-    backdrop-filter: blur(16px) saturate(160%);
+    border-radius: 14px !important;
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    backdrop-filter: blur(12px) saturate(140%);
     background-color: var(--gl-bg-soft) !important;
     border: 1px solid var(--gl-edge) !important;
     box-shadow:
-      inset 0 2px 6px -2px rgba(11,31,77,0.18),
+      inset 0 2px 5px -2px rgba(11,31,77,0.14),
       inset 0 1px 0 rgba(255,255,255,0.45) !important;
   }
+  html[data-theme="glass"] textarea { border-radius: 18px !important; }
   html[data-theme="glass"] :is(
     .glass-input,
     input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
@@ -132,28 +135,38 @@ html[data-theme="glass"] body {
   html[data-theme="glass"] :is(.glass-tint-ocre, .bg-ocre)  { background-color: var(--gl-ocre) !important; }
   html[data-theme="glass"] .glass-tint-red                  { background-color: var(--gl-red)  !important; }
 
-  /* Glow de color bajo los acentos (mayor especificidad para ganar el box-shadow) */
+  /* El logo (U) se mantiene navy sólido y crujiente, no translúcido */
+  html[data-theme="glass"] .glass-solid { background-color: #0B1F4D !important; }
+
+  /* Barras de "materias a estudiar" del calendario: varilla de vidrio de color */
+  html[data-theme="glass"] .glass-plan-bar {
+    border-radius: 3px;
+    box-shadow:
+      inset 1.5px 0 0 rgba(255,255,255,0.65),
+      inset -1px 0 3px rgba(11,31,77,0.20),
+      inset 0 1px 0 rgba(255,255,255,0.45) !important;
+  }
+
+  /* Glow de color bajo los acentos (gana el box-shadow por mayor especificidad) */
   html[data-theme="glass"] :is(.glass-button, button.rounded-full, a.rounded-full).glass-tint-navy,
   html[data-theme="glass"] :is(.glass-button, button.rounded-full, a.rounded-full).bg-navy {
-    box-shadow: var(--gl-inset), 0 18px 40px -16px rgba(11,31,77,0.60), 0 6px 16px -8px rgba(11,31,77,0.45) !important;
+    box-shadow: var(--gl-inset), 0 16px 34px -16px rgba(11,31,77,0.55), 0 5px 14px -8px rgba(11,31,77,0.40) !important;
   }
   html[data-theme="glass"] :is(.glass-button, button.rounded-full, a.rounded-full).glass-tint-ocre,
   html[data-theme="glass"] :is(.glass-button, button.rounded-full, a.rounded-full).bg-ocre {
-    box-shadow: var(--gl-inset), 0 18px 40px -16px rgba(201,162,39,0.55), 0 6px 16px -8px rgba(201,162,39,0.40) !important;
+    box-shadow: var(--gl-inset), 0 16px 34px -16px rgba(201,162,39,0.50), 0 5px 14px -8px rgba(201,162,39,0.38) !important;
   }
 
   /* Nav / header como panel de vidrio flotante */
   html[data-theme="glass"] header {
-    background: rgba(255,255,255,0.16) !important;
-    -webkit-backdrop-filter: blur(28px) saturate(190%);
-    backdrop-filter: blur(28px) saturate(190%);
+    background: rgba(255,255,255,0.18) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    backdrop-filter: blur(18px) saturate(150%);
     border-bottom: 1px solid var(--gl-edge) !important;
   }
 
   /* Range (sliders) en vidrio */
   html[data-theme="glass"] input[type="range"] {
     background: rgba(11,31,77,0.10);
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
   }
 }

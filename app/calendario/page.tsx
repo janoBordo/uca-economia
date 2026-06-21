@@ -156,7 +156,7 @@ export default function Calendario() {
                   {plan.length > 0 && (
                     <div className="absolute left-0 top-0 bottom-0 flex flex-col" style={{ width: BAR_W }}>
                       {plan.map(mid => (
-                        <div key={mid} className="flex-1 min-h-0"
+                        <div key={mid} className="glass-plan-bar flex-1 min-h-0"
                           style={{ background: colorMap[mid] ?? "#aaa", opacity: tieneExamen ? 0.75 : 1 }} />
                       ))}
                     </div>
