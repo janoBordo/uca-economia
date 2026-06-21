@@ -42,13 +42,17 @@ export default function TTS() {
   // ── Leer ──
   function hablar() {
     if (!texto.trim()) return;
-    speechSynthesis.cancel();
+    const synth = window.speechSynthesis;
+    synth.cancel();
     setError(null); setMp3Url(null); setProgreso(0);
 
     const utter = new SpeechSynthesisUtterance(texto);
-    utter.voice  = voces[vozIdx] ?? null;
-    utter.rate   = velocidad;
-    utter.lang   = voces[vozIdx]?.lang ?? "es-AR";
+    // iOS Safari falla en silencio si se asigna una voz inválida: sólo la seteamos
+    // si existe en la lista actual; si no, dejamos la default del sistema.
+    const v = voces[vozIdx];
+    if (v) utter.voice = v;
+    utter.rate = velocidad;
+    utter.lang = v?.lang ?? "es-AR";
 
     utter.onstart     = () => { setLeyendo(true); setPausado(false); };
     utter.onend       = () => { setLeyendo(false); setPausado(false); setProgreso(1); };
@@ -58,7 +62,11 @@ export default function TTS() {
     };
 
     utterRef.current = utter;
-    speechSynthesis.speak(utter);
+    // Optimista: en iOS onstart puede no dispararse aunque el audio suene.
+    setLeyendo(true); setPausado(false);
+    synth.speak(utter);
+    // iOS a veces deja la síntesis en estado "pausado" tras speak(): forzamos resume.
+    synth.resume();
   }
 
   function pausar() {
@@ -257,7 +265,7 @@ export default function TTS() {
           </p>
         )}
         <p className="text-navy/30 text-xs">
-          En Safari es posible que no se permita descargar el audio grabado.
+          En iPhone: si no se escucha, revisá que el switch lateral de silencio esté apagado y subí el volumen. En Safari es posible que no se permita descargar el audio grabado.
         </p>
       </div>
 

@@ -199,27 +199,27 @@ export default function Semestre() {
                 className="p-5 rounded-2xl border-2 border-ocre/30 bg-ocre/5">
                 <p className="font-semibold text-navy mb-4 text-sm uppercase tracking-wider">Nueva materia</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                  <div>
+                  <div className="min-w-0">
                     <label className="block text-xs text-navy/40 uppercase tracking-wider mb-1.5">Nombre</label>
                     <input value={nueva.nombre} onChange={e => setNueva(n => ({ ...n, nombre: e.target.value }))}
                       placeholder="Ej. Macroeconomía"
-                      className="w-full bg-canvas rounded-xl px-4 py-2.5 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40" />
+                      className="w-full min-w-0 appearance-none bg-canvas rounded-xl px-4 py-2.5 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="block text-xs text-navy/40 uppercase tracking-wider mb-1.5">Meta de horas</label>
                     <input type="number" min={1} value={nueva.metaHoras}
                       onChange={e => setNueva(n => ({ ...n, metaHoras: +e.target.value }))}
-                      className="w-full bg-canvas rounded-xl px-4 py-2.5 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40 text-center" />
+                      className="w-full min-w-0 appearance-none bg-canvas rounded-xl px-4 py-2.5 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40 text-center" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="block text-xs text-navy/40 uppercase tracking-wider mb-1.5">Fecha examen</label>
                     <input type="date" value={nueva.date} onChange={e => setNueva(n => ({ ...n, date: e.target.value }))}
-                      className="w-full bg-canvas rounded-xl px-4 py-2.5 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40" />
+                      className="w-full min-w-0 appearance-none bg-canvas rounded-xl px-4 py-2.5 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="block text-xs text-navy/40 uppercase tracking-wider mb-1.5">Hora examen</label>
                     <input type="time" value={nueva.time} onChange={e => setNueva(n => ({ ...n, time: e.target.value }))}
-                      className="w-full bg-canvas rounded-xl px-4 py-2.5 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40" />
+                      className="w-full min-w-0 appearance-none bg-canvas rounded-xl px-4 py-2.5 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40" />
                   </div>
                 </div>
                 <div className="flex gap-3">

@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 
 const LINKS = [
-  { href:"/",           label:"Inicio",     short:"Inicio" },
   { href:"/timer",      label:"Pomodoro",   short:"Timer"  },
   { href:"/metricas",   label:"Métricas",   short:"Stats"  },
   { href:"/calendario", label:"Calendario", short:"Cal"    },
@@ -18,11 +17,11 @@ export default function Nav() {
     <header className="sticky top-0 z-50 border-b border-navy/10"
       style={{ background:"rgba(245,244,240,0.85)", backdropFilter:"blur(16px)" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-2 shrink-0">
+        <Link href="/" className="flex items-center gap-2 shrink-0" aria-label="Ir al inicio">
           <div className="glass-solid w-8 h-8 rounded-lg bg-navy flex items-center justify-center">
-            <span className="text-ocre font-black text-sm">U</span>
+            <span className="font-black text-sm leading-none text-white">s<span style={{ color:"#009CDE" }}>.</span></span>
           </div>
-          <span className="font-bold text-navy text-sm tracking-tight hidden sm:block">UCA · Economía</span>
+          <span className="font-bold text-navy text-sm tracking-tight hidden sm:block">stuniv<span style={{ color:"#009CDE" }}>.</span></span>
         </Link>
         <nav className="flex items-center gap-0.5">
           {LINKS.map(l => {

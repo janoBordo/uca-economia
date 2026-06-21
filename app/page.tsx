@@ -7,14 +7,14 @@ import { materiasPorProximidad } from "./lib/api";
 import type { Materia } from "./lib/types";
 import ThemeToggle from "./components/ThemeToggle";
 
-function useDiff(target: string) {
+function useDiff(target: string, intervalMs = 1000) {
   const calc = useCallback(() => {
     const ms = new Date(target).getTime() - Date.now();
     const neg = ms < 0; const abs = Math.abs(ms);
     return { neg, dias:Math.floor(abs/86400000), horas:Math.floor((abs%86400000)/3600000), mins:Math.floor((abs%3600000)/60000), segs:Math.floor((abs%60000)/1000) };
   }, [target]);
   const [d, setD] = useState(calc);
-  useEffect(() => { const i = setInterval(() => setD(calc()), 1000); return () => clearInterval(i); }, [calc]);
+  useEffect(() => { const i = setInterval(() => setD(calc()), intervalMs); return () => clearInterval(i); }, [calc, intervalMs]);
   return d;
 }
 
@@ -35,7 +35,7 @@ function CountdownHero({ materia }: { materia: Materia }) {
 }
 
 function RowItem({ m, index }: { m: Materia; index: number }) {
-  const d = useDiff(m.examen);
+  const d = useDiff(m.examen, 60000); // la fila sólo muestra minutos → basta tickear cada 60s
   const fecha = new Date(m.examen).toLocaleDateString("es-AR", { day:"2-digit", month:"short" });
   return (
     <motion.li initial={{ opacity:0, x:-12 }} animate={{ opacity:1, x:0 }} transition={{ delay:0.4+index*0.05 }}

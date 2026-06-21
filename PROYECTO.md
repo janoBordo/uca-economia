@@ -6,8 +6,8 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
-## Versión actual: v7.2.1
-Ver changelog completo abajo. Cambios clave: **sistema Liquid Glass completo** (material centralizado + primitivos React `Glass*` en todas las vistas, toggle Clásico 2D ↔ Vidrio en Inicio), Matriz de Confianza (radar) en Métricas, y **feedback de hover** en ambos modos (escala/elevación/brillo en botones, "encendido" del cristal en cards).
+## Versión actual: v8
+Ver changelog completo abajo. Cambios clave: **rebrand a stuniv** (logo, favicon, título), nav sin "Inicio" (logo → home), fix TTS en iPhone, fix legibilidad confirmaciones rojas en Vidrio, fix overflow mobile al agregar materia, y **performance** (cache cliente con TTL + menos re-renders). Cambios clave: **sistema Liquid Glass completo** (material centralizado + primitivos React `Glass*` en todas las vistas, toggle Clásico 2D ↔ Vidrio en Inicio), Matriz de Confianza (radar) en Métricas, y **feedback de hover** en ambos modos (escala/elevación/brillo en botones, "encendido" del cristal en cards).
 
 ---
 
@@ -19,7 +19,7 @@ Ver detalle completo de v2 a v6.2 en la sección "Historia completa" al final de
 # ESTADO ACTUAL (se reescribe cada vez que algo de esto cambia)
 
 ## Qué es
-App personal de Jano (estudiante de Economía, UCA Buenos Aires, primer año) para gestionar el semestre: fechas de examen, horas de estudio, plan diario, lectura de apuntes en voz.
+**stuniv** (marca de la app web; el repo sigue llamándose `uca-economia`). App personal de Jano (estudiante de Economía, UCA Buenos Aires, primer año) para gestionar el semestre: fechas de examen, horas de estudio, plan diario, lectura de apuntes en voz. El claim "Tu futuro. Tu camino." del manual de marca NO se usa en la app.
 
 ## Infraestructura (ESTO PUEDE CAMBIAR — mantener actualizado)
 - **Hosting**: Vercel
@@ -55,7 +55,7 @@ type AppData = {
   notas: string[];                        // notas rápidas del calendario
 }
 ```
-Todo pasa por `/api/db` (GET trae todo, POST hace merge parcial).
+Todo pasa por `/api/db` (GET trae todo, POST hace merge parcial). **Cache cliente** (`app/lib/api.ts`): cache en memoria con TTL de 15s + dedupe de requests concurrentes, así navegar entre páginas no re-pega a `/api/db` cada vez (las escrituras refrescan el cache al instante). El nav NO tiene "Inicio" — al inicio se llega tocando el logo.
 
 ## Rutas actuales
 - `/` — countdown próximo examen + lista de materias
@@ -111,6 +111,21 @@ Fecha examen en mobile: `datetime-local` → `date` + `time` separados (fix iOS)
 Se migró el desarrollo de claude.ai (chat web) a Claude Code, trabajando directo sobre el repo local conectado a GitHub/Vercel. Este archivo (`PROYECTO.md`) reemplaza la necesidad de releer conversaciones pasadas — es la fuente de verdad única y acumulativa.
 
 <!-- A partir de acá, cada nueva versión agrega su entrada DEBAJO de esta línea, en orden cronológico -->
+
+### v8 — Rebrand stuniv + fixes + performance
+**Branding**
+- Rebrand de "UCA · Economía" a **stuniv** (la marca de la app web; el repo sigue siendo `uca-economia`). Nav: logo isotipo "s." (s blanca + punto azul `#009CDE`) y texto "stuniv."; `<title>` → "stuniv". Favicon (`app/icon.svg`) cambiado al isotipo stuniv. El claim "Tu futuro. Tu camino." nunca va en la app.
+- **Nav sin "Inicio"**: se quitó el link; a la home se llega tocando el logo (que ya linkea a `/`).
+
+**Bug fixes**
+- **TTS no sonaba en iPhone**: workarounds de iOS Safari en `hablar()` — voz robusta (sólo se asigna si existe en la lista; si no, default del sistema), estado `leyendo` optimista (en iOS `onstart` puede no dispararse), y `speechSynthesis.resume()` tras `speak()` (iOS lo deja en "pausado"). Nota agregada sobre el switch de silencio del iPhone. En compu seguía andando; esto apunta a mobile.
+- **Confirmaciones rojas ilegibles en Vidrio**: el "Sí" (`bg-red-500 text-white`) lo pisaba el material glass (fondo blanco translúcido → texto blanco invisible). Se exceptuaron `.bg-red-500/600` como tinte rojo legible (`--gl-red` 0.30 → 0.82) + text-shadow. Afecta "borrar materia", "borrar horas", "limpiar plan".
+- **Overflow mobile al agregar materia**: los inputs `date`/`time` nativos de iOS no respetaban `width:100%` y reventaban el card. Fix: `appearance-none` + `min-w-0` en los inputs y `min-w-0` en los items del grid (evita el blowout del grid).
+
+**Performance** (sin tocar nada visual ni de uso)
+- **Cache cliente con TTL** (`app/lib/api.ts`): cache en memoria 15s + dedupe de requests concurrentes (`inFlight`). Navegar entre páginas sirve del cache en vez de pegarle a `/api/db` cada vez → se va la sensación "dial-up". Las escrituras (`patch`) refrescan el cache al instante.
+- **Menos re-renders en la home**: las filas de "Todas las materias" tickeaban cada 1s (9 timers, 9 re-render/seg) pero sólo muestran minutos → pasaron a 60s. El countdown grande sigue a 1s. Cero cambio visual.
+- **Lo que NO se hizo (y por qué)**: paginación, auth, colas en background, load testing → son de backends multiusuario con base relacional grande; stuniv es de un solo usuario con una sola key en Vercel KV, no aplican. Skeleton loaders → implicarían UI nueva (el pedido era no cambiar nada visual). **Race condition celu↔compu** (modificar el mismo dato en 2 dispositivos a la vez): real, pero la solución de fondo (migrar a Supabase/Postgres con updates atómicos por fila) es un cambio grande de infraestructura → queda como recomendación pendiente, no se decide solo.
 
 ### v7.2.1 — Calibración de color en Vidrio 3D
 Los botones navy en modo Vidrio se veían demasiado "slate gris" / apagados. Causa: a 0.60 de opacidad, el fondo claro atravesaba el tinte y lo desaturaba, sumado al gloss blanco fuerte encima.

@@ -3,8 +3,8 @@ import "./globals.css";
 import Nav from "./components/Nav";
 
 export const metadata: Metadata = {
-  title: "UCA · Economía I",
-  description: "Centro de mando académico",
+  title: "stuniv",
+  description: "Tu semestre, organizado.",
   icons: {
     icon: "/icon.svg",
     shortcut: "/icon.svg",

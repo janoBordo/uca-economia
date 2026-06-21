@@ -5,11 +5,12 @@ import type { AppData } from "./types";
 
 export function useData() {
   const [data, setData] = useState<AppData>(getCached);
-  const reload = useCallback(() => { fetchData().then(setData).catch(console.error); }, []);
+  const reload = useCallback(() => { fetchData(true).then(setData).catch(console.error); }, []);
   useEffect(() => {
-    reload();
+    // Montaje: sirve del cache si está fresco (TTL); sólo pega a la red si hace falta.
+    fetchData().then(setData).catch(console.error);
     const unsub = subscribe(() => setData(getCached()));
     return () => { unsub(); };
-  }, [reload]);
+  }, []);
   return { data, reload };
 }
