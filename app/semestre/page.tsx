@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useData } from "../lib/useData";
 import { archivarSemestre, saveMaterias, resetHoras, clearPlanEstudio } from "../lib/api";
 import { MATERIAS_DEFAULT, type Materia, type SemestreArchivado } from "../lib/types";
+import { GlassCard, GlassButton, GlassInput } from "../components/glass";
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
@@ -23,7 +24,7 @@ function SemestreCard({ sem, open, onToggle }: { sem: SemestreArchivado; open: b
   const totalHoras = (totalMins / 60).toFixed(1);
   const fecha      = new Date(sem.archivedAt).toLocaleDateString("es-AR", { day:"2-digit", month:"short", year:"numeric" });
   return (
-    <motion.div layout className="rounded-2xl border border-navy/10 overflow-hidden" style={{ background:"rgba(11,31,77,0.025)" }}>
+    <GlassCard layout className="rounded-2xl border border-navy/10 overflow-hidden" style={{ background:"rgba(11,31,77,0.025)" }}>
       <button onClick={onToggle} className="w-full px-6 py-5 flex items-center justify-between text-left hover:bg-navy/3 transition-colors">
         <div>
           <p className="font-semibold text-navy text-base">{sem.nombre}</p>
@@ -69,7 +70,7 @@ function SemestreCard({ sem, open, onToggle }: { sem: SemestreArchivado; open: b
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </GlassCard>
   );
 }
 
@@ -152,7 +153,7 @@ export default function Semestre() {
             {local.map((m, i) => {
               const { date, time } = splitISO(m.examen);
               return (
-                <motion.div key={m.id}
+                <GlassCard key={m.id}
                   initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, scale:0.96 }}
                   transition={{ delay: i * 0.02 }}
                   className="p-5 rounded-2xl flex flex-col gap-4"
@@ -167,10 +168,10 @@ export default function Semestre() {
                     <label className="block text-xs text-navy/35 uppercase tracking-wider mb-2">Fecha examen</label>
                     {/* Dos inputs separados para compatibilidad iOS */}
                     <div className="flex gap-2">
-                      <input type="date" value={date}
+                      <GlassInput type="date" value={date}
                         onChange={e => updateDate(m.id, e.target.value, time)}
                         className="flex-1 min-w-0 bg-navy/3 rounded-xl px-3 py-2.5 text-navy text-xs font-medium border border-navy/8 focus:outline-none focus:ring-2 focus:ring-ocre/40" />
-                      <input type="time" value={time}
+                      <GlassInput type="time" value={time}
                         onChange={e => updateDate(m.id, date, e.target.value)}
                         className="w-24 bg-navy/3 rounded-xl px-3 py-2.5 text-navy text-xs font-medium border border-navy/8 focus:outline-none focus:ring-2 focus:ring-ocre/40 shrink-0" />
                     </div>
@@ -178,13 +179,13 @@ export default function Semestre() {
                   <div>
                     <label className="block text-xs text-navy/35 uppercase tracking-wider mb-2">Meta de horas</label>
                     <div className="flex items-center gap-2">
-                      <input type="number" min={1} max={200} value={m.metaHoras}
+                      <GlassInput type="number" min={1} max={200} value={m.metaHoras}
                         onChange={e => updateField(m.id, "metaHoras", +e.target.value)}
                         className="w-20 bg-navy/3 rounded-xl px-3 py-2.5 text-navy text-sm font-medium border border-navy/8 focus:outline-none focus:ring-2 focus:ring-ocre/40 text-center" />
                       <span className="text-navy/40 text-xs">horas</span>
                     </div>
                   </div>
-                </motion.div>
+                </GlassCard>
               );
             })}
           </AnimatePresence>
@@ -227,21 +228,21 @@ export default function Semestre() {
                 </div>
               </motion.div>
             ) : (
-              <motion.button initial={{ opacity:0 }} animate={{ opacity:1 }} onClick={() => setAgregando(true)}
+              <GlassButton initial={{ opacity:0 }} animate={{ opacity:1 }} onClick={() => setAgregando(true)}
                 className="w-full py-4 rounded-2xl border-2 border-dashed border-navy/15 text-navy/40 hover:border-ocre/40 hover:text-ocre transition-colors text-sm font-medium flex items-center justify-center gap-2">
                 <span className="text-xl leading-none">+</span> Agregar materia
-              </motion.button>
+              </GlassButton>
             )}
           </AnimatePresence>
         </div>
 
         {/* Guardar */}
         <div className="flex items-center gap-4 flex-wrap mt-6">
-          <button onClick={guardar} disabled={guardando}
+          <GlassButton onClick={guardar} disabled={guardando}
             className="px-8 py-3.5 rounded-full bg-navy text-canvas font-semibold hover:bg-navy-soft transition-colors disabled:opacity-60 flex items-center gap-2">
             {guardando && <span className="animate-spin text-ocre">◌</span>}
             {guardando ? "Guardando…" : "Guardar en la nube"}
-          </button>
+          </GlassButton>
           <AnimatePresence>
             {guardado && (
               <motion.span initial={{ opacity:0, x:-8 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0 }} className="text-sm text-navy/50 flex items-center gap-2">
@@ -313,7 +314,7 @@ export default function Semestre() {
         </h2>
         <p className="text-navy/45 text-base mb-8">Guardá el historial de cada semestre antes de empezar el siguiente.</p>
 
-        <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
+        <GlassCard tint="ocre" initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
           className="p-6 sm:p-8 rounded-3xl border border-ocre/30 bg-ocre/5">
           <div className="flex items-start justify-between flex-wrap gap-4 mb-6">
             <div>
@@ -326,11 +327,11 @@ export default function Semestre() {
             <div className="flex flex-col items-end gap-2">
               <AnimatePresence mode="wait">
                 {!confirmCerrar ? (
-                  <motion.button key="btn-cerrar" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+                  <GlassButton key="btn-cerrar" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
                     onClick={() => setConfirmCerrar(true)}
                     className="px-6 py-3 rounded-full bg-navy text-canvas font-semibold text-sm hover:bg-navy-soft transition-colors">
                     Cerrar semestre →
-                  </motion.button>
+                  </GlassButton>
                 ) : (
                   <motion.div key="confirm-cerrar" initial={{ opacity:0, scale:0.95 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0 }}
                     className="flex items-center gap-2 px-4 py-3 rounded-2xl border border-navy/20 bg-navy/5">
@@ -365,7 +366,7 @@ export default function Semestre() {
               <span className="font-black text-navy text-xl sm:text-2xl" style={{ letterSpacing:"-0.03em" }}>{cantMat}</span>
             </div>
           </div>
-        </motion.div>
+        </GlassCard>
       </div>
 
       {/* ── HISTORIAL ── */}
