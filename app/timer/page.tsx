@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useData } from "../lib/useData";
 import { addMinutos } from "../lib/api";
+import { GlassTabs, GlassButton, GlassInput, GlassSelect } from "../components/glass";
 
 type Modo = "pomodoro" | "cronometro";
 
@@ -171,23 +172,17 @@ export default function Timer() {
   return (
     <section className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative">
       {/* Modo */}
-      <div className="flex gap-1 p-1 rounded-full bg-navy/6 mb-8">
-        {(["pomodoro","cronometro"] as Modo[]).map(m => (
-          <button key={m} onClick={() => { if (!corriendo) setModo(m); }} disabled={corriendo}
-            className={`px-5 py-2 rounded-full text-sm font-semibold transition-all capitalize ${
-              modo===m ? "bg-navy text-canvas shadow-sm" : "text-navy/50 hover:text-navy"
-            } disabled:cursor-not-allowed`}>
-            {m==="pomodoro" ? "Pomodoro" : "Cronómetro"}
-          </button>
-        ))}
-      </div>
+      <GlassTabs className="mb-8"
+        options={[{ value:"pomodoro", label:"Pomodoro" }, { value:"cronometro", label:"Cronómetro" }]}
+        value={modo} disabled={corriendo}
+        onChange={(m) => { if (!corriendo) setModo(m); }} />
 
       <AnimatePresence>
         {modo==="pomodoro" && (
           <motion.div initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:"auto" }} exit={{ opacity:0, height:0 }}
             className="mb-8 flex items-center gap-3">
             <span className="text-navy/50 text-sm">Duración:</span>
-            <input type="number" min={1} max={180} value={customMins} disabled={corriendo}
+            <GlassInput type="number" min={1} max={180} value={customMins} disabled={corriendo}
               onChange={e => { if (!corriendo) setCustomMins(Math.max(1,+e.target.value)); }}
               className="w-20 text-center bg-transparent border-b-2 border-navy/20 focus:border-ocre text-navy font-bold text-lg focus:outline-none disabled:opacity-40" />
             <span className="text-navy/50 text-sm">min</span>
@@ -197,10 +192,10 @@ export default function Timer() {
 
       {/* Materia */}
       <div className="mb-10">
-        <select value={matId} onChange={e => setMatId(e.target.value)} disabled={corriendo}
+        <GlassSelect value={matId} onChange={e => setMatId(e.target.value)} disabled={corriendo}
           className="bg-transparent text-navy font-semibold text-base border-b-2 border-navy/15 pb-2 px-2 focus:outline-none focus:border-ocre appearance-none cursor-pointer disabled:opacity-40 text-center">
           {materias.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
-        </select>
+        </GlassSelect>
       </div>
 
       {/* Círculo */}
@@ -232,14 +227,14 @@ export default function Timer() {
 
       {/* Controles */}
       <div className="flex items-center gap-4 mt-10">
-        <button onClick={reset} className="w-12 h-12 rounded-full border-2 border-navy/15 text-navy/40 hover:border-navy/40 hover:text-navy transition-colors text-lg">↺</button>
-        <button onClick={() => corriendo ? pausar() : arrancar()}
+        <GlassButton onClick={reset} className="w-12 h-12 rounded-full border-2 border-navy/15 text-navy/40 hover:border-navy/40 hover:text-navy transition-colors text-lg">↺</GlassButton>
+        <GlassButton onClick={() => corriendo ? pausar() : arrancar()}
           className={`w-20 h-20 rounded-full font-bold text-xl shadow-lg transition-all active:scale-95 ${
             corriendo ? "bg-ocre text-navy hover:bg-ocre-light shadow-ocre/30" : "bg-navy text-canvas hover:bg-navy-soft shadow-navy/20"
           }`}>
           {corriendo ? "⏸" : "▶"}
-        </button>
-        <button onClick={() => frenar(false)} className="w-12 h-12 rounded-full border-2 border-navy/15 text-navy/40 hover:border-ocre/60 hover:text-ocre transition-colors text-lg font-bold">✓</button>
+        </GlassButton>
+        <GlassButton onClick={() => frenar(false)} className="w-12 h-12 rounded-full border-2 border-navy/15 text-navy/40 hover:border-ocre/60 hover:text-ocre transition-colors text-lg font-bold">✓</GlassButton>
       </div>
       <p className="mt-4 text-navy/30 text-xs text-center">
         {modo==="pomodoro" ? "▶ arrancar · ⏸ pausar · ✓ guardar · ↺ reiniciar — alarma al terminar"
