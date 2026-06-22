@@ -17,11 +17,11 @@ export default function Nav() {
     <header className="sticky top-0 z-50 border-b border-navy/10"
       style={{ background:"rgba(245,244,240,0.85)", backdropFilter:"blur(16px)" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-2 shrink-0" aria-label="Ir al inicio">
-          <div className="glass-solid w-8 h-8 rounded-lg bg-navy flex items-center justify-center">
-            <span className="font-black text-sm leading-none text-white">s<span style={{ color:"#009CDE" }}>.</span></span>
-          </div>
-          <span className="font-bold text-navy text-sm tracking-tight hidden sm:block">stuniv<span style={{ color:"#009CDE" }}>.</span></span>
+        <Link href="/" className="flex items-center shrink-0" aria-label="stuniv — inicio">
+          {/* Mobile: isotipo s. */}
+          <span className="sm:hidden font-extrabold text-navy text-2xl leading-none tracking-tight">s<span style={{ color:"#009CDE" }}>.</span></span>
+          {/* Desktop: logotipo completo */}
+          <span className="hidden sm:block font-extrabold text-navy text-2xl leading-none tracking-tight">stuniv<span style={{ color:"#009CDE" }}>.</span></span>
         </Link>
         <nav className="flex items-center gap-0.5">
           {LINKS.map(l => {

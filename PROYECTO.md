@@ -6,7 +6,7 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
-## Versión actual: v8
+## Versión actual: v8.0.1
 Ver changelog completo abajo. Cambios clave: **rebrand a stuniv** (logo, favicon, título), nav sin "Inicio" (logo → home), fix TTS en iPhone, fix legibilidad confirmaciones rojas en Vidrio, fix overflow mobile al agregar materia, y **performance** (cache cliente con TTL + menos re-renders). Cambios clave: **sistema Liquid Glass completo** (material centralizado + primitivos React `Glass*` en todas las vistas, toggle Clásico 2D ↔ Vidrio en Inicio), Matriz de Confianza (radar) en Métricas, y **feedback de hover** en ambos modos (escala/elevación/brillo en botones, "encendido" del cristal en cards).
 
 ---
@@ -111,6 +111,10 @@ Fecha examen en mobile: `datetime-local` → `date` + `time` separados (fix iOS)
 Se migró el desarrollo de claude.ai (chat web) a Claude Code, trabajando directo sobre el repo local conectado a GitHub/Vercel. Este archivo (`PROYECTO.md`) reemplaza la necesidad de releer conversaciones pasadas — es la fuente de verdad única y acumulativa.
 
 <!-- A partir de acá, cada nueva versión agrega su entrada DEBAJO de esta línea, en orden cronológico -->
+
+### v8.0.1 — Logo fiel al manual de marca
+- **Desktop**: el logo del nav ahora es el **logotipo completo "stuniv."** como texto (navy `#0B1F4D` extrabold lowercase + punto azul `#009CDE`), no el cuadradito isotipo.
+- **Mobile + favicon**: el **isotipo "s."** (s navy + punto azul) tal cual la referencia que pasó Jano — se reemplazó la versión anterior (s blanca sobre cuadrado navy). Favicon (`app/icon.svg`): fondo blanco redondeado, "s" navy, punto azul. Al ser SVG es vectorial = alta calidad a cualquier tamaño.
 
 ### v8 — Rebrand stuniv + fixes + performance
 **Branding**
