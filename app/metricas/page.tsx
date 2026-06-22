@@ -1,12 +1,15 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip,
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from "recharts";
+import dynamic from "next/dynamic";
 import { useData } from "../lib/useData";
 import { savePreparacion } from "../lib/api";
 import { COLORES_MATERIAS } from "../lib/types";
 import { GlassCard, GlassPanel } from "../components/glass";
+
+// Recharts (pesado) cargado en chunk aparte, sólo en cliente: no entra al bundle inicial.
+const BarHoras       = dynamic(() => import("./BarHoras"),       { ssr: false });
+const RadarConfianza = dynamic(() => import("./RadarConfianza"), { ssr: false });
 
 const UMBRAL_SOLIDO = 70; // valor de referencia "sólido" (mismo umbral que los sliders)
 
@@ -14,12 +17,13 @@ export default function Metricas() {
   const { data } = useData();
   const { materias, sesiones, preparacion: prepInit } = data;
   const [prep, setPrep] = useState<Record<string,number>>({});
-  const prepReal = { ...prepInit, ...prep };
+  const prepReal = useMemo(() => ({ ...prepInit, ...prep }), [prepInit, prep]);
 
-  const ahora = Date.now();
+  // Fijo "ahora" una vez por montaje para que los memos no se invaliden en cada render.
+  const ahora = useMemo(() => Date.now(), []);
 
   // Para el gráfico: si el examen ya pasó, solo mostrar horas estudiadas (sin meta)
-  const chartData = materias.map(m => {
+  const chartData = useMemo(() => materias.map(m => {
     const horas   = +((sesiones[m.id]||0)/60).toFixed(1);
     const rendida = new Date(m.examen).getTime() < ahora;
     const meta    = rendida ? 0 : m.metaHoras;
@@ -27,7 +31,7 @@ export default function Metricas() {
     // Resto = lo que falta para llegar a meta (apilado encima de horas)
     const resto   = rendida ? 0 : Math.max(0, +(meta - horas).toFixed(1));
     return { id: m.id, corto: m.nombre.split(" ")[0], horas, meta, resto, rendida, pct };
-  });
+  }), [materias, sesiones, ahora]);
 
   const totalHoras = chartData.reduce((a,d) => a+d.horas, 0);
   const totalMeta  = materias.reduce((a,m) => {
@@ -39,64 +43,19 @@ export default function Metricas() {
     : 0;
 
   // Matriz de Confianza: preparación subjetiva por materia (gráfico de radar)
-  const radarData = materias.map((m,i) => ({
+  const radarData = useMemo(() => materias.map((m,i) => ({
     materia: m.nombre.split(" ")[0],
     full:    m.nombre,
     valor:   prepReal[m.id] ?? 0,
     ref:     UMBRAL_SOLIDO,
     color:   COLORES_MATERIAS[i % COLORES_MATERIAS.length],
-  }));
+  })), [materias, prepReal]);
 
-  async function cambiarPrep(id: string, v: number) {
+  const cambiarPrep = useCallback(async (id: string, v: number) => {
     const next = { ...prepReal, [id]: v };
     setPrep(next);
     await savePreparacion(next);
-  }
-
-  // Etiqueta de eje del radar: punto de color + nombre de la materia
-  const RadarTick = ({ payload, x, y, cx, cy }: any) => {
-    const item   = radarData.find(d => d.materia === payload.value);
-    const center = Math.abs(x - cx) < 14;           // ejes arriba/abajo
-    const right  = x >= cx;
-    const anchor = center ? "middle" : right ? "start" : "end";
-    const tx     = center ? x : x + (right ? 14 : -14);
-    const dotY   = center ? y - (y < cy ? 13 : -13) : y;
-    return (
-      <g>
-        <circle cx={center ? x : tx + (right ? -8 : 8)} cy={dotY} r={4} fill={item?.color} />
-        <text x={tx} y={y} dy={center ? (y < cy ? -2 : 4) : 0}
-          textAnchor={anchor} dominantBaseline="central"
-          fill="rgba(11,31,77,0.7)" fontSize={12} fontWeight={600}>{payload.value}</text>
-      </g>
-    );
-  };
-
-  const RadarTooltip = ({ active, payload }: any) => {
-    if (!active || !payload?.length) return null;
-    const d = payload[0].payload;
-    return (
-      <div className="bg-navy text-canvas px-4 py-3 rounded-xl shadow-xl text-sm">
-        <p className="font-semibold mb-1 flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background:d.color }} />{d.full}
-        </p>
-        <p className="text-ocre">Confianza: {d.valor}/100</p>
-        <p className="text-canvas/40 text-xs">Umbral sólido: {UMBRAL_SOLIDO}</p>
-      </div>
-    );
-  };
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (!active||!payload?.length) return null;
-    const item = chartData.find(d => d.corto === label);
-    return (
-      <div className="bg-navy text-canvas px-4 py-3 rounded-xl shadow-xl text-sm">
-        <p className="font-semibold mb-1">{label}</p>
-        <p className="text-ocre">{item?.horas}h estudiado</p>
-        {!item?.rendida && <p className="text-canvas/50">Meta: {item?.meta}h</p>}
-        {item?.rendida && <p className="text-canvas/40 text-xs">Examen rendido</p>}
-      </div>
-    );
-  };
+  }, [prepReal]);
 
   return (
     <section className="flex-1 w-full max-w-4xl mx-auto px-6 sm:px-8 py-16 flex flex-col gap-20">
@@ -136,21 +95,7 @@ export default function Metricas() {
           </div>
         </div>
         <GlassPanel className="h-72 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top:0, right:0, left:-24, bottom:40 }} barGap={2}>
-              <XAxis dataKey="corto" angle={-35} textAnchor="end" interval={0}
-                tick={{ fill:"rgba(11,31,77,0.4)", fontSize:11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill:"rgba(11,31,77,0.3)", fontSize:10 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill:"rgba(11,31,77,0.03)" }} />
-              {/* Horas estudiadas (abajo) + resto hasta meta (arriba) apilados */}
-              <Bar dataKey="horas" stackId="a" radius={[4,4,0,0]} maxBarSize={36}>
-                {chartData.map((d,i) => (
-                  <Cell key={i} fill={d.rendida ? "rgba(11,31,77,0.3)" : d.pct>=100 ? "#0B1F4D" : "#C9A227"} />
-                ))}
-              </Bar>
-              <Bar dataKey="resto" stackId="a" fill="rgba(11,31,77,0.1)" radius={[6,6,0,0]} maxBarSize={36} />
-            </BarChart>
-          </ResponsiveContainer>
+          <BarHoras data={chartData} />
         </GlassPanel>
       </div>
 
@@ -163,18 +108,7 @@ export default function Metricas() {
           <span className="flex items-center gap-1.5"><span className="w-3 h-0 border-t border-dashed border-navy/40 inline-block"/>Umbral sólido ({UMBRAL_SOLIDO})</span>
         </div>
         <GlassPanel className="h-[360px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart data={radarData} outerRadius="70%" margin={{ top:20, right:60, bottom:20, left:60 }}>
-              <PolarGrid stroke="rgba(11,31,77,0.10)" />
-              <PolarAngleAxis dataKey="materia" tick={<RadarTick />} />
-              <PolarRadiusAxis domain={[0,100]} tick={false} axisLine={false} />
-              <Radar name="Umbral" dataKey="ref" stroke="rgba(11,31,77,0.35)" strokeWidth={1.5}
-                strokeDasharray="4 4" fill="none" isAnimationActive={false} />
-              <Radar name="Confianza" dataKey="valor" stroke="#0B1F4D" strokeWidth={2}
-                fill="#0B1F4D" fillOpacity={0.10} />
-              <Tooltip content={<RadarTooltip />} />
-            </RadarChart>
-          </ResponsiveContainer>
+          <RadarConfianza data={radarData} umbral={UMBRAL_SOLIDO} />
         </GlassPanel>
       </div>
 

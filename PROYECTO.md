@@ -6,7 +6,7 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
-## Versión actual: v8.0.1
+## Versión actual: v8.1
 Ver changelog completo abajo. Cambios clave: **rebrand a stuniv** (logo, favicon, título), nav sin "Inicio" (logo → home), fix TTS en iPhone, fix legibilidad confirmaciones rojas en Vidrio, fix overflow mobile al agregar materia, y **performance** (cache cliente con TTL + menos re-renders). Cambios clave: **sistema Liquid Glass completo** (material centralizado + primitivos React `Glass*` en todas las vistas, toggle Clásico 2D ↔ Vidrio en Inicio), Matriz de Confianza (radar) en Métricas, y **feedback de hover** en ambos modos (escala/elevación/brillo en botones, "encendido" del cristal en cards).
 
 ---
@@ -111,6 +111,13 @@ Fecha examen en mobile: `datetime-local` → `date` + `time` separados (fix iOS)
 Se migró el desarrollo de claude.ai (chat web) a Claude Code, trabajando directo sobre el repo local conectado a GitHub/Vercel. Este archivo (`PROYECTO.md`) reemplaza la necesidad de releer conversaciones pasadas — es la fuente de verdad única y acumulativa.
 
 <!-- A partir de acá, cada nueva versión agrega su entrada DEBAJO de esta línea, en orden cronológico -->
+
+### v8.1 — Performance (sin cambios visuales ni de uso)
+4 optimizaciones quirúrgicas. **Regla absoluta del pedido: cero cambios estéticos** (colores, opacidades, `--gl-*`, paddings, fuentes, bordes, sombras, animaciones `whileHover`/`whileTap`). El render es pixel-idéntico; sólo cambió dónde vive el estado y cómo se cargan los chunks.
+- **Aceleración GPU** (`globals.css`): al material maestro `:where(.glass-*, .rounded-*, botones)` se le agregó `will-change: transform, backdrop-filter` + `transform: translateZ(0)` (promueve a capa de composición → backdrop-filter más barato). No se tocó ninguna otra propiedad ni variable.
+- **Aislamiento de estado del Timer** (`app/timer/page.tsx`): el `setInterval` por segundo re-renderizaba TODO el Timer (tabs, input, select con ~9 options, círculo y controles). Se extrajo un nodo hoja `TimerDial` (memo) que es dueño del tick y se re-renderiza solo él. El padre ya no tickea. La lógica de `frenar()` se preservó exacta vía un `dispRef` puente (el leaf escribe ahí lo que antes iba al state). Inicio/Countdown ya estaba aislado (`CountdownHero`), no se tocó.
+- **Code splitting de Recharts** (`app/metricas/page.tsx` + nuevos `BarHoras.tsx` y `RadarConfianza.tsx`): los gráficos se importan con `next/dynamic({ ssr:false })` → Recharts sale del bundle inicial a un chunk aparte que carga sólo en `/metricas`, dentro de los `GlassPanel` ya dimensionados (cero salto de layout). Los parsers de `/tts` (`pdfjs-dist`, `mammoth`) ya estaban diferidos con `await import()`, no se tocaron.
+- **Prevención de re-renders** (`app/metricas/page.tsx`): `chartData`, `radarData` y `prepReal` con `useMemo`; `ahora` fijado una vez por montaje; `cambiarPrep` con `useCallback`; componentes de gráfico con `React.memo`. Resultado: arrastrar un slider de preparación recomputa sólo el radar, no el gráfico de barras.
 
 ### v8.0.1 — Logo fiel al manual de marca
 - **Desktop**: el logo del nav ahora es el **logotipo completo "stuniv."** como texto (navy `#0B1F4D` extrabold lowercase + punto azul `#009CDE`), no el cuadradito isotipo.

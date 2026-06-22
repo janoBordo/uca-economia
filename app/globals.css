@@ -63,6 +63,8 @@ html[data-theme="glass"] body {
     isolation: isolate;
     -webkit-backdrop-filter: blur(var(--gl-blur)) saturate(var(--gl-sat));
     backdrop-filter: blur(var(--gl-blur)) saturate(var(--gl-sat));
+    will-change: transform, backdrop-filter;
+    transform: translateZ(0);
     background-color: var(--gl-bg) !important;
     border: 1px solid var(--gl-edge) !important;
     box-shadow: var(--gl-inset), var(--gl-float) !important;

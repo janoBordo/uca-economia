@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useData } from "../lib/useData";
 import { addMinutos } from "../lib/api";
@@ -41,6 +41,78 @@ function loadSnap(): TimerSnap | null {
   catch { return null; }
 }
 
+type DispRef = React.MutableRefObject<{ restante: number; elapsed: number }>;
+type NumRef  = React.MutableRefObject<number>;
+
+// ── Nodo hoja AISLADO: es dueño del setInterval y se re-renderiza solo él ──
+// El padre (tabs, select, controles) no se re-renderiza por segundo.
+// El valor que tickea se escribe en dispRef para que frenar() lea exactamente
+// lo mismo que antes leía del state. `version` fuerza re-render en cambios
+// externos (reset/restaurar/cambio de modo) vía la comparación de memo.
+type DialProps = {
+  corriendo: boolean; modo: Modo; totalSecs: number;
+  startedRef: NumRef; acumRef: NumRef; dispRef: DispRef;
+  version: number; guardando: boolean; sesiones: number;
+  onComplete: () => void;
+};
+
+const TimerDial = memo(function TimerDial(
+  { corriendo, modo, totalSecs, startedRef, acumRef, dispRef, guardando, sesiones, onComplete }: DialProps
+) {
+  const [, forceTick] = useState(0);
+
+  useEffect(() => {
+    if (!corriendo) return;
+    const iv = setInterval(() => {
+      const delta = Math.floor((Date.now() - startedRef.current) / 1000) + acumRef.current;
+      if (modo === "pomodoro") {
+        const r = Math.max(0, totalSecs - delta);
+        dispRef.current.restante = r;
+        forceTick(t => t + 1);
+        if (r === 0) onComplete();
+      } else {
+        dispRef.current.elapsed = delta;
+        forceTick(t => t + 1);
+      }
+    }, 500);
+    return () => clearInterval(iv);
+  }, [corriendo, modo, totalSecs, startedRef, acumRef, dispRef, onComplete]);
+
+  const display  = modo === "pomodoro" ? dispRef.current.restante : dispRef.current.elapsed;
+  const mm       = String(Math.floor(display / 60)).padStart(2, "0");
+  const ss       = String(display % 60).padStart(2, "0");
+  const progreso = modo === "pomodoro" ? 1 - dispRef.current.restante / totalSecs : 0;
+  const R = 130; const circum = 2 * Math.PI * R;
+
+  return (
+    <div className="relative" style={{ width:300, height:300 }}>
+      <svg width="300" height="300" style={{ transform:"rotate(-90deg)" }}>
+        <circle cx="150" cy="150" r={R} fill="none" stroke="rgba(11,31,77,0.07)" strokeWidth="10" />
+        {modo==="pomodoro" && (
+          <motion.circle cx="150" cy="150" r={R} fill="none"
+            stroke={corriendo?"#C9A227":"#0B1F4D"} strokeWidth="10" strokeLinecap="round"
+            strokeDasharray={circum} animate={{ strokeDashoffset: circum*(1-progreso) }}
+            transition={{ ease:"linear", duration:0.4 }} />
+        )}
+        {modo==="cronometro" && corriendo && (
+          <circle cx="150" cy="150" r={R} fill="none" stroke="#C9A227" strokeWidth="10" />
+        )}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="tabular-nums font-black text-navy leading-none" style={{ fontSize:64, letterSpacing:"-0.04em" }}>{mm}:{ss}</span>
+        <span className="text-navy/35 text-xs uppercase tracking-widest mt-2 font-medium">
+          {guardando ? "guardando…" : corriendo ? (modo==="cronometro"?"registrando":"concentrado") : "listo"}
+        </span>
+        {sesiones>0 && (
+          <div className="flex gap-1 mt-3">
+            {Array.from({ length:Math.min(sesiones,8) }).map((_,i) => <div key={i} className="w-1.5 h-1.5 rounded-full bg-ocre"/>)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
 export default function Timer() {
   const { data } = useData();
   const materias = data.materias;
@@ -49,15 +121,14 @@ export default function Timer() {
   const [modo,       setModo]       = useState<Modo>("pomodoro");
   const [customMins, setCustomMins] = useState(25);
   const [corriendo,  setCorriendo]  = useState(false);
-  const [restante,   setRestante]   = useState(25 * 60);
-  const [elapsed,    setElapsed]    = useState(0);
   const [sesiones,   setSesiones]   = useState(0);
   const [toast,      setToast]      = useState<string | null>(null);
   const [guardando,  setGuardando]  = useState(false);
+  const [dialVersion, setDialVersion] = useState(0);   // notifica al leaf en cambios externos
 
   const acumRef    = useRef(0);   // segundos acumulados antes del tick actual
   const startedRef = useRef(0);   // Date.now() cuando arrancó el tick actual
-  const ivRef      = useRef<ReturnType<typeof setInterval>>();
+  const dispRef    = useRef({ restante: 25 * 60, elapsed: 0 });   // valor mostrado (lo escribe el leaf)
 
   const totalSecs = customMins * 60;
 
@@ -73,10 +144,11 @@ export default function Timer() {
     if (snap.corriendo) {
       const delta = Math.floor((Date.now() - snap.startedAt) / 1000) + snap.acumSecs;
       const total = snap.customMins * 60;
-      if (snap.modo === "pomodoro") setRestante(Math.max(0, total - delta));
-      else setElapsed(delta);
+      if (snap.modo === "pomodoro") dispRef.current.restante = Math.max(0, total - delta);
+      else dispRef.current.elapsed = delta;
       setCorriendo(true);
     }
+    setDialVersion(v => v + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -86,26 +158,11 @@ export default function Timer() {
   // Reset al cambiar modo/duración (solo si no corre)
   useEffect(() => {
     if (corriendo) return;
-    setRestante(totalSecs); setElapsed(0); acumRef.current = 0;
+    dispRef.current = { restante: totalSecs, elapsed: 0 };
+    acumRef.current = 0;
+    setDialVersion(v => v + 1);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modo, customMins]);
-
-  // ── Tick ──
-  useEffect(() => {
-    if (!corriendo) return;
-    ivRef.current = setInterval(() => {
-      const delta = Math.floor((Date.now() - startedRef.current) / 1000) + acumRef.current;
-      if (modo === "pomodoro") {
-        const r = Math.max(0, totalSecs - delta);
-        setRestante(r);
-        if (r === 0) frenar(true);
-      } else {
-        setElapsed(delta);
-      }
-    }, 500);
-    return () => clearInterval(ivRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [corriendo, modo, totalSecs]);
 
   // ── Persistir en localStorage cuando cambia el estado ──
   useEffect(() => {
@@ -123,16 +180,17 @@ export default function Timer() {
   }
 
   function pausar() {
-    clearInterval(ivRef.current);
     acumRef.current += Math.floor((Date.now() - startedRef.current) / 1000);
     setCorriendo(false);
   }
 
-  async function frenar(completo = false) {
-    clearInterval(ivRef.current);
+  const showToast = useCallback((msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3500); }, []);
+
+  const frenar = useCallback(async (completo = false) => {
     setCorriendo(false);
     if (completo) playAlarm();
 
+    const { restante, elapsed } = dispRef.current;
     const segsTransc = completo ? totalSecs
       : modo === "pomodoro"
         ? totalSecs - restante
@@ -150,24 +208,19 @@ export default function Timer() {
       const nombre = materias.find(m => m.id === matId)?.nombre ?? "";
       showToast(`+${mins} min guardados en ${nombre}`);
     }
-    setRestante(totalSecs); setElapsed(0);
-  }
+    dispRef.current = { restante: totalSecs, elapsed: 0 };
+    setDialVersion(v => v + 1);
+  }, [modo, totalSecs, matId, materias, showToast]);
+
+  const onComplete = useCallback(() => { frenar(true); }, [frenar]);
 
   function reset() {
-    clearInterval(ivRef.current);
     setCorriendo(false);
     acumRef.current = 0;
     saveSnap(null);
-    setRestante(totalSecs); setElapsed(0);
+    dispRef.current = { restante: totalSecs, elapsed: 0 };
+    setDialVersion(v => v + 1);
   }
-
-  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3500); }
-
-  const display  = modo === "pomodoro" ? restante : elapsed;
-  const mm       = String(Math.floor(display / 60)).padStart(2, "0");
-  const ss       = String(display % 60).padStart(2, "0");
-  const progreso = modo === "pomodoro" ? 1 - restante / totalSecs : 0;
-  const R = 130; const circum = 2 * Math.PI * R;
 
   return (
     <section className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative">
@@ -198,32 +251,10 @@ export default function Timer() {
         </GlassSelect>
       </div>
 
-      {/* Círculo */}
-      <div className="relative" style={{ width:300, height:300 }}>
-        <svg width="300" height="300" style={{ transform:"rotate(-90deg)" }}>
-          <circle cx="150" cy="150" r={R} fill="none" stroke="rgba(11,31,77,0.07)" strokeWidth="10" />
-          {modo==="pomodoro" && (
-            <motion.circle cx="150" cy="150" r={R} fill="none"
-              stroke={corriendo?"#C9A227":"#0B1F4D"} strokeWidth="10" strokeLinecap="round"
-              strokeDasharray={circum} animate={{ strokeDashoffset: circum*(1-progreso) }}
-              transition={{ ease:"linear", duration:0.4 }} />
-          )}
-          {modo==="cronometro" && corriendo && (
-            <circle cx="150" cy="150" r={R} fill="none" stroke="#C9A227" strokeWidth="10" />
-          )}
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="tabular-nums font-black text-navy leading-none" style={{ fontSize:64, letterSpacing:"-0.04em" }}>{mm}:{ss}</span>
-          <span className="text-navy/35 text-xs uppercase tracking-widest mt-2 font-medium">
-            {guardando ? "guardando…" : corriendo ? (modo==="cronometro"?"registrando":"concentrado") : "listo"}
-          </span>
-          {sesiones>0 && (
-            <div className="flex gap-1 mt-3">
-              {Array.from({ length:Math.min(sesiones,8) }).map((_,i) => <div key={i} className="w-1.5 h-1.5 rounded-full bg-ocre"/>)}
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Círculo (nodo hoja aislado del tick) */}
+      <TimerDial corriendo={corriendo} modo={modo} totalSecs={totalSecs}
+        startedRef={startedRef} acumRef={acumRef} dispRef={dispRef}
+        version={dialVersion} guardando={guardando} sesiones={sesiones} onComplete={onComplete} />
 
       {/* Controles */}
       <div className="flex items-center gap-4 mt-10">
