@@ -295,44 +295,46 @@ export default function Timer() {
         <p className="mt-2 text-ocre/60 text-xs text-center">El timer sigue aunque cambies de página</p>
       )}
 
-      {/* ── Carga manual: estudiaste y te olvidaste del pomodoro ── */}
+      {/* ── Carga manual, a un costado del timer (flotante, siempre visible sin scroll) ── */}
       {!corriendo && (
-        <div className="mt-8 w-full max-w-sm">
+        <div className="absolute top-4 right-4 sm:top-8 sm:right-8 z-10 w-[min(17rem,calc(100%-2rem))] flex flex-col items-end">
           <AnimatePresence mode="wait">
             {!manualOpen ? (
               <motion.button key="abrir" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
                 onClick={() => setManualOpen(true)}
-                className="w-full py-3 rounded-2xl border border-dashed border-navy/15 text-navy/45 hover:border-ocre/40 hover:text-ocre transition-colors text-sm font-medium flex items-center justify-center gap-2">
-                <span className="text-base leading-none">＋</span> Ya estudiaste sin el timer
+                className="px-3.5 py-2 rounded-full bg-navy/5 border border-navy/15 text-navy/60 hover:border-ocre/50 hover:text-ocre transition-colors text-xs font-medium flex items-center gap-1.5 whitespace-nowrap">
+                <span className="text-sm leading-none">＋</span>
+                <span className="hidden sm:inline">Cargar horas</span>
               </motion.button>
             ) : (
-              <motion.div key="form" initial={{ opacity:0, y:6 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
-                className="p-5 rounded-2xl border border-navy/10 bg-navy/[0.02]">
-                <p className="text-navy/60 text-sm font-medium text-center mb-4">
-                  Sumar horas a <span className="text-navy font-semibold">{materias.find(m => m.id === matId)?.nombre ?? "—"}</span>
+              <motion.div key="form" initial={{ opacity:0, y:-6, scale:0.98 }} animate={{ opacity:1, y:0, scale:1 }} exit={{ opacity:0, scale:0.98 }}
+                className="w-full p-4 rounded-2xl border border-navy/12 bg-canvas shadow-xl shadow-navy/10">
+                <p className="text-navy/55 text-xs font-medium mb-3 leading-snug">
+                  ¿Estudiaste sin el timer? Sumá horas a<br />
+                  <span className="text-navy font-semibold">{materias.find(m => m.id === matId)?.nombre ?? "—"}</span>
                 </p>
-                <div className="flex items-end justify-center gap-4 mb-5">
-                  <label className="flex flex-col items-center gap-1.5">
+                <div className="flex items-end gap-3 mb-4">
+                  <label className="flex flex-col items-center gap-1">
                     <GlassInput type="number" min={0} max={24} value={manualH}
                       onChange={e => setManualH(Math.max(0, +e.target.value))}
-                      className="w-20 text-center bg-transparent border-b-2 border-navy/20 focus:border-ocre text-navy font-bold text-2xl focus:outline-none" />
-                    <span className="text-navy/40 text-xs uppercase tracking-wider">horas</span>
+                      className="w-16 text-center bg-transparent border-b-2 border-navy/20 focus:border-ocre text-navy font-bold text-xl focus:outline-none" />
+                    <span className="text-navy/40 text-[10px] uppercase tracking-wider">horas</span>
                   </label>
-                  <label className="flex flex-col items-center gap-1.5">
+                  <label className="flex flex-col items-center gap-1">
                     <GlassInput type="number" min={0} max={59} value={manualM}
                       onChange={e => setManualM(Math.min(59, Math.max(0, +e.target.value)))}
-                      className="w-20 text-center bg-transparent border-b-2 border-navy/20 focus:border-ocre text-navy font-bold text-2xl focus:outline-none" />
-                    <span className="text-navy/40 text-xs uppercase tracking-wider">min</span>
+                      className="w-16 text-center bg-transparent border-b-2 border-navy/20 focus:border-ocre text-navy font-bold text-xl focus:outline-none" />
+                    <span className="text-navy/40 text-[10px] uppercase tracking-wider">min</span>
                   </label>
                 </div>
-                <div className="flex gap-3 justify-center">
+                <div className="flex gap-2">
                   <GlassButton onClick={guardarManual} disabled={guardando || (manualH === 0 && manualM === 0)}
-                    className="px-6 py-2.5 rounded-full bg-navy text-canvas text-sm font-semibold hover:bg-navy-soft transition-colors disabled:opacity-40 flex items-center gap-2">
+                    className="flex-1 px-3 py-2 rounded-full bg-navy text-canvas text-xs font-semibold hover:bg-navy-soft transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5">
                     {guardando && <span className="animate-spin text-ocre">◌</span>}
-                    Sumar horas
+                    Sumar
                   </GlassButton>
                   <button onClick={() => setManualOpen(false)}
-                    className="px-6 py-2.5 rounded-full border border-navy/15 text-navy/50 text-sm hover:border-navy/30 transition-colors">
+                    className="px-3 py-2 rounded-full border border-navy/15 text-navy/50 text-xs hover:border-navy/30 transition-colors">
                     Cancelar
                   </button>
                 </div>

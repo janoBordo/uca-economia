@@ -252,75 +252,53 @@ export default function Semestre() {
           </AnimatePresence>
         </div>
 
-        {/* Reiniciar datos */}
-        <div className="pt-8 mt-8 border-t border-navy/8">
-          <div className="flex items-center gap-2.5 mb-1.5">
-            <span className="flex items-center justify-center w-7 h-7 rounded-xl bg-ocre/15 text-ocre-dark text-sm shrink-0">⟳</span>
-            <h4 className="font-bold text-navy text-lg" style={{ letterSpacing:"-0.02em" }}>Reiniciar datos</h4>
-          </div>
-          <p className="text-navy/45 text-sm mb-5 pl-[2.4rem]">
-            Empezá de cero sin perder tus materias ni sus fechas. Cada acción te pide confirmar.
-          </p>
+        {/* Reiniciar datos — compacto, en línea, con acento rojo */}
+        <div className="pt-5 mt-6 border-t border-navy/8 flex flex-wrap items-center gap-x-5 gap-y-2.5">
+          <span className="text-red-500/70 text-[11px] font-bold uppercase tracking-widest">Reiniciar</span>
 
-          <div className="rounded-2xl border border-navy/10 overflow-hidden" style={{ background:"rgba(11,31,77,0.02)" }}>
-            {/* Horas y preparación */}
-            <div className="flex items-center justify-between gap-4 px-5 py-4">
-              <div className="min-w-0">
-                <p className="text-navy font-medium text-sm">Horas y preparación</p>
-                <p className="text-navy/40 text-xs mt-0.5">Vuelve las métricas a cero. Las fechas de examen quedan intactas.</p>
-              </div>
-              <AnimatePresence mode="wait">
-                {!confirmHoras ? (
-                  <motion.button key="bh" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-                    onClick={() => setConfirmHoras(true)}
-                    className="shrink-0 px-4 py-2 rounded-full border border-navy/15 text-navy/55 text-xs font-semibold hover:border-navy/35 hover:text-navy transition-colors">
-                    Reiniciar
-                  </motion.button>
-                ) : (
-                  <motion.div key="ch" initial={{ opacity:0, x:8 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0 }}
-                    className="shrink-0 flex items-center gap-2">
-                    <span className="text-navy/45 text-xs hidden sm:inline">¿Seguro?</span>
-                    <button onClick={doResetHoras} disabled={ejHoras}
-                      className="px-3.5 py-1.5 rounded-full bg-red-500 text-white text-xs font-semibold hover:bg-red-600 transition-colors disabled:opacity-50">
-                      {ejHoras ? "…" : "Sí, borrar"}
-                    </button>
-                    <button onClick={() => setConfirmHoras(false)}
-                      className="px-3.5 py-1.5 rounded-full border border-navy/15 text-navy/50 text-xs hover:border-navy/35 transition-colors">Cancelar</button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+          {/* Horas y preparación */}
+          <AnimatePresence mode="wait">
+            {!confirmHoras ? (
+              <motion.button key="bh" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+                onClick={() => setConfirmHoras(true)}
+                className="text-red-500 text-sm hover:text-red-600 transition-colors">
+                Borrar horas y preparación
+              </motion.button>
+            ) : (
+              <motion.span key="ch" initial={{ opacity:0, x:6 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0 }}
+                className="flex items-center gap-2 text-xs">
+                <span className="text-navy/50">¿Borrar las métricas? (las fechas quedan)</span>
+                <button onClick={doResetHoras} disabled={ejHoras}
+                  className="px-3 py-1 rounded-full bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors disabled:opacity-50">
+                  {ejHoras ? "…" : "Sí"}
+                </button>
+                <button onClick={() => setConfirmHoras(false)} className="text-navy/45 hover:text-navy transition-colors">No</button>
+              </motion.span>
+            )}
+          </AnimatePresence>
 
-            <div className="h-px bg-navy/6" />
+          <span className="text-navy/20 hidden sm:inline">·</span>
 
-            {/* Plan de estudio */}
-            <div className="flex items-center justify-between gap-4 px-5 py-4">
-              <div className="min-w-0">
-                <p className="text-navy font-medium text-sm">Plan de estudio</p>
-                <p className="text-navy/40 text-xs mt-0.5">Borra los días planificados en el calendario.</p>
-              </div>
-              <AnimatePresence mode="wait">
-                {!confirmPlan ? (
-                  <motion.button key="bp" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-                    onClick={() => setConfirmPlan(true)}
-                    className="shrink-0 px-4 py-2 rounded-full border border-navy/15 text-navy/55 text-xs font-semibold hover:border-navy/35 hover:text-navy transition-colors">
-                    Limpiar
-                  </motion.button>
-                ) : (
-                  <motion.div key="cp" initial={{ opacity:0, x:8 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0 }}
-                    className="shrink-0 flex items-center gap-2">
-                    <span className="text-navy/45 text-xs hidden sm:inline">¿Seguro?</span>
-                    <button onClick={doClearPlan} disabled={ejPlan}
-                      className="px-3.5 py-1.5 rounded-full bg-red-500 text-white text-xs font-semibold hover:bg-red-600 transition-colors disabled:opacity-50">
-                      {ejPlan ? "…" : "Sí, borrar"}
-                    </button>
-                    <button onClick={() => setConfirmPlan(false)}
-                      className="px-3.5 py-1.5 rounded-full border border-navy/15 text-navy/50 text-xs hover:border-navy/35 transition-colors">Cancelar</button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </div>
+          {/* Plan de estudio */}
+          <AnimatePresence mode="wait">
+            {!confirmPlan ? (
+              <motion.button key="bp" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+                onClick={() => setConfirmPlan(true)}
+                className="text-red-500 text-sm hover:text-red-600 transition-colors">
+                Limpiar plan de estudio
+              </motion.button>
+            ) : (
+              <motion.span key="cp" initial={{ opacity:0, x:6 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0 }}
+                className="flex items-center gap-2 text-xs">
+                <span className="text-navy/50">¿Borrar los días planificados?</span>
+                <button onClick={doClearPlan} disabled={ejPlan}
+                  className="px-3 py-1 rounded-full bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors disabled:opacity-50">
+                  {ejPlan ? "…" : "Sí"}
+                </button>
+                <button onClick={() => setConfirmPlan(false)} className="text-navy/45 hover:text-navy transition-colors">No</button>
+              </motion.span>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 

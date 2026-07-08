@@ -6,7 +6,17 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
-## Versión actual: v8.2
+## Versión actual: v8.4
+Ajustes de UX y performance sobre lo de v8.2:
+- **Pomodoro — carga manual reubicada**: el botón "Cargar horas" ya no va abajo (requería scroll para descubrirlo). Ahora es un panel **flotante a un costado del timer** (`absolute top-right`, siempre visible sin scroll). Trigger chico (ícono ＋ en mobile, "＋ Cargar horas" en desktop) que abre un mini-form compacto.
+- **Lectura — reproductor simplificado y sin bug de pausa**: se sacó la card con las frases. Ahora es sólo una **barra que muestra por qué parte va + clickeable para saltar**, con controles ↺ principio · ⏮ atrás · ▶/⏸ · ⏭ adelante. La pausa ahora es confiable: en vez del `pause()/resume()` de Web Speech (que corta las utterances largas y quedaba trabado), **pausar cancela y recuerda la parte**, y al reanudar re-lee la parte actual desde el inicio (las partes son cortas → predecible).
+- **Lectura — menos texto de notas**: la nota larga del MP3 + tip de iPhone se reemplazó por una sola línea ("Se genera al instante. No ocupa espacio en tu cuenta.").
+- **Semestre — "Reiniciar datos" más compacto**: se sacó la card grande. Ahora es una **fila en línea** con acento rojo: label "Reiniciar" + links rojos "Borrar horas y preparación" / "Limpiar plan de estudio" con confirmación inline (Sí/No). Ocupa mucho menos espacio y mantiene el rojo.
+- **Vidrio 3D — performance**: el material glass aplicaba `backdrop-filter` + `will-change` + `translateZ(0)` a **cada** elemento redondeado (todos los pills/botones), promoviendo cientos de capas GPU → app trabada, sobre todo en mobile. Ahora el blur va **sólo en superficies grandes** (cards, paneles, modales, tabs); los botones conservan el vidrio (translúcido + borde + gloss) sin blur propio. Se quitó `will-change`/`translateZ` globales. Se ve prácticamente igual pero mucho más fluido. (Ver globals.css.)
+
+---
+
+## v8.2
 Cambios de esta versión (Lectura + Pomodoro + Semestre):
 - **Pomodoro — carga manual de horas**: en `/timer`, botón "Ya estudiaste sin el timer" que abre un mini form (horas + min) y suma directo a la materia con `addMinutos`, para cuando estudiaste sin usar el timer. Solo visible con el timer detenido.
 - **Pomodoro — materia por defecto = examen más próximo**: la materia preseleccionada ahora es la del examen más cercano no vencido (`materiasPorProximidad(data)[0]`), no la primera de la lista.
@@ -53,7 +63,8 @@ Ver detalle completo de v2 a v6.2 en la sección "Historia completa" al final de
 - Se cambia con el toggle al final de la home (`app/components/ThemeToggle.tsx`, usa `GlassTabs`).
 - Preferencia guardada en `localStorage` key `uca_theme` ("normal" | "glass") — NO va a la DB.
 - Script anti-flash en `layout.tsx` aplica el tema antes del primer paint.
-- **Sistema de material** (v7.1): el material Liquid Glass vive centralizado en `globals.css` bajo `html[data-theme="glass"]` (tokens `--gl-*` + cobertura de cards, botones, inputs, selects, textarea, tabs, paneles, modales y header). Transparencia real, blur fuerte, borde de cristal, reflejo gloss (`::before`), glow de color y profundidad flotante. Calibrado ~70% de las referencias.
+- **Sistema de material** (v7.1): el material Liquid Glass vive centralizado en `globals.css` bajo `html[data-theme="glass"]` (tokens `--gl-*` + cobertura de cards, botones, inputs, selects, textarea, tabs, paneles, modales y header). Transparencia real, borde de cristal, reflejo gloss (`::before`), glow de color y profundidad flotante. Calibrado ~70% de las referencias.
+- **Performance del vidrio (v8.4)**: el `backdrop-filter` (blur, lo caro en GPU) se aplica **sólo a superficies grandes** (cards, paneles, modales, tabs, `.rounded-2xl/3xl`), NO a cada pill/botón. Los botones conservan translúcido + borde + gloss sin blur propio. Se quitaron `will-change` y `translateZ(0)` globales (promovían cientos de capas). Look casi idéntico, mucho más fluido en mobile.
 - **Primitivos React** (`app/components/glass.tsx`): `GlassCard`, `GlassPanel`, `GlassButton`, `GlassInput`, `GlassSelect`, `GlassTextarea`, `GlassModal`, `GlassTabs`. Son wrappers finos sobre `framer-motion` que sólo agregan la clase marcadora `.glass-*` y reenvían props/animaciones/ref. En modo Clásico no agregan estilos → look idéntico al actual. Todas las vistas usan estos primitivos.
 
 ## Modelo de datos (`app/lib/types.ts` → `AppData`)

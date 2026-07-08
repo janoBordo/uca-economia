@@ -66,7 +66,6 @@ export default function TTS() {
   const inputRef  = useRef<HTMLInputElement>(null);
   const velRef    = useRef(1);       // velocidad viva para el encadenado onend
   const vozRef    = useRef(0);
-  const listaRef  = useRef<HTMLDivElement>(null);
 
   const capitulos = useMemo(() => dividirEnCapitulos(texto), [texto]);
 
@@ -95,9 +94,12 @@ export default function TTS() {
   // Frenar al desmontar
   useEffect(() => () => detenerVoz(), []);
 
-  // ── Reproducción por capítulos ──
+  // ── Reproducción por partes (Web Speech) ──
+  // Pausar = cancelar y recordar la parte. Web Speech pausa mal y corta las
+  // utterances largas, así que al reanudar re-leemos la parte actual desde su
+  // inicio: como son cortas queda predecible y sin quedar "trabado".
   function detenerVoz() {
-    if (utterRef.current) utterRef.current.onend = null;  // evita que se dispare el encadenado
+    if (utterRef.current) utterRef.current.onend = null;  // que no dispare el encadenado
     try { window.speechSynthesis.cancel(); } catch { /* noop */ }
   }
 
@@ -115,7 +117,7 @@ export default function TTS() {
     utter.onend = () => {
       const next = i + 1;
       if (next < capitulos.length) reproducirDesde(next);
-      else { setLeyendo(false); setPausado(false); setCapIdx(capitulos.length); }  // terminó: 100%
+      else { setLeyendo(false); setPausado(false); setCapIdx(capitulos.length); }  // terminó
     };
     utter.onerror = () => { setLeyendo(false); setPausado(false); };
 
@@ -125,42 +127,35 @@ export default function TTS() {
     window.speechSynthesis.resume();   // iOS a veces arranca pausado
   }
 
-  // Botón central: play / pausa / reanudar / reiniciar
+  // Botón central: reproducir / pausar
   function togglePlay() {
     if (!capitulos.length) return;
-    if (!leyendo) {
+    if (leyendo) {                              // sonando → pausar
+      detenerVoz();
+      setLeyendo(false); setPausado(true);
+    } else {                                    // detenido o pausado → seguir desde la parte actual
       reproducirDesde(capIdx >= capitulos.length ? 0 : capIdx);
-    } else if (pausado) {
-      window.speechSynthesis.resume(); setPausado(false);
-    } else {
-      window.speechSynthesis.pause(); setPausado(true);
     }
   }
 
-  function saltar(delta: number) {
-    const destino = Math.max(0, Math.min(capIdx + delta, capitulos.length - 1));
-    if (leyendo) reproducirDesde(destino);   // como un podcast: salta y sigue sonando
-    else setCapIdx(destino);
+  function irAParte(idx: number) {
+    const destino = Math.max(0, Math.min(idx, capitulos.length - 1));
+    if (leyendo) reproducirDesde(destino);      // sonando → salta y sigue
+    else { setCapIdx(destino); setPausado(false); }  // detenido → sólo reposiciona
   }
 
-  function irACapitulo(i: number) {
-    reproducirDesde(i);   // clic en la lista = escuchar esa parte desde ahí
+  function irInicio() {
+    if (leyendo) reproducirDesde(0);
+    else { detenerVoz(); setCapIdx(0); setPausado(false); }
   }
 
-  function detenerTodo() {
-    detenerVoz();
-    setLeyendo(false); setPausado(false); setCapIdx(0);
+  // Barra clickeable: elegir la parte tocando la barra
+  function seekBar(e: React.MouseEvent<HTMLButtonElement>) {
+    if (capitulos.length <= 1) return irAParte(0);
+    const rect  = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    irAParte(Math.round(ratio * (capitulos.length - 1)));
   }
-
-  // Mantener el capítulo activo visible en la lista
-  useEffect(() => {
-    const cont = listaRef.current;
-    const el = cont?.querySelector<HTMLElement>(`[data-cap="${capIdx}"]`);
-    if (el && cont) {
-      const top = el.offsetTop - cont.offsetTop - cont.clientHeight / 2 + el.clientHeight / 2;
-      cont.scrollTo({ top, behavior: "smooth" });
-    }
-  }, [capIdx]);
 
   // ── Descargar MP3 real (proxy TTS gratuito) ──
   async function descargarMp3() {
@@ -236,8 +231,10 @@ export default function TTS() {
     } finally { setCargandoDoc(false); }
   }
 
-  const chars    = texto.length;
-  const progreso = capitulos.length ? Math.min(capIdx, capitulos.length) / capitulos.length : 0;
+  const chars  = texto.length;
+  const barPct = capitulos.length <= 1
+    ? (capIdx >= capitulos.length ? 100 : 0)
+    : Math.min(capIdx, capitulos.length - 1) / (capitulos.length - 1) * 100;
 
   return (
     <section className="flex-1 w-full max-w-3xl mx-auto px-6 sm:px-8 py-16 flex flex-col">
@@ -289,64 +286,41 @@ export default function TTS() {
         </div>
       </div>
 
-      {/* ── Reproductor por capítulos ── */}
+      {/* ── Reproductor por partes ── */}
       {capitulos.length > 0 && (
-        <div className="mt-8 rounded-3xl border border-navy/10 bg-navy/[0.02] p-5 sm:p-6">
-          {/* Barra de progreso */}
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-navy/45 text-xs font-medium tabular-nums">
+        <div className="mt-8 rounded-2xl border border-navy/10 bg-navy/[0.02] p-5 sm:p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-navy/55 text-sm font-medium tabular-nums">
               Parte {Math.min(capIdx + 1, capitulos.length)} de {capitulos.length}
             </span>
-            <span className="text-navy/30 text-xs">{Math.round(progreso * 100)}%</span>
-          </div>
-          <div className="h-1.5 rounded-full bg-navy/8 overflow-hidden mb-5">
-            <motion.div className="h-full bg-ocre rounded-full"
-              animate={{ width: `${progreso * 100}%` }} transition={{ ease:"linear", duration:0.3 }} />
+            <span className="text-ocre text-xs font-medium h-4">
+              {leyendo ? "Reproduciendo…" : pausado ? "Pausado" : ""}
+            </span>
           </div>
 
-          {/* Transporte */}
-          <div className="flex items-center justify-center gap-4 mb-5">
-            <GlassButton onClick={() => saltar(-1)} disabled={capIdx <= 0}
-              className="w-12 h-12 rounded-full border-2 border-navy/15 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors text-lg disabled:opacity-30">
-              ⏮
-            </GlassButton>
-            <GlassButton onClick={togglePlay}
+          {/* Barra: muestra por qué parte va y permite saltar */}
+          <button type="button" onClick={seekBar} aria-label="Elegir parte"
+            className="relative w-full h-3 rounded-full bg-navy/10 overflow-hidden cursor-pointer">
+            <motion.div className="absolute inset-y-0 left-0 bg-ocre rounded-full"
+              animate={{ width: `${barPct}%` }} transition={{ ease:"linear", duration:0.25 }} />
+          </button>
+
+          {/* Controles: principio · atrás · play/pausa · adelante */}
+          <div className="flex items-center justify-center gap-3 mt-6">
+            <GlassButton onClick={irInicio} disabled={capIdx <= 0 && !leyendo} aria-label="Volver al principio"
+              className="w-11 h-11 rounded-full border-2 border-navy/15 text-navy/55 hover:border-navy/40 hover:text-navy transition-colors disabled:opacity-30 text-base">↺</GlassButton>
+            <GlassButton onClick={() => irAParte(capIdx - 1)} disabled={capIdx <= 0} aria-label="Parte anterior"
+              className="w-12 h-12 rounded-full border-2 border-navy/15 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors disabled:opacity-30 text-lg">⏮</GlassButton>
+            <GlassButton onClick={togglePlay} aria-label={leyendo ? "Pausar" : "Escuchar"}
               className={`w-16 h-16 rounded-full font-bold text-xl shadow-lg transition-all active:scale-95 ${
-                leyendo && !pausado ? "bg-ocre text-navy hover:bg-ocre-light" : "bg-navy text-canvas hover:bg-navy-soft"
+                leyendo ? "bg-ocre text-navy hover:bg-ocre-light" : "bg-navy text-canvas hover:bg-navy-soft"
               }`}>
-              {leyendo && !pausado ? "⏸" : "▶"}
+              {leyendo ? "⏸" : "▶"}
             </GlassButton>
-            <GlassButton onClick={() => saltar(1)} disabled={capIdx >= capitulos.length - 1}
-              className="w-12 h-12 rounded-full border-2 border-navy/15 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors text-lg disabled:opacity-30">
-              ⏭
-            </GlassButton>
-            {leyendo && (
-              <GlassButton onClick={detenerTodo}
-                className="w-12 h-12 rounded-full border-2 border-navy/15 text-navy/40 hover:border-ocre/60 hover:text-ocre transition-colors text-sm">
-                ⏹
-              </GlassButton>
-            )}
+            <GlassButton onClick={() => irAParte(capIdx + 1)} disabled={capIdx >= capitulos.length - 1} aria-label="Parte siguiente"
+              className="w-12 h-12 rounded-full border-2 border-navy/15 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors disabled:opacity-30 text-lg">⏭</GlassButton>
           </div>
-          <p className="text-center text-navy/35 text-xs mb-4">
-            ⏮ atrás · ▶ escuchar / ⏸ pausar · ⏭ adelante — o tocá cualquier parte de la lista
-          </p>
-
-          {/* Lista de capítulos: seleccionar la parte a escuchar */}
-          <div ref={listaRef} className="max-h-64 overflow-y-auto rounded-2xl border border-navy/8 bg-canvas/60 divide-y divide-navy/6">
-            {capitulos.map((c, i) => (
-              <button key={i} data-cap={i} onClick={() => irACapitulo(i)}
-                className={`w-full text-left px-4 py-3 flex gap-3 transition-colors ${
-                  i === capIdx ? "bg-ocre/10" : "hover:bg-navy/[0.03]"
-                }`}>
-                <span className={`shrink-0 text-xs tabular-nums font-semibold mt-0.5 ${i === capIdx ? "text-ocre-dark" : "text-navy/30"}`}>
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span className={`text-sm leading-snug ${i === capIdx ? "text-navy font-medium" : "text-navy/55"}`}>
-                  {c.length > 140 ? c.slice(0, 140) + "…" : c}
-                </span>
-              </button>
-            ))}
-          </div>
+          <p className="text-center text-navy/35 text-xs mt-4">↺ principio · ⏮ atrás · ⏭ adelante · o tocá la barra</p>
         </div>
       )}
 
@@ -363,12 +337,7 @@ export default function TTS() {
             <motion.div className="h-full bg-ocre rounded-full" animate={{ width: `${mp3Pct}%` }} transition={{ ease:"linear", duration:0.2 }} />
           </div>
         )}
-        <p className="text-navy/30 text-xs mt-3">
-          El .mp3 se arma en el momento con una voz de servidor gratuita. No se guarda nada en la nube ni ocupa espacio en tu cuenta.
-        </p>
-        <p className="text-navy/30 text-xs mt-1">
-          Para escuchar en vivo se usa la voz del dispositivo. En iPhone, revisá que el switch de silencio esté apagado y el volumen arriba.
-        </p>
+        <p className="text-navy/30 text-xs mt-3">Se genera al instante. No ocupa espacio en tu cuenta.</p>
       </div>
 
       <AnimatePresence>
