@@ -2,7 +2,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useData } from "../lib/useData";
-import { addMinutos } from "../lib/api";
+import { addMinutos, materiasPorProximidad } from "../lib/api";
 import { GlassTabs, GlassButton, GlassInput, GlassSelect } from "../components/glass";
 
 type Modo = "pomodoro" | "cronometro";
@@ -116,6 +116,8 @@ const TimerDial = memo(function TimerDial(
 export default function Timer() {
   const { data } = useData();
   const materias = data.materias;
+  // Materia sugerida por default: la del examen más próximo (no vencido).
+  const materiaProxima = materiasPorProximidad(data)[0]?.id ?? "";
 
   const [matId,      setMatId]      = useState("");
   const [modo,       setModo]       = useState<Modo>("pomodoro");
@@ -125,6 +127,9 @@ export default function Timer() {
   const [toast,      setToast]      = useState<string | null>(null);
   const [guardando,  setGuardando]  = useState(false);
   const [dialVersion, setDialVersion] = useState(0);   // notifica al leaf en cambios externos
+  const [manualOpen, setManualOpen] = useState(false);  // carga manual de horas ya estudiadas
+  const [manualH,    setManualH]    = useState(1);
+  const [manualM,    setManualM]    = useState(0);
 
   const acumRef    = useRef(0);   // segundos acumulados antes del tick actual
   const startedRef = useRef(0);   // Date.now() cuando arrancó el tick actual
@@ -152,8 +157,8 @@ export default function Timer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Materia default
-  useEffect(() => { if (!matId && materias.length) setMatId(materias[0].id); }, [materias, matId]);
+  // Materia default: la del examen más próximo
+  useEffect(() => { if (!matId && materiaProxima) setMatId(materiaProxima); }, [materiaProxima, matId]);
 
   // Reset al cambiar modo/duración (solo si no corre)
   useEffect(() => {
@@ -214,6 +219,21 @@ export default function Timer() {
 
   const onComplete = useCallback(() => { frenar(true); }, [frenar]);
 
+  // Sumar horas estudiadas sin haber usado el timer (te olvidaste del pomodoro)
+  async function guardarManual() {
+    const mins = Math.max(0, Math.round(manualH * 60 + manualM));
+    if (mins <= 0 || !matId) return;
+    setGuardando(true);
+    await addMinutos(matId, mins);
+    setGuardando(false);
+    setSesiones(s => s + 1);
+    const nombre = materias.find(m => m.id === matId)?.nombre ?? "";
+    const hLbl = manualH ? `${manualH}h ` : "";
+    const mLbl = manualM ? `${manualM}min` : "";
+    showToast(`+${(hLbl + mLbl).trim() || `${mins} min`} guardados en ${nombre}`);
+    setManualOpen(false); setManualH(1); setManualM(0);
+  }
+
   function reset() {
     setCorriendo(false);
     acumRef.current = 0;
@@ -273,6 +293,53 @@ export default function Timer() {
       </p>
       {corriendo && (
         <p className="mt-2 text-ocre/60 text-xs text-center">El timer sigue aunque cambies de página</p>
+      )}
+
+      {/* ── Carga manual: estudiaste y te olvidaste del pomodoro ── */}
+      {!corriendo && (
+        <div className="mt-8 w-full max-w-sm">
+          <AnimatePresence mode="wait">
+            {!manualOpen ? (
+              <motion.button key="abrir" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+                onClick={() => setManualOpen(true)}
+                className="w-full py-3 rounded-2xl border border-dashed border-navy/15 text-navy/45 hover:border-ocre/40 hover:text-ocre transition-colors text-sm font-medium flex items-center justify-center gap-2">
+                <span className="text-base leading-none">＋</span> Ya estudiaste sin el timer
+              </motion.button>
+            ) : (
+              <motion.div key="form" initial={{ opacity:0, y:6 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
+                className="p-5 rounded-2xl border border-navy/10 bg-navy/[0.02]">
+                <p className="text-navy/60 text-sm font-medium text-center mb-4">
+                  Sumar horas a <span className="text-navy font-semibold">{materias.find(m => m.id === matId)?.nombre ?? "—"}</span>
+                </p>
+                <div className="flex items-end justify-center gap-4 mb-5">
+                  <label className="flex flex-col items-center gap-1.5">
+                    <GlassInput type="number" min={0} max={24} value={manualH}
+                      onChange={e => setManualH(Math.max(0, +e.target.value))}
+                      className="w-20 text-center bg-transparent border-b-2 border-navy/20 focus:border-ocre text-navy font-bold text-2xl focus:outline-none" />
+                    <span className="text-navy/40 text-xs uppercase tracking-wider">horas</span>
+                  </label>
+                  <label className="flex flex-col items-center gap-1.5">
+                    <GlassInput type="number" min={0} max={59} value={manualM}
+                      onChange={e => setManualM(Math.min(59, Math.max(0, +e.target.value)))}
+                      className="w-20 text-center bg-transparent border-b-2 border-navy/20 focus:border-ocre text-navy font-bold text-2xl focus:outline-none" />
+                    <span className="text-navy/40 text-xs uppercase tracking-wider">min</span>
+                  </label>
+                </div>
+                <div className="flex gap-3 justify-center">
+                  <GlassButton onClick={guardarManual} disabled={guardando || (manualH === 0 && manualM === 0)}
+                    className="px-6 py-2.5 rounded-full bg-navy text-canvas text-sm font-semibold hover:bg-navy-soft transition-colors disabled:opacity-40 flex items-center gap-2">
+                    {guardando && <span className="animate-spin text-ocre">◌</span>}
+                    Sumar horas
+                  </GlassButton>
+                  <button onClick={() => setManualOpen(false)}
+                    className="px-6 py-2.5 rounded-full border border-navy/15 text-navy/50 text-sm hover:border-navy/30 transition-colors">
+                    Cancelar
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       )}
 
       <AnimatePresence>

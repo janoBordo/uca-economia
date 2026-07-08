@@ -6,8 +6,19 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
-## Versión actual: v8.1
-Ver changelog completo abajo. Cambios clave: **rebrand a stuniv** (logo, favicon, título), nav sin "Inicio" (logo → home), fix TTS en iPhone, fix legibilidad confirmaciones rojas en Vidrio, fix overflow mobile al agregar materia, y **performance** (cache cliente con TTL + menos re-renders). Cambios clave: **sistema Liquid Glass completo** (material centralizado + primitivos React `Glass*` en todas las vistas, toggle Clásico 2D ↔ Vidrio en Inicio), Matriz de Confianza (radar) en Métricas, y **feedback de hover** en ambos modos (escala/elevación/brillo en botones, "encendido" del cristal en cards).
+## Versión actual: v8.2
+Cambios de esta versión (Lectura + Pomodoro + Semestre):
+- **Pomodoro — carga manual de horas**: en `/timer`, botón "Ya estudiaste sin el timer" que abre un mini form (horas + min) y suma directo a la materia con `addMinutos`, para cuando estudiaste sin usar el timer. Solo visible con el timer detenido.
+- **Pomodoro — materia por defecto = examen más próximo**: la materia preseleccionada ahora es la del examen más cercano no vencido (`materiasPorProximidad(data)[0]`), no la primera de la lista.
+- **Lectura — PDF arreglado**: el worker de pdf.js apuntaba a un `.min.js` inexistente en CDN (por eso solo andaba Word). Ahora usa el worker `.mjs` correcto desde unpkg matcheando la versión del paquete + polyfill de `Promise.withResolvers` (pdf.js v4 lo requiere y iOS/Safari viejos no lo tienen). También se acepta `.txt`.
+- **Lectura — escuchar por capítulos con seek**: el texto se parte en "partes" (oraciones agrupadas ~240 chars). Reproductor tipo podcast con ⏮/▶⏸/⏭ y una lista clickeable para saltar a cualquier parte y escuchar desde ahí (antes había que arrancar del inicio siempre). Sigue usando Web Speech (voz del navegador, gratis).
+- **Lectura — descargar .mp3 REAL sin grabar pantalla**: nueva ruta `/api/tts` (edge) que hace de **proxy al TTS gratuito de Google Translate** (sin API key, sin ElevenLabs, sin tocar Vercel KV). El cliente parte el texto en trozos ≤200 chars, pide cada uno, concatena los blobs y descarga un `lectura.mp3` con barra de progreso. No se guarda nada en la nube.
+- **Semestre — rediseño "Zona peligrosa" → "Reiniciar datos"**: se sacó el bloque rojo genérico. Ahora es una tarjeta navy/ocre integrada a la marca, con filas (Horas y preparación / Plan de estudio), botones neutros "Reiniciar"/"Limpiar" y confirmación inline; el rojo queda solo en el botón "Sí, borrar" (que en tema Vidrio se mapea al token `--gl-red`). Mismas funciones que antes.
+
+---
+
+## v8.1
+Cambios clave: **rebrand a stuniv** (logo, favicon, título), nav sin "Inicio" (logo → home), fix TTS en iPhone, fix legibilidad confirmaciones rojas en Vidrio, fix overflow mobile al agregar materia, y **performance** (cache cliente con TTL + menos re-renders). Cambios clave: **sistema Liquid Glass completo** (material centralizado + primitivos React `Glass*` en todas las vistas, toggle Clásico 2D ↔ Vidrio en Inicio), Matriz de Confianza (radar) en Métricas, y **feedback de hover** en ambos modos (escala/elevación/brillo en botones, "encendido" del cristal en cards).
 
 ---
 
@@ -27,14 +38,15 @@ Ver detalle completo de v2 a v6.2 en la sección "Historia completa" al final de
 - **Base de datos**: Vercel KV (Upstash Redis), una sola key `uca_data`
 - **Dominio**: el que da Vercel por defecto (sin dominio propio comprado)
 - **Auth/login**: no tiene — uso personal de un solo usuario, sin cuentas
-- **Servicios externos pagos**: ninguno
+- **Servicios externos pagos**: ninguno. (Para el MP3 se usa el TTS gratuito de Google Translate vía proxy `/api/tts`, no oficial y sin costo; si Google lo bloqueara, la descarga MP3 fallaría con aviso, pero escuchar en vivo con Web Speech seguiría andando.)
 
 ## Stack técnico
 - Next.js 14 (App Router), TypeScript, Tailwind CSS
 - Framer Motion (animaciones)
 - Recharts (gráfico de barras de métricas + radar "Matriz de Confianza")
-- pdfjs-dist + mammoth (lectura PDF/Word en TTS)
-- Web Speech API nativa del navegador (TTS, sin servidor ni costo)
+- pdfjs-dist + mammoth (lectura PDF/Word/TXT en Lectura). Worker de pdf.js desde unpkg (`.mjs`, versión matcheada) + polyfill `Promise.withResolvers`.
+- Web Speech API nativa del navegador → **escuchar** en vivo por capítulos (gratis, sin servidor)
+- **Descargar MP3**: ruta edge `/api/tts` que proxea al TTS gratuito de Google Translate (sin key, sin servicio pago, sin tocar KV). El cliente trocea ≤200 chars y concatena los MP3.
 
 ## Temas visuales (desde v7 / sistema Liquid Glass en v7.1)
 - Dos modos: **Clásico 2D** (default, look de siempre) y **Vidrio 3D / Liquid Glass**.
@@ -59,11 +71,11 @@ Todo pasa por `/api/db` (GET trae todo, POST hace merge parcial). **Cache client
 
 ## Rutas actuales
 - `/` — countdown próximo examen + lista de materias
-- `/timer` — Pomodoro + Cronómetro, persiste en localStorage al navegar
+- `/timer` — Pomodoro + Cronómetro (persiste en localStorage al navegar) + carga manual de horas; materia default = examen más próximo
 - `/metricas` — horas vs meta + sliders de preparación
 - `/calendario` — grilla mensual, exámenes, plan de estudio, notas rápidas
 - `/semestre` — config de materias + cierre/archivo de semestres + historial
-- `/tts` — lectura de texto/PDF/Word por voz
+- `/tts` — Lectura: texto/PDF/Word/TXT; escuchar por capítulos con seek + descargar .mp3 real
 - `/configuracion` — redirect a `/semestre` (legacy)
 
 ## Reglas de diseño fijas

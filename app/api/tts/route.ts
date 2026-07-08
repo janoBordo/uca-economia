@@ -1,22 +1,39 @@
 import { NextResponse } from "next/server";
 
+// Proxy liviano al TTS gratuito de Google Translate.
+// - No usa API key ni servicios pagos (nada de ElevenLabs).
+// - No toca la base de datos (Vercel KV): sólo reenvía audio.
+// - Devuelve MP3 real por trozo; el cliente concatena y arma el archivo.
+// El endpoint acepta ~200 caracteres por request, así que el cliente
+// parte el texto y llama una vez por trozo.
+
 export const runtime = "edge";
 
-const VOCES: Record<string,string> = {
-  rachel:"21m00Tcm4TlvDq8ikWAM", antoni:"ErXwobaYiN019PkySvjV",
-  bella:"EXAVITQu4vr4xnSDxMaL",  adam:"pNInz6obpgDQGcFmaJgB",
-};
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const q  = (searchParams.get("q") ?? "").slice(0, 200);
+  const tl = searchParams.get("tl") ?? "es";
+  if (!q.trim()) return NextResponse.json({ error: "Texto vacío." }, { status: 400 });
 
-export async function POST(req: Request) {
-  const key = process.env.ELEVENLABS_API_KEY;
-  if (!key) return NextResponse.json({ error:"Falta ELEVENLABS_API_KEY." }, { status:500 });
-  const { texto, voz } = await req.json();
-  if (!texto?.trim()) return NextResponse.json({ error:"Texto vacío." }, { status:400 });
-  const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOCES[voz]??VOCES.rachel}`, {
-    method:"POST",
-    headers:{"xi-api-key":key,"Content-Type":"application/json",Accept:"audio/mpeg"},
-    body:JSON.stringify({ text:texto.slice(0,5000), model_id:"eleven_multilingual_v2", voice_settings:{stability:0.5,similarity_boost:0.75} }),
-  });
-  if (!r.ok) return NextResponse.json({ error:"ElevenLabs error." }, { status:r.status });
-  return new Response(r.body, { headers:{"Content-Type":"audio/mpeg"} });
+  const url =
+    `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob` +
+    `&tl=${encodeURIComponent(tl)}&total=1&idx=0&textlen=${q.length}` +
+    `&q=${encodeURIComponent(q)}`;
+
+  try {
+    const r = await fetch(url, {
+      headers: {
+        // Sin un User-Agent de navegador, Google responde 403.
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        "Referer": "https://translate.google.com/",
+      },
+    });
+    if (!r.ok) return NextResponse.json({ error: "TTS no disponible." }, { status: 502 });
+    return new Response(r.body, {
+      headers: { "Content-Type": "audio/mpeg", "Cache-Control": "no-store" },
+    });
+  } catch {
+    return NextResponse.json({ error: "Error contactando el TTS." }, { status: 502 });
+  }
 }
