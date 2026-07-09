@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { GlassButton, GlassSelect, GlassTextarea, GlassCard } from "../components/glass";
 
 // Lectura:
-// - Escuchar con Web Speech (voz del navegador): gratis, sin límite, por CAPÍTULOS
-//   con volver atrás / adelantar como un podcast.
+// - Escuchar con Web Speech (voz del navegador): gratis, sin límite, por partes,
+//   con volver atrás / adelantar / pausar-resumir exacto, como un podcast.
 // - Descargar .mp3 real: el cliente parte el texto y pide cada trozo a /api/tts
 //   (proxy al TTS gratuito de Google) y concatena todo en un solo archivo.
 //   No graba pantalla, no toca la base de datos, no agrega peso al cliente.
@@ -67,14 +67,16 @@ export default function TTS() {
   const [descargando, setDescargando] = useState(false);
   const [mp3Pct,      setMp3Pct]      = useState(0);
 
-  const utterRef  = useRef<SpeechSynthesisUtterance | null>(null);
-  const inputRef  = useRef<HTMLInputElement>(null);
-  const velRef    = useRef(1);       // velocidad viva para el encadenado onend
-  const vozRef    = useRef(0);
+  const utterRef      = useRef<SpeechSynthesisUtterance | null>(null);
+  const inputRef      = useRef<HTMLInputElement>(null);
+  const velRef        = useRef(1);   // velocidad viva para el encadenado onend
+  const vozRef        = useRef(0);
   const genRef        = useRef(0);   // generación: invalida callbacks de utterances viejas
   const tickRef       = useRef<ReturnType<typeof setInterval> | null>(null);
-  const partStartRef  = useRef(0);   // ms al arrancar la parte actual
-  const partDurRef    = useRef(1);   // duración estimada de la parte actual (ms)
+  const partStartRef  = useRef(0);   // ms al arrancar el tramo actual
+  const partDurRef    = useRef(1);   // duración estimada del tramo actual (ms)
+  const offsetRef     = useRef(0);   // char donde arranca el tramo actual, dentro de la parte
+  const boundaryRef   = useRef(0);   // último charIndex de onboundary (relativo al tramo) → resumir exacto
 
   const capitulos = useMemo(() => dividirEnCapitulos(texto), [texto]);
 
@@ -97,6 +99,7 @@ export default function TTS() {
   useEffect(() => {
     detenerVoz();
     setLeyendo(false); setPausado(false); setCapIdx(0); setProgress(0);
+    offsetRef.current = 0; boundaryRef.current = 0;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [texto]);
 
@@ -104,37 +107,57 @@ export default function TTS() {
   useEffect(() => () => detenerVoz(), []);
 
   // ── Reproducción por partes (Web Speech) ──
-  // Web Speech pausa mal y corta las utterances largas. Estrategia robusta:
-  //  · Partes cortas (≤160 chars) leídas en cadena.
-  //  · Un "genRef" invalida los callbacks de utterances viejas → sin carreras
-  //    al saltar/pausar (era el bug: el onerror de la vieja pisaba a la nueva).
-  //  · La barra avanza SUAVE por tiempo estimado (setInterval), no a saltos.
-  //  · Pausar = cancelar y recordar la parte; reanudar re-lee esa parte.
+  // Web Speech no deja "pausar y seguir" de forma confiable ni cortar utterances
+  // largas. Estrategia (100% cliente, sin red ni DB, cero peso extra):
+  //  · Partes cortas (≤160 chars) leídas en cadena, evita el corte de Chrome a los ~15s.
+  //  · Un "genRef" invalida callbacks de utterances viejas → sin carreras al saltar/pausar.
+  //  · onboundary nos da el carácter exacto que se está leyendo DENTRO del tramo:
+  //    al pausar guardamos ese offset; al reanudar leemos sólo el resto desde ahí,
+  //    en vez de repetir la parte entera. Si el navegador no dispara boundary
+  //    (pasa en Safari/iPhone), no perdemos nada: cae al comportamiento anterior
+  //    (retoma desde donde arrancó ese tramo), nunca peor que antes.
+  //  · La barra avanza suave por tiempo estimado (setInterval liviano), no a saltos.
   function limpiarTick() {
     if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
   }
   function detenerVoz() {
     genRef.current++;                       // invalida callbacks pendientes
     limpiarTick();
-    if (utterRef.current) { utterRef.current.onend = null; utterRef.current.onerror = null; }
+    if (utterRef.current) { utterRef.current.onend = null; utterRef.current.onerror = null; utterRef.current.onboundary = null; }
     try { window.speechSynthesis.cancel(); } catch { /* noop */ }
   }
 
-  function reproducirDesde(idx: number) {
+  // idx = parte a leer · offset = carácter donde arrancar DENTRO de esa parte (resume exacto)
+  function reproducirDesde(idx: number, offset = 0) {
     if (!capitulos.length) return;
     detenerVoz();
     const gen = genRef.current;
     const total = capitulos.length;
     const i = Math.max(0, Math.min(idx, total - 1));
+    const fullText = capitulos[i];
+    const off = Math.max(0, Math.min(offset, Math.max(0, fullText.length - 1)));
+    const restante = fullText.slice(off);
+
     setCapIdx(i);
     setPausado(false);
     setLeyendo(true);
+    offsetRef.current = off;
+    boundaryRef.current = 0;
 
-    const utter = new SpeechSynthesisUtterance(capitulos[i]);
+    if (!restante.trim()) {                 // offset ya al final: seguir a la próxima parte
+      if (i + 1 < total) { reproducirDesde(i + 1); return; }
+      setLeyendo(false); setPausado(false); setCapIdx(total); setProgress(1); return;
+    }
+
+    const utter = new SpeechSynthesisUtterance(restante);
     const v = voces[vozRef.current];
     if (v) utter.voice = v;
     utter.rate = velRef.current;
     utter.lang = v?.lang ?? "es-AR";
+    utter.onboundary = (e) => {
+      if (genRef.current !== gen) return;
+      boundaryRef.current = e.charIndex ?? 0;   // avance dentro del tramo → para resumir exacto
+    };
     utter.onend = () => {
       if (genRef.current !== gen) return;   // callback viejo: ignorar
       if (i + 1 < total) reproducirDesde(i + 1);
@@ -146,14 +169,15 @@ export default function TTS() {
     };
     utterRef.current = utter;
 
-    // Progreso suave: estimamos la duración de la parte (~14 chars/seg × velocidad)
+    // Progreso suave: interpola por tiempo estimado dentro de lo que falta del tramo
     partStartRef.current = Date.now();
-    partDurRef.current   = Math.max(700, (capitulos[i].length / (14 * velRef.current)) * 1000);
+    partDurRef.current   = Math.max(500, (restante.length / (14 * velRef.current)) * 1000);
     limpiarTick();
     tickRef.current = setInterval(() => {
       if (genRef.current !== gen) return;
-      const frac = Math.min(1, (Date.now() - partStartRef.current) / partDurRef.current);
-      setProgress((i + frac) / total);
+      const elapsedFrac = Math.min(1, (Date.now() - partStartRef.current) / partDurRef.current);
+      const fracEnParte = (off + elapsedFrac * (fullText.length - off)) / fullText.length;
+      setProgress((i + fracEnParte) / total);
     }, 100);
 
     window.speechSynthesis.speak(utter);
@@ -163,25 +187,30 @@ export default function TTS() {
   // Botón central: reproducir / pausar
   function togglePlay() {
     if (!capitulos.length) return;
-    if (leyendo) {                          // sonando → pausar
+    if (leyendo) {                                    // sonando → pausar en el punto exacto
+      const posicion = offsetRef.current + boundaryRef.current;
       detenerVoz();
+      offsetRef.current = posicion;                   // recordado para resumir ahí
       setLeyendo(false); setPausado(true);
-    } else {                                // detenido o pausado → seguir desde la parte actual
+    } else if (pausado) {                              // pausado → resumir donde quedó
+      reproducirDesde(capIdx, offsetRef.current);
+    } else {                                           // detenido → arrancar la parte actual de cero
       reproducirDesde(capIdx >= capitulos.length ? 0 : capIdx);
     }
   }
 
-  // Saltar a una parte y escucharla desde ahí (botones ⏮/⏭ y toque en la barra)
+  // Saltar a una parte y escucharla desde su inicio (botones ⏮/⏭ y toque en la barra)
   function irAParte(idx: number) {
     reproducirDesde(Math.max(0, Math.min(idx, capitulos.length - 1)));
   }
 
   function irInicio() {
+    offsetRef.current = 0; boundaryRef.current = 0;
     if (leyendo) reproducirDesde(0);
     else { detenerVoz(); setCapIdx(0); setPausado(false); setProgress(0); }
   }
 
-  // Barra clickeable: saltar tocando/arrastrando cualquier punto
+  // Barra clickeable: saltar tocando cualquier punto
   function seekBar(clientX: number, target: HTMLElement) {
     const total = capitulos.length;
     if (total <= 1) return irAParte(0);
@@ -281,7 +310,7 @@ export default function TTS() {
         onDragOver={e => e.preventDefault()}>
         <GlassTextarea value={texto} onChange={e => setTexto(e.target.value)} disabled={leyendo}
           placeholder="Pegá el texto o arrastrá un archivo acá…" rows={9}
-          className="w-full resize-none bg-navy/[0.03] rounded-2xl px-6 py-5 text-navy text-base leading-relaxed border border-navy/[0.08] focus:outline-none focus:border-ocre/50 transition-all placeholder:text-navy/25 disabled:opacity-60" />
+          className="glass-lite w-full resize-none bg-navy/[0.03] rounded-2xl px-6 py-5 text-navy text-base leading-relaxed border border-navy/[0.08] focus:outline-none focus:border-ocre/50 transition-all placeholder:text-navy/25 disabled:opacity-60" />
         <span className="absolute bottom-4 right-5 text-navy/25 text-xs tabular-nums">{chars.toLocaleString()} chars</span>
       </div>
 
@@ -320,7 +349,7 @@ export default function TTS() {
 
       {/* ── Reproductor por partes ── */}
       {capitulos.length > 0 && (
-        <div className="mt-8 rounded-2xl border border-navy/10 bg-navy/[0.02] p-5 sm:p-6">
+        <div className="glass-lite mt-8 rounded-2xl border border-navy/10 bg-navy/[0.02] p-5 sm:p-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-navy/55 text-sm font-medium tabular-nums">
               Parte {Math.min(capIdx + 1, capitulos.length)} de {capitulos.length}
@@ -368,7 +397,7 @@ export default function TTS() {
         </GlassButton>
         {descargando && (
           <div className="mt-3 h-1 rounded-full bg-navy/8 overflow-hidden max-w-xs">
-            <motion.div className="h-full bg-ocre rounded-full" animate={{ width: `${mp3Pct}%` }} transition={{ ease:"linear", duration:0.2 }} />
+            <div className="h-full bg-ocre rounded-full transition-[width] duration-200 ease-linear" style={{ width: `${mp3Pct}%` }} />
           </div>
         )}
         <p className="text-navy/30 text-xs mt-3">En Safari/iPhone puede que la descarga no funcione; usá Chrome.</p>

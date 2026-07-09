@@ -6,7 +6,14 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
-## Versión actual: v8.5
+## Versión actual: v8.6
+Fix de fondo del pausado en Lectura + performance del Vidrio 3D en esa pantalla:
+- **Lectura — pausa/resume EXACTO por carácter**: v8.5 pausaba cancelando y recordaba sólo la "parte" (~160 chars) → al reanudar releía la parte entera desde el principio, sonaba raro. Ahora se usa el evento `onboundary` de Web Speech (dispara con el carácter exacto que se está leyendo) para guardar el punto preciso al pausar; al reanudar, se lee sólo el texto restante desde ese carácter (`fullText.slice(offset)`), no la parte completa. 100% cliente: sin llamadas de red ni escrituras a Vercel KV, sólo un par de refs (`offsetRef`, `boundaryRef`) — cero peso extra. Si el navegador no dispara `onboundary` (pasa en Safari/iPhone), cae automáticamente al comportamiento de v8.5 (retoma la parte desde su inicio) — nunca peor que antes.
+- **Vidrio 3D — Lectura más liviana**: nuevo marcador CSS `.glass-lite` (mismo patrón que ya se usaba para las celdas del calendario) que mantiene el vidrio (tinte + borde + reflejo) pero sin `backdrop-filter` (el blur, lo caro en GPU). Aplicado a las dos superficies más grandes de `/tts`: el textarea y el panel del reproductor. Se ve prácticamente igual, pesa bastante menos. También se sacó `framer-motion` de la barra de progreso del MP3 (ahora CSS puro).
+
+---
+
+## v8.5
 Fixes sobre v8.4:
 - **Lectura — reproductor arreglado de verdad**: (1) la **barra ahora avanza suave** mientras suena (progreso por tiempo estimado con `setInterval`, no a saltos por parte); (2) se puede **saltar tocando la barra** (`seekBar` mapea el toque a la parte); (3) **pausa confiable**: el bug era una condición de carrera (el `onerror` de la utterance cancelada pisaba a la nueva) — se agregó un `genRef` que invalida callbacks viejos y se anulan `onend`+`onerror` al cancelar. Además las partes ahora son ≤160 chars para no chocar con el corte de ~15s de Chrome. Barra con perilla arrastrable visual + botones ↺/⏮/▶⏸/⏭.
 - **Timer — materia por defecto (bug recurrente) resuelto de raíz**: `materiasPorProximidad` hacía `Infinity - Infinity = NaN` cuando todos los exámenes estaban vencidos → el `sort` quedaba en el orden original y caía siempre en Administración. Reescrito: **futuros ascendente primero (el más próximo arriba), después los rendidos**. Y en `/timer` la sugerencia ahora **sigue actualizándose al llegar los datos de la nube** (antes se pegaba al primer valor), salvo que el usuario elija materia a mano (`eligioManual` ref).

@@ -131,6 +131,19 @@ html[data-theme="glass"] body {
       inset 0 1px 0 rgba(255,255,255,0.45) !important;
   }
   html[data-theme="glass"] textarea { border-radius: 18px !important; }
+
+  /* ── PERFORMANCE: marcador .glass-lite — mismo vidrio (tinte+borde+gloss)
+     pero SIN blur propio, para superficies grandes donde el frost pesa y casi
+     no se nota (ej. el textarea y el panel del reproductor en Lectura).
+     La clase se repite a propósito: por spec, :is()/:not() toman la especificidad
+     de su rama MÁS específica exista o no coincida con el elemento — la regla de
+     inputs de arriba tiene :not() en cadena y pesa más que una clase sola, así
+     que la repetimos para superarla de forma limpia (sin tocar esa regla). */
+  html[data-theme="glass"] .glass-lite.glass-lite.glass-lite.glass-lite {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
   html[data-theme="glass"] :is(
     .glass-input,
     input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
