@@ -50,10 +50,17 @@ export async function archivarSemestre(nombre: string, mats: Materia[]) {
   return patch({ _archivar: { nombre }, materias: mats });
 }
 
+// Ordena por proximidad de examen: primero los FUTUROS (el más próximo arriba),
+// después los ya rendidos (el más reciente arriba). Evita el NaN de Infinity-Infinity
+// que dejaba el orden original (y hacía caer siempre en la primera materia).
 export function materiasPorProximidad(data: AppData): Materia[] {
   const now = Date.now();
   return [...data.materias].sort((a, b) => {
-    const da = new Date(a.examen).getTime(); const db = new Date(b.examen).getTime();
-    return (da < now ? Infinity : da) - (db < now ? Infinity : db);
+    const da = new Date(a.examen).getTime();
+    const db = new Date(b.examen).getTime();
+    const fa = da >= now, fb = db >= now;
+    if (fa && fb) return da - db;   // ambos futuros → el más próximo primero
+    if (fa !== fb) return fa ? -1 : 1;  // el futuro va antes que el pasado
+    return db - da;                // ambos pasados → el más reciente primero
   });
 }

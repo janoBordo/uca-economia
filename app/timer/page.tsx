@@ -131,9 +131,10 @@ export default function Timer() {
   const [manualH,    setManualH]    = useState(1);
   const [manualM,    setManualM]    = useState(0);
 
-  const acumRef    = useRef(0);   // segundos acumulados antes del tick actual
-  const startedRef = useRef(0);   // Date.now() cuando arrancó el tick actual
-  const dispRef    = useRef({ restante: 25 * 60, elapsed: 0 });   // valor mostrado (lo escribe el leaf)
+  const acumRef      = useRef(0);   // segundos acumulados antes del tick actual
+  const startedRef   = useRef(0);   // Date.now() cuando arrancó el tick actual
+  const dispRef      = useRef({ restante: 25 * 60, elapsed: 0 });   // valor mostrado (lo escribe el leaf)
+  const eligioManual = useRef(false);   // el usuario eligió materia a mano → no la piso con la sugerida
 
   const totalSecs = customMins * 60;
 
@@ -143,6 +144,7 @@ export default function Timer() {
     if (!snap) return;
     setModo(snap.modo);
     setMatId(snap.matId);
+    eligioManual.current = true;   // respetamos la materia del timer guardado
     setCustomMins(snap.customMins);
     acumRef.current    = snap.acumSecs;
     startedRef.current = snap.startedAt;
@@ -157,8 +159,12 @@ export default function Timer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Materia default: la del examen más próximo
-  useEffect(() => { if (!matId && materiaProxima) setMatId(materiaProxima); }, [materiaProxima, matId]);
+  // Materia default: la del examen más próximo. Sigue actualizándose cuando llegan
+  // los datos reales de la nube, salvo que el usuario ya haya elegido una a mano.
+  useEffect(() => {
+    if (eligioManual.current) return;
+    if (materiaProxima) setMatId(materiaProxima);
+  }, [materiaProxima]);
 
   // Reset al cambiar modo/duración (solo si no corre)
   useEffect(() => {
@@ -265,7 +271,7 @@ export default function Timer() {
 
       {/* Materia */}
       <div className="mb-10">
-        <GlassSelect value={matId} onChange={e => setMatId(e.target.value)} disabled={corriendo}
+        <GlassSelect value={matId} onChange={e => { setMatId(e.target.value); eligioManual.current = true; }} disabled={corriendo}
           className="bg-transparent text-navy font-semibold text-base border-b-2 border-navy/15 pb-2 px-2 focus:outline-none focus:border-ocre appearance-none cursor-pointer disabled:opacity-40 text-center">
           {materias.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
         </GlassSelect>

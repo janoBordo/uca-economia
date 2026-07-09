@@ -10,21 +10,25 @@ import { GlassButton, GlassSelect, GlassTextarea, GlassCard } from "../component
 //   (proxy al TTS gratuito de Google) y concatena todo en un solo archivo.
 //   No graba pantalla, no toca la base de datos, no agrega peso al cliente.
 
-// Divide el texto en "capítulos" (oraciones agrupadas ~240 chars) para navegar.
+// Divide el texto en "partes" (oraciones agrupadas ≤160 chars) para navegar.
+// El tope de 160 evita el bug de Chrome que corta las utterances de más de ~15s.
 function dividirEnCapitulos(txt: string): string[] {
   const limpio = txt.replace(/\s+/g, " ").trim();
   if (!limpio) return [];
+  // Corta por oración; si una oración es larguísima, la parte igual en ~160.
   const oraciones = limpio.match(/[^.!?…]+[.!?…]+|\S[^.!?…]*$/g) ?? [limpio];
   const caps: string[] = [];
   let buf = "";
+  const push = (s: string) => { for (let k = 0; k < s.length; k += 160) caps.push(s.slice(k, k + 160).trim()); };
   for (const o of oraciones) {
     const frag = o.trim();
     if (!frag) continue;
-    if (buf && (buf + " " + frag).length > 240) { caps.push(buf); buf = frag; }
+    if (frag.length > 160) { if (buf) { caps.push(buf); buf = ""; } push(frag); continue; }
+    if (buf && (buf + " " + frag).length > 160) { caps.push(buf); buf = frag; }
     else buf = buf ? buf + " " + frag : frag;
   }
   if (buf) caps.push(buf);
-  return caps;
+  return caps.filter(Boolean);
 }
 
 // Parte el texto en trozos ≤200 chars (límite del TTS de Google), cortando en palabras.
@@ -57,7 +61,8 @@ export default function TTS() {
 
   const [leyendo,     setLeyendo]     = useState(false);
   const [pausado,     setPausado]     = useState(false);
-  const [capIdx,      setCapIdx]      = useState(0);   // capítulo actual
+  const [capIdx,      setCapIdx]      = useState(0);   // parte actual
+  const [progress,    setProgress]    = useState(0);   // 0..1, avanza suave mientras suena
 
   const [descargando, setDescargando] = useState(false);
   const [mp3Pct,      setMp3Pct]      = useState(0);
@@ -66,6 +71,10 @@ export default function TTS() {
   const inputRef  = useRef<HTMLInputElement>(null);
   const velRef    = useRef(1);       // velocidad viva para el encadenado onend
   const vozRef    = useRef(0);
+  const genRef        = useRef(0);   // generación: invalida callbacks de utterances viejas
+  const tickRef       = useRef<ReturnType<typeof setInterval> | null>(null);
+  const partStartRef  = useRef(0);   // ms al arrancar la parte actual
+  const partDurRef    = useRef(1);   // duración estimada de la parte actual (ms)
 
   const capitulos = useMemo(() => dividirEnCapitulos(texto), [texto]);
 
@@ -87,7 +96,7 @@ export default function TTS() {
   // Al cambiar el texto: frenar y volver al inicio
   useEffect(() => {
     detenerVoz();
-    setLeyendo(false); setPausado(false); setCapIdx(0);
+    setLeyendo(false); setPausado(false); setCapIdx(0); setProgress(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [texto]);
 
@@ -95,19 +104,31 @@ export default function TTS() {
   useEffect(() => () => detenerVoz(), []);
 
   // ── Reproducción por partes (Web Speech) ──
-  // Pausar = cancelar y recordar la parte. Web Speech pausa mal y corta las
-  // utterances largas, así que al reanudar re-leemos la parte actual desde su
-  // inicio: como son cortas queda predecible y sin quedar "trabado".
+  // Web Speech pausa mal y corta las utterances largas. Estrategia robusta:
+  //  · Partes cortas (≤160 chars) leídas en cadena.
+  //  · Un "genRef" invalida los callbacks de utterances viejas → sin carreras
+  //    al saltar/pausar (era el bug: el onerror de la vieja pisaba a la nueva).
+  //  · La barra avanza SUAVE por tiempo estimado (setInterval), no a saltos.
+  //  · Pausar = cancelar y recordar la parte; reanudar re-lee esa parte.
+  function limpiarTick() {
+    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
+  }
   function detenerVoz() {
-    if (utterRef.current) utterRef.current.onend = null;  // que no dispare el encadenado
+    genRef.current++;                       // invalida callbacks pendientes
+    limpiarTick();
+    if (utterRef.current) { utterRef.current.onend = null; utterRef.current.onerror = null; }
     try { window.speechSynthesis.cancel(); } catch { /* noop */ }
   }
 
   function reproducirDesde(idx: number) {
     if (!capitulos.length) return;
     detenerVoz();
-    const i = Math.max(0, Math.min(idx, capitulos.length - 1));
+    const gen = genRef.current;
+    const total = capitulos.length;
+    const i = Math.max(0, Math.min(idx, total - 1));
     setCapIdx(i);
+    setPausado(false);
+    setLeyendo(true);
 
     const utter = new SpeechSynthesisUtterance(capitulos[i]);
     const v = voces[vozRef.current];
@@ -115,46 +136,59 @@ export default function TTS() {
     utter.rate = velRef.current;
     utter.lang = v?.lang ?? "es-AR";
     utter.onend = () => {
-      const next = i + 1;
-      if (next < capitulos.length) reproducirDesde(next);
-      else { setLeyendo(false); setPausado(false); setCapIdx(capitulos.length); }  // terminó
+      if (genRef.current !== gen) return;   // callback viejo: ignorar
+      if (i + 1 < total) reproducirDesde(i + 1);
+      else { limpiarTick(); setLeyendo(false); setPausado(false); setCapIdx(total); setProgress(1); }
     };
-    utter.onerror = () => { setLeyendo(false); setPausado(false); };
-
+    utter.onerror = () => {
+      if (genRef.current !== gen) return;
+      limpiarTick(); setLeyendo(false);
+    };
     utterRef.current = utter;
-    setLeyendo(true); setPausado(false);
+
+    // Progreso suave: estimamos la duración de la parte (~14 chars/seg × velocidad)
+    partStartRef.current = Date.now();
+    partDurRef.current   = Math.max(700, (capitulos[i].length / (14 * velRef.current)) * 1000);
+    limpiarTick();
+    tickRef.current = setInterval(() => {
+      if (genRef.current !== gen) return;
+      const frac = Math.min(1, (Date.now() - partStartRef.current) / partDurRef.current);
+      setProgress((i + frac) / total);
+    }, 100);
+
     window.speechSynthesis.speak(utter);
-    window.speechSynthesis.resume();   // iOS a veces arranca pausado
+    window.speechSynthesis.resume();        // iOS a veces arranca pausado
   }
 
   // Botón central: reproducir / pausar
   function togglePlay() {
     if (!capitulos.length) return;
-    if (leyendo) {                              // sonando → pausar
+    if (leyendo) {                          // sonando → pausar
       detenerVoz();
       setLeyendo(false); setPausado(true);
-    } else {                                    // detenido o pausado → seguir desde la parte actual
+    } else {                                // detenido o pausado → seguir desde la parte actual
       reproducirDesde(capIdx >= capitulos.length ? 0 : capIdx);
     }
   }
 
+  // Saltar a una parte y escucharla desde ahí (botones ⏮/⏭ y toque en la barra)
   function irAParte(idx: number) {
-    const destino = Math.max(0, Math.min(idx, capitulos.length - 1));
-    if (leyendo) reproducirDesde(destino);      // sonando → salta y sigue
-    else { setCapIdx(destino); setPausado(false); }  // detenido → sólo reposiciona
+    reproducirDesde(Math.max(0, Math.min(idx, capitulos.length - 1)));
   }
 
   function irInicio() {
     if (leyendo) reproducirDesde(0);
-    else { detenerVoz(); setCapIdx(0); setPausado(false); }
+    else { detenerVoz(); setCapIdx(0); setPausado(false); setProgress(0); }
   }
 
-  // Barra clickeable: elegir la parte tocando la barra
-  function seekBar(e: React.MouseEvent<HTMLButtonElement>) {
-    if (capitulos.length <= 1) return irAParte(0);
-    const rect  = e.currentTarget.getBoundingClientRect();
-    const ratio = (e.clientX - rect.left) / rect.width;
-    irAParte(Math.round(ratio * (capitulos.length - 1)));
+  // Barra clickeable: saltar tocando/arrastrando cualquier punto
+  function seekBar(clientX: number, target: HTMLElement) {
+    const total = capitulos.length;
+    if (total <= 1) return irAParte(0);
+    const rect  = target.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    setProgress(ratio);                     // feedback inmediato
+    irAParte(Math.round(ratio * (total - 1)));
   }
 
   // ── Descargar MP3 real (proxy TTS gratuito) ──
@@ -232,9 +266,7 @@ export default function TTS() {
   }
 
   const chars  = texto.length;
-  const barPct = capitulos.length <= 1
-    ? (capIdx >= capitulos.length ? 100 : 0)
-    : Math.min(capIdx, capitulos.length - 1) / (capitulos.length - 1) * 100;
+  const barPct = Math.round(progress * 100);
 
   return (
     <section className="flex-1 w-full max-w-3xl mx-auto px-6 sm:px-8 py-16 flex flex-col">
@@ -298,11 +330,13 @@ export default function TTS() {
             </span>
           </div>
 
-          {/* Barra: muestra por qué parte va y permite saltar */}
-          <button type="button" onClick={seekBar} aria-label="Elegir parte"
-            className="relative w-full h-3 rounded-full bg-navy/10 overflow-hidden cursor-pointer">
-            <motion.div className="absolute inset-y-0 left-0 bg-ocre rounded-full"
-              animate={{ width: `${barPct}%` }} transition={{ ease:"linear", duration:0.25 }} />
+          {/* Barra: avanza mientras suena y salta al tocarla */}
+          <button type="button" aria-label="Elegir parte"
+            onClick={e => seekBar(e.clientX, e.currentTarget)}
+            className="relative w-full h-4 rounded-full bg-navy/10 cursor-pointer select-none group">
+            <div className="absolute inset-y-0 left-0 bg-ocre rounded-full" style={{ width: `${barPct}%` }} />
+            <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-ocre shadow-md ring-2 ring-canvas transition-transform group-hover:scale-110"
+              style={{ left: `${Math.max(2, Math.min(98, barPct))}%` }} />
           </button>
 
           {/* Controles: principio · atrás · play/pausa · adelante */}
@@ -337,7 +371,7 @@ export default function TTS() {
             <motion.div className="h-full bg-ocre rounded-full" animate={{ width: `${mp3Pct}%` }} transition={{ ease:"linear", duration:0.2 }} />
           </div>
         )}
-        <p className="text-navy/30 text-xs mt-3">Se genera al instante. No ocupa espacio en tu cuenta.</p>
+        <p className="text-navy/30 text-xs mt-3">En Safari/iPhone puede que la descarga no funcione; usá Chrome.</p>
       </div>
 
       <AnimatePresence>

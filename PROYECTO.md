@@ -6,7 +6,16 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
-## Versión actual: v8.4
+## Versión actual: v8.5
+Fixes sobre v8.4:
+- **Lectura — reproductor arreglado de verdad**: (1) la **barra ahora avanza suave** mientras suena (progreso por tiempo estimado con `setInterval`, no a saltos por parte); (2) se puede **saltar tocando la barra** (`seekBar` mapea el toque a la parte); (3) **pausa confiable**: el bug era una condición de carrera (el `onerror` de la utterance cancelada pisaba a la nueva) — se agregó un `genRef` que invalida callbacks viejos y se anulan `onend`+`onerror` al cancelar. Además las partes ahora son ≤160 chars para no chocar con el corte de ~15s de Chrome. Barra con perilla arrastrable visual + botones ↺/⏮/▶⏸/⏭.
+- **Timer — materia por defecto (bug recurrente) resuelto de raíz**: `materiasPorProximidad` hacía `Infinity - Infinity = NaN` cuando todos los exámenes estaban vencidos → el `sort` quedaba en el orden original y caía siempre en Administración. Reescrito: **futuros ascendente primero (el más próximo arriba), después los rendidos**. Y en `/timer` la sugerencia ahora **sigue actualizándose al llegar los datos de la nube** (antes se pegaba al primer valor), salvo que el usuario elija materia a mano (`eligioManual` ref).
+- **Lectura — nota del MP3 corregida**: decía algo sin sentido para el usuario ("no ocupa espacio en tu cuenta"). Ahora: "En Safari/iPhone puede que la descarga no funcione; usá Chrome."
+- **Semestre — "Reiniciar datos" con más diseño**: los links pelados pasaron a **botones con borde redondeado + hover** (borde rojo suave → relleno rojo claro al pasar el mouse), tipografía `text-sm` de la página (no más `text-[11px] uppercase`). Confirmación inline en pill roja.
+
+---
+
+## v8.4
 Ajustes de UX y performance sobre lo de v8.2:
 - **Pomodoro — carga manual reubicada**: el botón "Cargar horas" ya no va abajo (requería scroll para descubrirlo). Ahora es un panel **flotante a un costado del timer** (`absolute top-right`, siempre visible sin scroll). Trigger chico (ícono ＋ en mobile, "＋ Cargar horas" en desktop) que abre un mini-form compacto.
 - **Lectura — reproductor simplificado y sin bug de pausa**: se sacó la card con las frases. Ahora es sólo una **barra que muestra por qué parte va + clickeable para saltar**, con controles ↺ principio · ⏮ atrás · ▶/⏸ · ⏭ adelante. La pausa ahora es confiable: en vez del `pause()/resume()` de Web Speech (que corta las utterances largas y quedaba trabado), **pausar cancela y recuerda la parte**, y al reanudar re-lee la parte actual desde el inicio (las partes son cortas → predecible).
