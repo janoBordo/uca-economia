@@ -28,9 +28,11 @@ de tener datos reales de terceros en juego.
 4. **Que no cueste dinero tenerla ni mantenerla** — presupuesto $0 por el momento,
    todo en tiers gratuitos mientras la escala lo permita.
 5. **Que se pueda seguir actualizando y mejorando, sin cerrar puertas a futuro** —
-   arquitectura que no se vuelva una bola de barro a medida que crece, y que no
-   bloquee agregar cosas más adelante (ej. pasarelas de pago) aunque hoy no se
-   construyan.
+   Jano va a seguir trabajando con Claude (esta misma sesión, no Fable 5) después
+   de la migración, agregando secciones y pusheando versiones nuevas como viene
+   pasando desde v2 hasta v8.6. La arquitectura no puede volverse una bola de
+   barro que trabe ese flujo normal, ni bloquear cosas que se agreguen más
+   adelante (pagos con Stripe es solo un ejemplo posible, no el único).
 6. **Que quede práctico acceder a la app, al backend y a la base de datos — todo
    ordenado, sin sobrecomplejizar.** No apilar piezas nuevas si una ya alcanza.
 
@@ -73,13 +75,13 @@ bloqueantes, son cosas para monitorear a medida que crece el tráfico real).
 
 | Servicio | Elegido | Costo | Nota |
 |---|---|---|---|
-| Hosting/deploy | Vercel (Hobby) | $0 | Ya en uso. Pensado para uso no comercial — Stuniv no cobra, entra bien. Si el tráfico se dispara y se acerca al límite de ancho de banda del plan, ahí (y sólo ahí) evaluar Vercel Pro. |
-| Dominio | Propio, a comprar (~US$10-15/**año**) | ~US$1/mes | **Único gasto de todo el plan — dejó de ser opcional.** Sin dominio propio verificado, Resend no puede mandarle el mail de "olvidé mi contraseña" a NINGÚN usuario que no sea Jano (ver sección 6.1 y 6.16) — el flujo de recuperación de cuenta, que es seguridad bloqueante, no funciona para usuarios reales sin esto. Se compra antes de arrancar la Fase 0. |
+| Hosting/deploy | Vercel (Hobby) | $0 | Ya en uso. Pensado para uso no comercial — Stuniv no cobra, entra bien. Si el tráfico se dispara y se acerca al límite de ancho de banda del plan, ahí (y sólo ahí) evaluar Vercel Pro. Aprovechar la migración para renombrar el proyecto de `uca-economia` a `stuniv` (sección 3.3) — sujeto a que el subdominio `stuniv.vercel.app` esté libre. |
+| Dominio | Ninguno por ahora — se sigue con `*.vercel.app` | $0 | Jano no va a pagar dominio por el momento. Esto obliga a resolver el email transaccional sin dominio propio (ver fila de Email abajo). |
 | Base de datos + Auth | Supabase (free tier) | $0 | RLS activado desde el día uno (sección 6.3). Auth free tier soporta hasta 50.000 usuarios activos/mes — sobra para "miles". |
 | Backups | Script propio: GitHub Action programada + `pg_dump`, sube el dump a un repo privado de backups | $0 | Los backups automáticos gestionados de Supabase son de plan Pro (pago). Este es el reemplazo gratis — corre solo, sin mantenimiento manual día a día. |
 | "Keep-alive" anti-pausa | Ping gratuito programado (ej. cron-job.org, gratis) a un endpoint de health-check cada pocos días | $0 | Los proyectos free de Supabase se pausan tras ~7 días sin actividad. Sólo importa en el arranque, antes de tener usuarios reales — una vez que hay tráfico real y constante, el propio uso mantiene el proyecto activo y este ping deja de ser necesario. |
 | Rate limiting | Upstash Redis + librería `@upstash/ratelimit` | $0 | Tier gratis generoso. Upstash es, de hecho, el mismo proveedor que hoy está detrás de Vercel KV — no es un vendor nuevo para Jano. |
-| Email transaccional (reset de contraseña, confirmación) | Resend, con el dominio propio verificado | $0 (tier gratis ~100 emails/día) | El SMTP gratuito integrado de Supabase Auth es solo para testing (pocos emails/hora) — no sirve para producción real. Sin dominio verificado, Resend solo entrega al mail del dueño de la cuenta — por eso el dominio pasó a ser parte de la Fase 0. |
+| Email transaccional (reset de contraseña, confirmación) | **Amazon SES** (no Resend) | $0 (~US$0,10 cada 1.000 emails una vez fuera del tier gratis — irrelevante al volumen de Stuniv) | Resend y la mayoría de los proveedores de email exigen verificar un DOMINIO propio (registros DNS) — imposible con `*.vercel.app`, porque esa zona es de Vercel, no de Jano. SES es la excepción: deja verificar una sola DIRECCIÓN de email (un clic en el link que llega a esa casilla, sin DNS) y después pedir "production access" (formulario gratis, aprobación típica en <24hs) para poder mandarle mail a cualquier usuario real. Pedir este acceso de producción el mismo día que se arranca, por la demora de aprobación. Fable 5 debe confirmar que esta sigue siendo la mejor opción sin dominio al momento de implementar. |
 | Error tracking | Sentry (free tier) | $0 | Ya contemplado en el checklist (sección 6.9). |
 | Analytics de producto (cuánta gente usa la app, a qué velocidad crece) | PostHog Cloud (free tier) | $0 | Free tier generoso (del orden de ~1 millón de eventos/mes — confirmar cifra exacta al implementar, cambia con el tiempo). Trackea signups (velocidad de crecimiento), usuarios activos diarios/semanales/mensuales, y retención — sin esto Jano no tiene forma de saber si la gente vuelve a usar la app o no. Ver sección 3.2. |
 | CDN / edge | Vercel (incluido) | $0 | Ya viene con el hosting, sin configuración extra. |
@@ -89,11 +91,14 @@ bloqueantes, son cosas para monitorear a medida que crece el tráfico real).
    realista de tocar antes que cualquier otro con tráfico alto — se mitiga con
    el cache que ya tiene la app (`app/lib/api.ts`, TTL 15s) y con paginar
    cualquier endpoint que devuelva listas (sección 6.12). Si se acerca al
-   límite, recién ahí evaluar Supabase Pro (~US$25/mes) — no antes.
+   límite, ahí se evalúa Supabase Pro (~US$25/mes) — pero **esa decisión es
+   siempre de Jano, nunca automática**: sin una tarjeta cargada en la cuenta de
+   Supabase, ningún agente podría activarlo aunque quisiera, así que esto no es
+   una restricción operativa hoy, es sólo la aclaración de quién decide si en
+   algún momento se agrega un medio de pago ahí.
 2. **Vercel Hobby** es para uso no comercial — mientras Stuniv no cobre nada,
    corresponde. Si el uso se vuelve masivo y Vercel lo señala, el camino es
-   Vercel Pro (~US$20/mes). Es una decisión para el día que realmente haga
-   falta, no para hoy.
+   Vercel Pro (~US$20/mes). Misma lógica: decisión de Jano, no algo que pase solo.
 
 ### 3.2 Capacidad estimada — cuánto aguanta gratis y cuándo mirar de cerca
 
@@ -134,33 +139,35 @@ Supabase Pro (~US$25/mes) — sin rediseñar nada, sin migrar de proveedor, un c
 Nota: no hay certeza total de si Supabase corta de golpe o degrada gradualmente
 al pasarse del límite gratis — confirmar en su documentación al implementar.
 
-### 3.2.1 Objetivo específico: 10.000 usuarios activos por día
+### 3.2.1 El pedido real a Fable 5: maximizar, sin techo fijo
 
-Con esto ya no alcanza el free tier de Supabase con margen cómodo — hay que ser
-honestos con la cuenta, no prometer algo que no cierra:
+Jano no quiere un número exacto a cumplir — quiere que Fable 5 **optimice al
+máximo la cantidad de usuarios/tráfico diario que aguanta gratis, cuanto más
+mejor, sin techo prefijado y sin pasar a ningún plan pago sin autorización
+explícita de Jano.**
 
-- Con las optimizaciones de arriba (~80-120 KB/día por usuario): 10.000 usuarios
-  × ~100 KB/día ≈ 1 GB/día ≈ **~30 GB/mes** de egress. El free tier de Supabase
-  da 5GB/mes — una brecha real de 6 veces.
-- **Palanca gratis adicional, a verificar/activar**: confirmar que las respuestas
-  de la API (Supabase y las rutas de Next.js) viajen comprimidas (gzip/brotli).
-  JSON comprime muy bien (fácilmente 70-80% menos peso) — si no está activado
-  por default, activarlo es gratis y sin riesgo. Con esto, el egress por usuario
-  baja a ~25-30 KB/día → 10.000 usuarios ≈ **~7.5-9 GB/mes**. Sigue por encima
-  del límite gratis, pero la brecha pasa de 6x a menos de 2x.
-- **Para cerrar esa brecha con margen cómodo (no al filo del límite), el camino
-  es activar Supabase Pro (~US$25/mes)** — no es una complicación de
-  arquitectura ni un cambio de proveedor: mismo Supabase, mismo RLS, misma Auth,
-  solo más cupo de ancho de banda (el plan Pro da bastante más que los ~30GB que
-  harían falta, con margen). Cero cambios de código, cero impacto en seguridad,
-  la app se ve y funciona exactamente igual.
-- **Este costo no es de entrada** — el plan sigue arrancando en $0 (arista 4:
-  "presupuesto $0 por el momento"). Se activa recién cuando PostHog/el dashboard
-  de Supabase muestren que el tráfico real se acerca a esa escala, no antes. Es
-  la única forma honesta de sostener 10.000 usuarios diarios sin resignar
-  ninguna de las demás aristas (nada de armar una arquitectura de cacheo
-  compleja de varias capas solo para evitar un costo chico y predecible —
-  eso sí violaría la arista 6).
+Técnicas dentro del mismo stack ya decidido (no suman ningún vendor nuevo, por
+lo tanto no violan la arista 6) que Fable 5 debería evaluar y aplicar según su
+criterio técnico:
+- Consultas por pantalla en vez de traer todo el estado del usuario de una vez
+  (consecuencia natural de pasar a tablas separadas, sección 6.11).
+- Cache del cliente más largo para datos que no cambian todo el tiempo.
+- Cacheo de rutas que ya trae Next.js de fábrica (`revalidate`, sin servicio
+  nuevo) — inclusive cachear en el borde de Vercel respuestas por usuario en
+  ventanas cortas, para que lecturas repetidas no le peguen a Supabase en
+  absoluto (mueve el costo del recurso escaso — el ancho de banda de Supabase —
+  al recurso que sobra — el de Vercel, ~20 veces más generoso).
+- Confirmar que las respuestas viajen comprimidas (gzip/brotli) — si no está
+  activado por default, es gratis activarlo y el JSON comprime muy bien.
+- Cualquier otra técnica que Fable 5 identifique, mientras no agregue un
+  servicio/dashboard nuevo fuera de la tabla de la sección 3.1.
+
+**Si después de optimizar en serio el techo gratis sigue sin alcanzar para el
+volumen que Jano espera**, la instrucción es: Fable 5 no activa nada pago por su
+cuenta — reporta el número real al que llegó optimizando, y qué pasaría con
+Supabase Pro (~US$25/mes) si se activara, para que Jano decida. Esa decisión
+siempre es de Jano, y en la práctica ni siquiera es algo que Fable 5 pueda
+ejecutar solo (necesita una tarjeta cargada en la cuenta, que no existe hoy).
 
 ### 3.3 Checklist de cuentas y tokens a preparar antes de arrancar con Fable 5
 
@@ -172,13 +179,12 @@ dashboard:
 
 | Servicio | Lo único manual | Con eso, Fable 5 automatiza |
 |---|---|---|
-| Dominio | Comprarlo (cualquier registrador barato) | Configurar los registros DNS (apuntar a Vercel, SPF/DKIM para Resend) |
 | Supabase | Signup (con GitHub) → *Account Settings → Access Tokens* → generar uno | Crear el proyecto entero vía CLI/Management API, sacar URL/anon key/service role key, correr migraciones y políticas RLS |
 | Upstash | Signup (con GitHub) → *Account → API Keys* → generar uno | Crear la base Redis vía API, configurarla para rate limiting |
-| Resend | Signup → *API Keys* → crear una | Configurar el envío transaccional con el dominio verificado |
+| **AWS (para SES)** | Signup → verificar una dirección de email propia (clic en el link que llega a esa casilla) → pedir "production access" en la consola de SES (formulario gratis — **hacer esto el mismo día, antes de arrancar con Fable 5**, la aprobación tarda hasta ~24hs) → generar credenciales SMTP/API | Configurar el envío transaccional (reset de contraseña con código OTP, confirmaciones) con esas credenciales |
 | Sentry | Signup (con GitHub) → *Settings → Auth Tokens* → generar uno (`project:write`) | Crear el proyecto y sacar el DSN |
 | PostHog | Signup (con GitHub) → *Project Settings → API Keys* → generar una | Instrumentar los eventos de signup/login/uso y armar los dashboards de crecimiento |
-| Vercel | Ya hay cuenta → *Settings → Tokens* → generar uno | Cargar TODAS las variables de entorno nuevas vía `vercel env add` |
+| Vercel | Ya hay cuenta → *Settings → Tokens* → generar uno | Cargar TODAS las variables de entorno nuevas vía `vercel env add`, y renombrar el proyecto de `uca-economia` a `stuniv` (verificando que el subdominio `stuniv.vercel.app` esté libre; si no, usar una variante cercana) |
 | GitHub (repo de backups) | Nada si `gh` ya está autenticado en la máquina | `gh repo create stuniv-backups --private` |
 
 **Entrega de credenciales**: no pegarlas como texto en el chat — crear un
@@ -702,12 +708,12 @@ database security rules.
 ## 8. Orden sugerido de ejecución (fases, sobre el checklist de la sección 6)
 
 - **Fase 0 — bloqueante, antes de que exista un segundo usuario**: todo lo marcado
-  🔴 arriba, más comprar el dominio (sección 3.1) — sin él, Supabase Auth con
-  recuperación de contraseña no funciona para nadie que no sea Jano. Es, en
-  esencia: migrar a Postgres/Supabase con RLS en todas las tablas, Supabase Auth
-  con logout real e IDOR resuelto, updates atómicos por fila, secrets solo
-  server-side, backups activados, y ningún commit de base de datos sin revisión
-  humana.
+  🔴 arriba, incluyendo dejar el email transaccional andando con AWS SES (sección
+  3.1) — sin esto, la recuperación de contraseña no le llega a nadie que no sea
+  Jano. Es, en esencia: migrar a Postgres/Supabase con RLS en todas las tablas,
+  Supabase Auth con logout real e IDOR resuelto, updates atómicos por fila,
+  secrets solo server-side, backups activados, y ningún commit de base de datos
+  sin revisión humana.
 - **Fase 1 — antes de abrir la app públicamente (aunque sea a pocos usuarios)**:
   todo lo marcado 🟡 — rate limiting, headers de seguridad, CORS, cookies
   confirmadas, paginación, `npm audit` limpio, monitoreo básico (Sentry),
@@ -736,9 +742,16 @@ sesión, en vez del modelo de "proponé y esperá confirmación en cada paso".
   ya lo hace por default" — confirmarlo contra la documentación real y dejarlo
   explícito en código/config.
 - Los servicios de terceros y sus costos ya están decididos en la sección 3.1
-  (todo en tier gratuito: Vercel Hobby, Supabase free, Upstash Redis, Resend,
-  Sentry, backup propio vía GitHub Action) — no hace falta que Fable 5 proponga
-  alternativas ni pregunte por presupuesto, ya está resuelto.
+  (todo en tier gratuito: Vercel Hobby, Supabase free, Upstash Redis, AWS SES,
+  Sentry, PostHog, backup propio vía GitHub Action) — no hace falta que Fable 5
+  proponga alternativas ni pregunte por presupuesto, ya está resuelto.
+- **Optimizar al máximo la capacidad diaria gratis, sin techo fijo** (sección
+  3.2.1) — usando técnicas dentro del mismo stack (consultas por pantalla, cache,
+  compresión, cacheo en el borde de Vercel), sin sumar ningún servicio nuevo, y
+  sin activar ningún plan pago sin autorización explícita de Jano.
+- **Renombrar el proyecto de Vercel** de `uca-economia` a `stuniv` (sección 3.3).
+- **Versionar esta migración como v10 de Stuniv en `PROYECTO.md`** (no como una
+  continuación incremental de v8.6), dado el peso del cambio de arquitectura.
 - **Access Control Matrix**: definir por escrito qué puede hacer cada tipo de
   usuario según su nivel de permisos (usuario normal, admin si llega a existir),
   y dejarlo en `PROYECTO.md` o en un `CLAUDE.md` del repo. La mayoría de
@@ -751,7 +764,8 @@ sesión, en vez del modelo de "proponé y esperá confirmación en cada paso".
   datos) al terminar — es la regla que ya rige el resto del proyecto.
 - Cerrar con un resumen único: qué quedó resuelto de la sección 6, qué falta (si
   algo quedó pendiente), y qué tiene que hacer Jano manualmente (crear cuenta de
-  Supabase/Upstash/Resend, cargar variables de entorno en Vercel, etc.).
+  Supabase/Upstash/AWS/Sentry/PostHog, cargar variables de entorno en Vercel,
+  etc.).
 
 ---
 
@@ -763,29 +777,31 @@ multi-usuario segura, de punta a punta, en esta misma sesión: Postgres (Supabas
 con Row Level Security, Supabase Auth para el login, y todo lo necesario para que
 ningún hacker pueda robarle datos a un usuario ni que un usuario pueda ver o tocar
 los datos de otro. La seguridad es la prioridad número uno, por encima de todo lo
-demás. Espero potencialmente cientos/miles de usuarios (apunto a mi facultad/
-carrera) con presupuesto cero para infraestructura salvo un dominio propio (único
-gasto del plan, ~US$10-15/año, ya comprado o lo compro yo antes de arrancar) —
-todo lo demás tiene que quedar en tiers gratuitos. Hoy la app la uso solo yo, no
-hay otros usuarios en riesgo todavía, así que podés avanzar sin pedirme
-confirmación en cada paso.
+demás. Espero potencialmente miles de usuarios (apunto a mi facultad/carrera) con
+presupuesto cero para infraestructura — no voy a pagar un dominio propio, así que
+todo se resuelve sobre `*.vercel.app`. Hoy la app la uso solo yo, no hay otros
+usuarios en riesgo todavía, así que podés avanzar sin pedirme confirmación en cada
+paso. Esta migración es la v10 de Stuniv.
 
 Te adjunto MIGRACION-MULTIUSUARIO.md con todo el contexto: las prioridades, NINGUNA
 negociable (sección 2: seguridad, fluidez/ligereza, que no se rompa, que no cueste
-dinero, que se pueda seguir mejorando sin cerrar puertas a futuro, y que sea
-práctico de acceder/ordenado sin sobrecomplejizar), la arquitectura ya decidida
-(Postgres/Supabase + RLS + Supabase Auth), el plan completo de servicios de
-terceros ya resuelto (sección 3.1: Vercel Hobby, dominio propio, Supabase free,
-Upstash Redis para rate limiting, Resend para email transaccional con el dominio
-verificado, Sentry, PostHog para analytics de producto, backup propio vía GitHub
-Action + pg_dump — todo gratis salvo el dominio, no hace falta que propongas
-alternativas ni preguntes por presupuesto), la capacidad estimada y las palancas
-gratis para estirarla a varios miles sin sumar complejidad (sección 3.2), el
-checklist de cuentas/tokens ya resuelto (sección 3.3), el checklist completo de
-seguridad y robustez (sección 6, marcado 🔴 bloqueante / 🟡 antes de abrir la app /
-⚪ condicional), y el apéndice de las 50 vulnerabilidades (sección 7).
+dinero, que se pueda seguir mejorando sin cerrar puertas a futuro — voy a seguir
+trabajando con Claude en sesiones separadas agregando cosas después de esto, no
+solo con vos —, y que sea práctico de acceder/ordenado sin sobrecomplejizar), la
+arquitectura ya decidida (Postgres/Supabase + RLS + Supabase Auth), el plan
+completo de servicios de terceros ya resuelto (sección 3.1: Vercel Hobby sin
+dominio propio, Supabase free, Upstash Redis para rate limiting, **Amazon SES**
+para email transaccional (no Resend — sin dominio propio no se puede verificar
+con la mayoría de los proveedores; SES permite verificar solo una dirección de
+email), Sentry, PostHog para analytics de producto, backup propio vía GitHub
+Action + pg_dump — todo gratis, no hace falta que propongas alternativas ni
+preguntes por presupuesto), la capacidad estimada y el pedido de optimizarla al
+máximo sin techo fijo (sección 3.2 y 3.2.1), el checklist de cuentas/tokens ya
+resuelto (sección 3.3), el checklist completo de seguridad y robustez (sección 6,
+marcado 🔴 bloqueante / 🟡 antes de abrir la app / ⚪ condicional), y el apéndice de
+las 50 vulnerabilidades (sección 7).
 
-Tres puntos específicos que quiero remarcar:
+Puntos específicos que quiero remarcar:
 - **Recuperación de cuenta (sección 6.1 y 6.16)**: quiero que la recuperación de
   contraseña sea por CÓDIGO de 6 dígitos mandado al mail (no solo un link), con
   expiración corta, límite estricto de intentos, y sin filtrar si un email existe
@@ -794,18 +810,20 @@ Tres puntos específicos que quiero remarcar:
 - **No cerrar puertas a pagos futuros (sección 6.8)**: no construyas nada de
   Stripe/pagos ahora, pero el esquema de base de datos tiene que quedar armado de
   forma que agregar una pasarela de pago más adelante (si algún día vendo la
-  app) sea sumar una tabla y un endpoint, no rediseñar todo.
-- **Objetivo de escala: 10.000 usuarios activos por día (sección 3.2 y 3.2.1)**:
-  al armar el schema separado por tabla, asegurate de que cada pantalla pida
-  solo los datos que necesita (no todo el estado del usuario de una), usá el
-  cacheo que ya trae Next.js de fábrica para las lecturas más frecuentes, y
-  confirmá que las respuestas viajen comprimidas (gzip/brotli) — sin sumar
-  ningún servicio nuevo de caching. Sé honesto conmigo: 10.000/día no entra
-  100% gratis ni con estas optimizaciones (la cuenta está en la sección 3.2.1) —
-  dejá la arquitectura lista para que pasar a Supabase Pro (~US$25/mes) el día
-  que el tráfico real lo pida sea solo activar el plan, cero cambios de código
-  ni de seguridad. No actives ningún plan pago vos mismo — avisame cuando
-  PostHog/el dashboard de Supabase indiquen que nos acercamos, y lo decido yo.
+  app, o cualquier otra cosa que se me ocurra con el tiempo) sea sumar una tabla
+  y un endpoint, no rediseñar todo.
+- **Maximizar capacidad diaria gratis, SIN techo fijo (sección 3.2.1)**: no
+  apunto a un número exacto — cuantos más usuarios/tráfico aguante gratis, mejor.
+  Usá las técnicas que consideres dentro del mismo stack ya decidido (consultas
+  por pantalla en vez de todo el estado de una, cache, compresión, cacheo en el
+  borde de Vercel), pero NO agregues ningún servicio/vendor nuevo fuera de la
+  sección 3.1 sin consultarme primero — ese es el límite real de "no
+  sobrecomplejizar", no evitar buena ingeniería. Si después de optimizar en
+  serio hay un techo real, no actives ningún plan pago por tu cuenta (además,
+  no tenés forma de hacerlo: no hay tarjeta cargada en ninguna cuenta) — parame
+  y reportame el número al que llegaste.
+- **Renombrar el proyecto de Vercel** de `uca-economia` a `stuniv` (verificando
+  que `stuniv.vercel.app` esté libre; si no, una variante cercana).
 
 Reglas para esta sesión:
 1. Único paso obligatorio ANTES de tocar cualquier dato: exportá/hacé backup de mi
@@ -813,30 +831,31 @@ Reglas para esta sesión:
    historial de estudio si algo sale mal. Después de eso, no necesito aprobar nada
    más paso a paso — resolvé todo de corrido.
 2. Ejecutá completo TODO lo marcado 🔴 de la sección 6 (Fase 0, incluyendo dejar
-   configurado el dominio con sus registros DNS y el flujo de recuperación por
-   código), y de ahí seguí con lo marcado 🟡 (Fase 1) en la misma sesión si el
-   tiempo/tokens lo permiten: schema separado por tabla con RLS en todas,
-   Supabase Auth con logout real, updates atómicos, secrets solo server-side,
-   rate limiting con Upstash, headers de seguridad, CORS, cookies, email
-   transaccional con Resend, analytics con PostHog (signups, usuarios activos,
-   retención), backup automático propio con GitHub Action.
+   AWS SES aprobado y andando para el flujo de recuperación por código), y de ahí
+   seguí con lo marcado 🟡 (Fase 1) en la misma sesión si el tiempo/tokens lo
+   permiten: schema separado por tabla con RLS en todas, Supabase Auth con logout
+   real, updates atómicos, secrets solo server-side, rate limiting con Upstash,
+   headers de seguridad, CORS, cookies, email transaccional con SES, analytics
+   con PostHog (signups, usuarios activos, retención), backup automático propio
+   con GitHub Action.
 3. No dejes ningún punto de la sección 6 por sobreentendido "porque Supabase/
    Next.js ya lo hace por default" — confirmalo vos mismo contra la documentación
    real y dejalo explícito en el código o config.
-4. Todo en los tiers gratuitos ya decididos en la sección 3.1 (salvo el dominio) —
-   no propongas servicios pagos, y no agregues piezas de infraestructura nuevas
-   que no estén ya en el plan salvo que me lo consultes primero.
+4. Todo en los tiers gratuitos ya decididos en la sección 3.1 — no propongas
+   servicios pagos, y no agregues piezas de infraestructura nuevas que no estén
+   ya en el plan salvo que me lo consultes primero.
 5. Commits chicos y frecuentes a medida que avanzás, no uno gigante al final.
 6. Cuando termines, corré vos mismo la auditoría de la sección 7 ("Act as a senior
    security engineer...") sobre lo que armaste, y arreglá lo que encuentres —
    sin esperar que yo te lo pida en otro mensaje.
 7. Actualizá PROYECTO.md con el nuevo estado (infraestructura, stack, modelo de
-   datos) al terminar.
+   datos), versionado como v10.
 
-Al final quiero un resumen único: qué quedó resuelto de la sección 6, qué falta
-(si algo quedó pendiente por límite de tiempo/tokens), y qué tengo que hacer yo
-manualmente (crear cuentas de Supabase/Upstash/Resend/PostHog, cargar variables
-de entorno en Vercel, etc. — la lista completa ya está en la sección 3.3). No me
-pidas nada intermedio salvo que te topes con algo genuinamente ambiguo o
-irreversible que no esté ya cubierto acá.
+Al final quiero un resumen único: qué quedó resuelto de la sección 6, el número
+real de usuarios/día al que llegó la optimización de capacidad, qué falta (si algo
+quedó pendiente por límite de tiempo/tokens), y qué tengo que hacer yo manualmente
+(crear cuentas de Supabase/Upstash/AWS/Sentry/PostHog, cargar variables de entorno
+en Vercel, etc. — la lista completa ya está en la sección 3.3). No me pidas nada
+intermedio salvo que te topes con algo genuinamente ambiguo o irreversible que no
+esté ya cubierto acá.
 ```
