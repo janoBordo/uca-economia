@@ -134,6 +134,34 @@ Supabase Pro (~US$25/mes) — sin rediseñar nada, sin migrar de proveedor, un c
 Nota: no hay certeza total de si Supabase corta de golpe o degrada gradualmente
 al pasarse del límite gratis — confirmar en su documentación al implementar.
 
+### 3.2.1 Objetivo específico: 10.000 usuarios activos por día
+
+Con esto ya no alcanza el free tier de Supabase con margen cómodo — hay que ser
+honestos con la cuenta, no prometer algo que no cierra:
+
+- Con las optimizaciones de arriba (~80-120 KB/día por usuario): 10.000 usuarios
+  × ~100 KB/día ≈ 1 GB/día ≈ **~30 GB/mes** de egress. El free tier de Supabase
+  da 5GB/mes — una brecha real de 6 veces.
+- **Palanca gratis adicional, a verificar/activar**: confirmar que las respuestas
+  de la API (Supabase y las rutas de Next.js) viajen comprimidas (gzip/brotli).
+  JSON comprime muy bien (fácilmente 70-80% menos peso) — si no está activado
+  por default, activarlo es gratis y sin riesgo. Con esto, el egress por usuario
+  baja a ~25-30 KB/día → 10.000 usuarios ≈ **~7.5-9 GB/mes**. Sigue por encima
+  del límite gratis, pero la brecha pasa de 6x a menos de 2x.
+- **Para cerrar esa brecha con margen cómodo (no al filo del límite), el camino
+  es activar Supabase Pro (~US$25/mes)** — no es una complicación de
+  arquitectura ni un cambio de proveedor: mismo Supabase, mismo RLS, misma Auth,
+  solo más cupo de ancho de banda (el plan Pro da bastante más que los ~30GB que
+  harían falta, con margen). Cero cambios de código, cero impacto en seguridad,
+  la app se ve y funciona exactamente igual.
+- **Este costo no es de entrada** — el plan sigue arrancando en $0 (arista 4:
+  "presupuesto $0 por el momento"). Se activa recién cuando PostHog/el dashboard
+  de Supabase muestren que el tráfico real se acerca a esa escala, no antes. Es
+  la única forma honesta de sostener 10.000 usuarios diarios sin resignar
+  ninguna de las demás aristas (nada de armar una arquitectura de cacheo
+  compleja de varias capas solo para evitar un costo chico y predecible —
+  eso sí violaría la arista 6).
+
 ### 3.3 Checklist de cuentas y tokens a preparar antes de arrancar con Fable 5
 
 Las cuentas en sí no se pueden delegar (los signups tienen CAPTCHA/verificación de
@@ -767,12 +795,17 @@ Tres puntos específicos que quiero remarcar:
   Stripe/pagos ahora, pero el esquema de base de datos tiene que quedar armado de
   forma que agregar una pasarela de pago más adelante (si algún día vendo la
   app) sea sumar una tabla y un endpoint, no rediseñar todo.
-- **Capacidad para miles, sin complejizar (sección 3.2)**: al armar el schema
-  separado por tabla, asegurate de que cada pantalla pida solo los datos que
-  necesita (no todo el estado del usuario de una), y usá el cacheo que ya trae
-  Next.js de fábrica para las lecturas más frecuentes — sin sumar ningún servicio
-  nuevo de caching. El objetivo es estirar la capacidad gratis lo más posible sin
-  apilar piezas extra.
+- **Objetivo de escala: 10.000 usuarios activos por día (sección 3.2 y 3.2.1)**:
+  al armar el schema separado por tabla, asegurate de que cada pantalla pida
+  solo los datos que necesita (no todo el estado del usuario de una), usá el
+  cacheo que ya trae Next.js de fábrica para las lecturas más frecuentes, y
+  confirmá que las respuestas viajen comprimidas (gzip/brotli) — sin sumar
+  ningún servicio nuevo de caching. Sé honesto conmigo: 10.000/día no entra
+  100% gratis ni con estas optimizaciones (la cuenta está en la sección 3.2.1) —
+  dejá la arquitectura lista para que pasar a Supabase Pro (~US$25/mes) el día
+  que el tráfico real lo pida sea solo activar el plan, cero cambios de código
+  ni de seguridad. No actives ningún plan pago vos mismo — avisame cuando
+  PostHog/el dashboard de Supabase indiquen que nos acercamos, y lo decido yo.
 
 Reglas para esta sesión:
 1. Único paso obligatorio ANTES de tocar cualquier dato: exportá/hacé backup de mi
