@@ -1,10 +1,12 @@
 # Stuniv → Multi-usuario: documento de contexto para la migración
 
 Este documento es para pegarle/adjuntarle a Fable 5 (u otra sesión de Claude dedicada)
-al arrancar la migración de Stuniv de app personal a app multi-usuario. Consolida el
-checklist de seguridad que trajo Jano + el estado real del proyecto, priorizado para
-esta migración puntual. No es el registro de cambios del día a día — ese es
-`PROYECTO.md`, que sigue siendo la fuente de verdad del estado actual de la app.
+al arrancar la migración de Stuniv de app personal a app multi-usuario. Incluye **todo**
+lo relacionado a seguridad y a que la app no se rompa/caiga del checklist que trajo
+Jano, sin recortar — la prioridad número uno de esta migración es que ningún atacante
+pueda robarle los datos a un usuario ni tocar los de otro. No es el registro de cambios
+del día a día — ese es `PROYECTO.md`, que sigue siendo la fuente de verdad del estado
+actual de la app.
 
 ---
 
@@ -17,7 +19,8 @@ de tener datos reales de terceros en juego.
 
 ## 2. Las 5 prioridades de Jano (en ese orden de peso, no de secuencia)
 
-1. **Seguridad** — que un usuario nunca pueda ver ni tocar datos de otro.
+1. **Seguridad** — que un usuario nunca pueda ver ni tocar datos de otro, y que ningún
+   hacker pueda robarle datos a ningún usuario. Esta es LA prioridad de esta migración.
 2. **Fluidez / ligereza** — que la app se sienta rápida (ya se venía trabajando esto:
    ver v8.4/v8.6 en `PROYECTO.md`, performance del modo Vidrio 3D).
 3. **Que no se rompa ni se caiga** — robustez ante errores, condiciones de carrera,
@@ -75,109 +78,491 @@ al mismo tiempo) si la arquitectura de datos no cambia.
   `semestres` (archivo histórico), `planEstudio`, `notas`. Todo pasa por
   `/api/db` con GET (trae todo) y POST (merge parcial).
 - Ruta `/api/tts` (edge) proxea a Google Translate TTS gratis para descargar MP3 —
-  no toca la DB, no tiene costo, no necesita cambios de seguridad más allá de rate
-  limiting básico si se abre a más usuarios.
+  no toca la DB, no tiene costo.
 - Sin analytics, sin monitoreo de errores, sin backups configurados (no aplica hoy
   porque KV no tiene ese concepto igual que Postgres).
 
-## 6. Checklist priorizado para esta migración
+---
 
-Organizado en fases. **No hay que resolver las 50 vulnerabilidades del PDF original
-de una — la mayoría son condicionales ("si en algún momento agregás X").** Lo que
-sigue es lo que aplica a Stuniv de verdad, ordenado por cuándo importa.
+## 6. Checklist completo de seguridad y robustez (todo lo del PDF, sin recortar)
 
-### Fase 0 — Bloqueante antes de que exista un segundo usuario
+Cada ítem marcado con cuándo importa:
+🔴 **bloqueante** (antes de que exista un segundo usuario) · 🟡 **antes de abrir la
+app públicamente** · ⚪ **condicional** (solo si en algún momento se da esa situación
+puntual — igual queda documentado para no perderlo de vista).
 
-- [ ] Migrar Vercel KV → Postgres (Supabase), schema separado por tabla:
-      `users`, `materias`, `sesiones_estudio`, `semestres`, `plan_estudio`, `notas`
-      — todas con `user_id` (foreign key), nada de un blob JSON gigante.
-- [ ] Activar **RLS en todas las tablas**, políticas que cubran SELECT +
-      INSERT/UPDATE/DELETE (no solo lectura). Cada policy filtra por
-      `auth.uid() = user_id`. Este es el punto que hace al resto tener sentido.
-- [ ] Supabase Auth: login con email+contraseña, y Google/Apple Sign-In.
-      Logout real (sesión invalidada server-side).
-- [ ] Ningún endpoint confía en un `user_id` que mande el cliente — siempre se saca
-      de la sesión autenticada server-side (evita IDOR, el #33 del checklist).
-- [ ] Updates atómicos por fila para operaciones concurrentes (ej: sumar minutos
-      de estudio) — nunca leer-modificar-escribir desde la app. Esto reemplaza el
-      parche `_delta` actual de raíz.
-- [ ] `.env` con las credenciales de Supabase (connection string, anon key, service
-      role key) — nunca en el cliente salvo la `anon key` pública que Supabase
-      diseña para ir en el frontend (confirmar con Fable 5 cuál va en cada lado).
-- [ ] Borrado de usuario: soft-delete (`deleted_at`) por default + foreign keys con
-      `ON DELETE CASCADE` para cuando se pida borrado definitivo.
+### 6.1 Autenticación y control de accesos
 
-### Fase 1 — Antes de abrir la app públicamente (aunque sea a pocos usuarios)
+- 🔴 Login real con email + contraseña — nunca hardcodeado, nunca en `localStorage`.
+- 🔴 Usar Supabase Auth (ver decisión de arquitectura arriba) — nunca armar un
+  sistema de auth propio desde cero.
+- 🟡 OAuth con Google y Apple Sign-In (genera confianza, facilita el onboarding).
+- 🔴 Logout real: si volvés atrás en el navegador después de cerrar sesión, no te
+  tiene que dejar entrar de nuevo — la sesión del lado del servidor tiene que estar
+  invalidada, no solo borrada del cliente.
+- 🔴 Un usuario logueado no puede acceder a URLs o datos de otro usuario aunque
+  adivine o modifique el ID en la URL.
+- 🔴 Chequear que cada ruta protegida realmente verifique sesión server-side, no
+  solo que "parezca" protegida en el frontend.
+- 🔴 Autenticación (quién sos) y autorización (qué podés hacer) son cosas
+  distintas — se puede estar logueado y aun así no tener permiso para una acción
+  puntual (ej: borrar el examen de otro usuario). Verificar ambas por separado.
+- 🟡 Flujos de reset de contraseña: el link tiene que expirar, ser de un solo uso, y
+  no filtrar si un email existe o no en la base (evita que alguien use el formulario
+  para enumerar usuarios registrados). Con Supabase Auth esto ya viene resuelto —
+  no programarlo a mano.
+- 🔴 Manejo de sesión: nunca sesiones que no expiran, ni que sigan válidas después
+  de cambiar la contraseña.
+- ⚪ Credenciales por defecto sin cambiar — si en algún momento se usa un servicio
+  con usuario/contraseña admin de fábrica (paneles de admin, dashboards de infra),
+  cambiarlo apenas se instala.
 
-- [ ] Rate limiting en login, signup, y cualquier endpoint que llame a una API
-      externa (incluido `/api/tts`).
-- [ ] Validación de inputs en el servidor con Zod (no solo confiar en el frontend).
-- [ ] CORS restringido al dominio propio.
-- [ ] Security headers (CSP, X-Content-Type-Options, Strict-Transport-Security,
-      anti-clickjacking) — pedirle esto explícito a Fable 5, es una tarea acotada.
-- [ ] Cookies de sesión con `HttpOnly` + `Secure` + `SameSite` (Supabase Auth ya lo
-      maneja bien por default — confirmar, no asumir).
-- [ ] Mensajes de error genéricos al usuario, detalle completo solo en logs del
-      servidor.
-- [ ] Ninguna ruta de debug/test vieja (`/api/debug`, etc.) accesible en producción.
-- [ ] Paginación en cualquier endpoint que devuelva listas (a futuro, si
-      `sesiones`/`semestres` crecen mucho por usuario).
-- [ ] Backups automáticos de la base activados (Supabase los tiene incluidos en el
-      plan) + probar un restore al menos una vez.
-- [ ] `npm audit` corrido y limpio; revisar que cada dependencia nueva exista de
-      verdad en npmjs.com antes de instalarla (los agentes de IA a veces alucinan
-      nombres de paquetes).
+### 6.2 API keys, secrets y variables de entorno
 
-### Fase 2 — Calidad de vida / cuando ya hay usuarios reales
+- 🔴 Cero API keys en el frontend — si alguien inspecciona la página (F12 →
+  Network/Sources), no debe ver nada sensible.
+- 🔴 Todas las keys van en `.env` del servidor, nunca en el cliente (la única
+  excepción es la `anon key` pública de Supabase, diseñada para ir en el frontend —
+  confirmar con Fable 5 cuál va en cada lado).
+- ⚪ Preferir credenciales de corta duración (short-lived) sobre keys estáticas
+  fijas, cuando el servicio lo permita.
+- 🔴 Las llamadas a APIs externas (Anthropic, Stripe, ElevenLabs, lo que sea)
+  siempre pasan por el servidor propio — nunca directo desde el browser.
+- 🔴 `.env` en `.gitignore` desde el primer commit del proyecto (ya está así en
+  Stuniv). Si en algún momento se sospecha que algo se subió igual, correr
+  `git log --all --full-history -- .env` para chequear el historial completo.
+- 🔴 Si se descubre que una key se filtró: rotarla de inmediato (y todas las del
+  mismo archivo, no solo la sospechosa) — recién después limpiar el historial de
+  Git con `git filter-repo` o BFG Repo-Cleaner. El orden importa: mientras la key
+  vieja siga activa, sirve igual aunque se borre el archivo del repo.
+- 🔴 Secrets filtrados en el JavaScript del frontend: pasa cuando una variable de
+  entorno sin el prefijo correcto (en Next.js, `NEXT_PUBLIC_` puesto donde no
+  corresponde, o al revés, faltando donde sí correspondía) termina bundleada y
+  visible en el código que llega al navegador. Revisar cada `NEXT_PUBLIC_*`
+  manualmente antes de cada release.
+- 🟡 Revisar que los logs de build de Vercel no impriman variables de entorno
+  completas en consola durante el deploy.
+- 🟡 Source maps expuestos en producción: facilitan a un atacante leer el código
+  fuente original. Confirmar `productionBrowserSourceMaps: false` en
+  `next.config.mjs` (es el default de Next.js, pero confirmarlo explícitamente).
+- ⚪ Si el repo de GitHub es público: cualquiera puede ver todo el historial de
+  commits, no solo el código actual — si se subió algo sensible alguna vez, sigue
+  ahí aunque se haya "borrado" en un commit posterior.
 
-- [ ] Error tracking (Sentry, tier gratuito alcanza para empezar).
-- [ ] Analytics básico (PostHog, tier gratuito) si se quiere saber uso real.
-- [ ] Mail de soporte separado del Gmail personal.
-- [ ] Skeleton loaders en vez de spinners, optimistic UI en acciones frecuentes
-      (tildar materia estudiada, sumar minutos) — mejora percepción de velocidad
-      sin tocar el backend.
+### 6.3 Base de datos — RLS, permisos y aislación multi-usuario
 
-### Fase 3 — Solo si se monetiza o se abre a otros países
+Esta es la sección más importante de todo el documento para Stuniv.
 
-- [ ] Webhooks de pago verificados por firma; check de plan pago siempre
-      server-side.
-- [ ] Política de privacidad + términos y condiciones (obligatorio si se recopila
-      cualquier dato personal, revisar con un abogado antes de publicar).
-- [ ] Cookie consent si hay usuarios en Europa.
-- [ ] Verificar el nombre "Stuniv" en INPI/redes/dominio antes de registrar marca.
+- 🔴 Activar **Row Level Security (RLS)** en TODAS las tablas — el 70% de las apps
+  hechas con IA lo tienen desactivado. Sin RLS, cualquier usuario logueado puede
+  leer datos de cualquier otro con una API call básica.
+- 🔴 Supabase tiene un Security Advisor integrado que dice exactamente qué política
+  falta — pasarle el output a Fable 5/Claude para que lo arregle.
+- 🔴 Cada usuario solo lee/escribe lo suyo, sin excepción — sin este punto no tiene
+  sentido nada más de este documento.
+- 🔴 Las políticas de RLS tienen que cubrir tanto `SELECT` como
+  `INSERT`/`UPDATE`/`DELETE`, no solo lectura.
+- 🔴 Si en algún momento se usa un bucket de storage (fotos de perfil, archivos
+  subidos): confirmar que no quede público por error — es de las fugas más
+  comunes y silenciosas (nadie se entera hasta que ya pasó).
+- 🔴 **IDOR (Insecure Direct Object Reference)**: cuando un endpoint confía en el ID
+  que manda el cliente sin verificar que le pertenezca a quien hace el request.
+  Ejemplo concreto para Stuniv: `GET /api/materias/123` tiene que chequear
+  server-side que la materia `123` sea del usuario logueado, no devolverla solo
+  porque el ID es válido.
+- 🔴 Nunca mandar `role: "admin"` (o cualquier rol/permiso) desde el frontend y
+  confiar en eso — el rol se determina siempre server-side contra la base.
+- 🟡 El usuario/rol técnico de base de datos que usa el backend no debería tener
+  permisos de superadmin sobre toda la base — darle sólo lo que necesita.
+- 🔴 **Este es EL punto central de la migración**: cada query tiene que estar
+  filtrada por `user_id` a nivel de política de base de datos (RLS), no solo a
+  nivel de código de la app — porque un bug en el código puede saltarse un filtro
+  en JavaScript, pero no puede saltarse una política RLS en la base.
+- **Caso real para tener muy presente**: una app con límites de uso de IA por
+  usuario tenía mal configurado RLS — alguien encontró la forma de borrar sus
+  propios límites (y los de otros), lo que en teoría podía generar una factura de
+  $10.000 de costos de API. Es el ejemplo perfecto de por qué RLS no es opcional
+  si en algún momento Stuniv tiene cualquier feature con límites de uso o cuotas.
+- ⚪ Si en algún momento se arma un panel de admin: confirmar que no quede
+  accesible sin login para cualquiera que encuentre la URL.
 
-## 7. Reglas para Fable 5 al ejecutar esta migración
+### 6.4 Protección contra ataques (inyecciones, XSS, CSRF, etc.)
+
+- 🔴 Validar y sanitizar todos los campos en el servidor, no solo en el frontend —
+  el cliente se puede bypassear siempre.
+- 🔴 **SQL injection**: la defensa estructural es usar ORM y prepared statements
+  (Prisma, el client de Supabase, etc.), no escapar manualmente. Un ORM separa el
+  código SQL de los datos del usuario a nivel de protocolo — aunque alguien meta
+  `admin' --` en un campo, nunca se interpreta como parte de la query SQL en sí.
+    - *Mecánica del ataque*: cuando un login arma la query con un `WHERE` y el
+      atacante mete una comilla seguida de `--`, esa comilla cierra el string y los
+      dos guiones convierten el resto de la query en comentario — el chequeo de
+      contraseña queda anulado y entra sin importar qué contraseña haya puesto,
+      siempre que el usuario exista. Un ORM hace este ataque estructuralmente
+      imposible, en vez de depender de "acordarse de validar cada campo".
+- ⚪ **NoSQL injection**: mismo concepto para bases no relacionales — no aplica con
+  Postgres, pero si en algún momento se suma Mongo o similar, nunca pasar objetos
+  de input del usuario directo a una query sin validar su forma esperada.
+- 🔴 **XSS (Cross-Site Scripting)**: cualquier lugar donde el usuario escriba texto
+  (notas, comentarios, formularios) es una puerta de entrada potencial. Si no se
+  cuida, un atacante mete un script entre etiquetas, y cuando se renderiza para
+  cualquier otro usuario el navegador lo ejecuta como parte legítima del sitio —
+  puede robar cookies, leer `localStorage`, o redirigir a otra página.
+    - Defensa en dos capas: (1) validar todo lo que entra con esquemas (Zod), y
+      (2) escapar las salidas — convertir `<` y `>` a texto plano para que el
+      navegador no los reconozca como etiquetas ejecutables.
+    - React ya escapa esto automáticamente en el render normal (`{variable}`
+      dentro de JSX). Donde se rompe esa protección es si en algún momento se usa
+      `dangerouslySetInnerHTML` — si se agrega texto con formato rico (negrita,
+      itálica en notas, por ejemplo), ahí hay que sanitizar con una librería como
+      DOMPurify antes de renderizar.
+    - 🟡 Header `Content-Security-Policy` (CSP): le dice al navegador que no
+      ejecute ningún script que no venga del servidor propio — segunda capa de
+      defensa por si algo se cuela pese al escape.
+- 🟡 **CSRF (Cross-Site Request Forgery)**: ataque donde un sitio malicioso hace
+  que el navegador del usuario logueado mande requests no autorizados a la propia
+  API, aprovechando que ya tiene la cookie de sesión activa. Supabase Auth maneja
+  esto con tokens anti-CSRF o `SameSite` cookies — confirmar que esté activo, no
+  asumirlo.
+- ⚪ **Uploads de archivos inseguros**: si en algún momento se deja subir archivos
+  (PDFs para Lectura ya se hace hoy client-side; si se sube el procesamiento al
+  servidor, o se agregan fotos de perfil), validar tipo de archivo real (no solo
+  la extensión, que se puede falsear), tamaño máximo, y nunca ejecutar ni servir
+  el archivo desde el mismo dominio sin sandboxing.
+- ⚪ **Path traversal**: si algún endpoint arma una ruta de archivo a partir de un
+  input del usuario, validar que no pueda meter `../../` para escaparse del
+  directorio esperado y leer archivos del servidor que no debería.
+- ⚪ **SSRF (Server-Side Request Forgery)**: si el backend hace requests a una URL
+  que viene de un input del usuario (poco común hoy en Stuniv, pero si en algún
+  momento se agrega "importar desde una URL" o similar), validar que esa URL no
+  apunte a infraestructura interna (`localhost`, IPs internas de Vercel/AWS).
+
+### 6.5 Rate limiting y abuso de API
+
+- 🔴 Limitar requests por usuario y por IP en todos los endpoints públicos. Sin
+  esto, bots pueden spamear la API y generar una factura enorme en
+  Vercel/Supabase.
+- 🔴 Aplica especialmente a: login, registro, búsqueda, y cualquier endpoint que
+  llame a una API paga o con cuota — incluido `/api/tts` en Stuniv.
+- ⚪ **Prompt injection en features de IA**: si en algún momento la app manda texto
+  del usuario a un modelo de lenguaje, un atacante puede escribir instrucciones
+  diseñadas para sobreescribir el prompt de sistema. Defensa: envolver siempre el
+  input del usuario en delimitadores claros y nunca dejar que el contenido del
+  usuario llegue a la posición de "system prompt" — tiene que quedar marcado como
+  "esto es input externo, no instrucción".
+- ⚪ Herramientas o acciones de IA con acceso a datos: si alguna vez un agente de
+  IA tiene la capacidad de leer/escribir en la base en nombre de un usuario, esa
+  capacidad tiene que respetar los mismos permisos por usuario que el resto de la
+  app (RLS incluido), no tener un acceso privilegiado paralelo.
+
+### 6.6 CORS, headers y configuración de red
+
+- 🔴 Configurar CORS para que solo acepte requests desde el dominio propio. Sin
+  esto, páginas externas pueden hacer requests a la API usando la sesión de un
+  usuario que tenga el sitio abierto.
+- 🟡 Security Headers HTTP para evitar que la página se pueda embeber en un
+  iframe falso (clickjacking) — se le puede pedir directo a Fable 5: "Agregá
+  Security Headers en mi aplicación".
+- 🟡 Además del anti-clickjacking: `X-Content-Type-Options`,
+  `Strict-Transport-Security` (fuerza HTTPS), y el `Content-Security-Policy` ya
+  mencionado arriba.
+- ⚪ Si en algún momento existe un entorno de staging/test público
+  (`staging.stuniv.com`), protegerlo con auth básica o IP allowlist — muchos
+  atacantes buscan específicamente subdominios de staging porque suelen tener
+  menos seguridad que producción.
+
+### 6.7 Sesiones, cookies y tokens
+
+- 🔴 Si se usa JWT en algún punto, el secret de firma tiene que ser largo, random,
+  y único por entorno (no el mismo secret en dev y producción).
+- 🔴 Cookies de sesión con `HttpOnly` (evita que JavaScript, incluido un script de
+  XSS, pueda leerla), `Secure` (fuerza que solo viaje por HTTPS), y `SameSite`
+  (mitiga CSRF). Con Supabase Auth bien configurado esto ya se maneja por
+  default — confirmar, no asumir.
+- 🔴 Nunca guardar tokens de sesión en `localStorage` — es una señal clásica de
+  auth mal hecho. Si el token de sesión vive en `localStorage` en vez de una
+  cookie HTTP-only, cualquier extensión de Chrome maliciosa o ataque de XSS
+  exitoso puede robar la sesión directamente leyendo el `localStorage`. Confirmar
+  que no se esté guardando nada de sesión manualmente en `localStorage` en ningún
+  lado del código (hoy Stuniv sólo guarda ahí el timer y la preferencia de tema —
+  ninguno es sesión, está bien, pero prestar atención a que la migración no
+  agregue esto por error).
+
+### 6.8 Pagos y webhooks (⚪ condicional — solo si en algún momento se monetiza)
+
+- Webhooks sin verificación de firma: si se integra Stripe o similar, cada
+  webhook recibido tiene que verificar la firma que manda el proveedor — sin
+  esto, cualquiera puede mandar un POST falso simulando "pago confirmado".
+- Checks de pago o suscripción hechos solo en el frontend: el control de "¿este
+  usuario pagó / tiene plan premium?" tiene que verificarse server-side en cada
+  request relevante, nunca confiar en un flag que mandó el cliente.
+
+### 6.9 Logs, monitoreo y auditoría
+
+- 🔴 Revisar qué loguea la app en consola/logs de Vercel — es común que por error
+  se loguee el body completo de un request que incluye datos sensibles (tokens,
+  emails, contraseñas).
+- 🟡 Mensajes de error: uno genérico tipo "Algo salió mal" sin código ni contexto
+  deja ciego para debuggear, pero uno demasiado detallado mostrado al usuario
+  final le da a un atacante información de cómo está armado el sistema por
+  dentro. El equilibrio correcto: loguear el detalle completo del lado del
+  servidor (idealmente en una herramienta como Sentry), y mostrarle al usuario un
+  mensaje genérico con un código de referencia.
+- 🔴 Confirmar que ninguna ruta de diagnóstico/debug usada durante desarrollo
+  (`/api/debug`, `/test`) quede accesible una vez en producción.
+- ⚪ Si en algún momento hay panel de administración: confirmar que tiene su
+  propio chequeo de auth + rol admin, no solo "está logueado".
+- ⚪ Audit logs: para el arranque es secundario, pero si la app crece y en algún
+  momento hay que investigar "¿qué pasó acá?", tener un registro de acciones
+  importantes (login, cambios de datos críticos) ayuda mucho.
+- 🟡 Monitoreo y alertas: enterarse de que algo se rompió porque un usuario
+  escribe, en vez de por una alerta automática, es la diferencia entre reaccionar
+  en minutos o en días. Sentry (tier gratuito alcanza para empezar) avisa de
+  errores en tiempo real con stack trace incluido.
+
+### 6.10 Backups y recuperación
+
+- 🔴 Configurar backups automáticos diarios (Supabase los tiene como feature del
+  plan — confirmar que estén activos) y **probar el proceso de restore al menos
+  una vez** antes de necesitarlo de verdad. El error que se repite en apps sin
+  esto: alguien pierde la base de producción entera por una migración mal
+  corrida, y la única respuesta posible es "estamos investigando el problema"
+  porque no hay backup.
+- 🔴 Migraciones de base de datos con IA: **nunca automáticas en producción**. Si
+  en algún momento se le pide a Fable 5/Claude que modifique el schema (agregar
+  columna, renombrar tabla, cambiar un tipo de dato): revisar el SQL generado a
+  mano antes de correrlo, probarlo primero en una base local o de desarrollo,
+  hacer backup antes de aplicarlo en producción, y nunca dejar que el agente
+  ejecute directamente un comando destructivo contra la base real. Esto aplica
+  especialmente a Stuniv porque viene trabajando con Claude generando código de
+  base de datos directamente.
+
+### 6.11 Arquitectura de base de datos (que no se rompa al crecer)
+
+- 🔴 No usar una sola tabla gigante con todo adentro (perfil + settings +
+  historial + lo que sea) — es exactamente lo que hoy es el blob `uca_data` en
+  Vercel KV. Cuando esa tabla crece, cada query se pone lenta porque tiene que
+  leer filas mucho más pesadas de lo necesario. Separar en tablas relacionadas:
+  `users`, `materias`, `sesiones_estudio`, `semestres`, `plan_estudio`, `notas`,
+  vinculadas por `user_id`.
+- El bug de los emojis (3 bytes vs 4 bytes): en MySQL con charset `utf8` (mal
+  llamado así históricamente), el límite es 3 bytes por carácter, pero los
+  emojis modernos pesan 4 bytes — un insert con emoji puede tirar error o
+  truncar el dato en silencio. Esto no le va a pasar a Stuniv si se migra a
+  Postgres (Supabase), porque soporta UTF-8 completo nativamente sin
+  configuración extra — buena noticia dado que ya está decidido usar Supabase.
+- 🟡 Indexing: pedirle a Fable 5 que revise las queries más frecuentes y agregue
+  índices en las columnas que más se filtran/ordenan (típicamente `user_id`,
+  fechas de examen).
+- 🔴 La connection string de la base (usuario y contraseña incluidos) tiene que
+  vivir únicamente en variables de entorno del servidor, nunca en código ni en
+  logs.
+- 🔴 Cada campo que llega a la base debería pasar por una validación de
+  tipo/formato (Zod) antes de tocar la query, así un dato corrupto nunca llega a
+  romper una columna con un tipo incompatible.
+
+### 6.12 Performance y que no se ponga lenta
+
+- 🟡 Caching: calcular una vez, cachear, servir desde cache — no reprocesar lo
+  mismo en cada request (Stuniv ya hace esto client-side con el cache de 15s en
+  `app/lib/api.ts` — mantener el equivalente del lado del servidor/DB).
+- ⚪ Async / procesamiento en background: operaciones pesadas (mandar emails,
+  generar reportes, procesos largos) van a una cola en background, el usuario no
+  se queda esperando bloqueado.
+- 🟡 Paginación: los endpoints que devuelven listas tienen que paginar siempre —
+  nunca devolver la tabla entera de una. Esto es además un punto de seguridad:
+  sin paginación, un solo GET puede dumpear toda la base de un saque.
+- 🟡 Load testing antes de lanzar: pedirle a Fable 5 que simule tráfico para
+  encontrar cuellos de botella antes de que pase con usuarios reales — mejor que
+  reviente en testing que en producción.
+- ⚪ Performance de frontend: comprimir imágenes antes de subir, eliminar
+  animaciones pesadas innecesarias (ya se viene trabajando esto en Stuniv, ver
+  v8.4/v8.6), testear con Google PageSpeed Insights.
+- ⚪ Performance percibida (UX): skeleton loaders en vez de spinners; caching del
+  lado del cliente para que la navegación no se sienta lenta (ya existe en
+  Stuniv); optimistic rendering en acciones que casi siempre funcionan (ej:
+  tildar una materia como estudiada — actualizar la UI al instante, revertir
+  solo si falla); tooltips en botones que son solo ícono.
+
+### 6.13 Robustez — que no se crashee
+
+- 🔴 **Race conditions / transacciones atómicas**: pasa cuando dos procesos
+  intentan modificar el mismo dato al mismo tiempo, y el orden en que "ganan" es
+  impredecible. Esto le puede pegar directo a Stuniv, porque la app sincroniza
+  entre celular y compu: si se abre en los dos dispositivos a la vez y se
+  modifica el mismo dato (sumar minutos de estudio a la misma materia) en
+  simultáneo, sin una transacción atómica se puede perder uno de los dos
+  cambios. La solución es usar transacciones atómicas en las operaciones de
+  escritura concurrente (en Postgres/Supabase esto se maneja con funciones de
+  base de datos o `UPDATE ... WHERE` con valores actuales, no
+  leer-modificar-escribir desde la app). Ver sección 4 — esto ya pasó una vez en
+  Stuniv (`addMinutos` + `_delta`), la migración lo resuelve de raíz.
+- 🟡 Errores genéricos sin contexto (ya cubierto en logs) también es un tema de
+  robustez: si no se sabe por qué crasheó, no se puede prevenir que vuelva a
+  pasar.
+
+### 6.14 Dependencias y código generado por IA
+
+- 🔴 No confiar a ciegas en lo que un agente de IA instala. Antes de aceptar un
+  `npm install` sugerido, fijarse en `package.json` que el paquete exista de
+  verdad (buscarlo en npmjs.com) y que no sea una versión vieja con
+  vulnerabilidades conocidas. Los modelos de lenguaje a veces "alucinan" nombres
+  de paquetes que suenan plausibles pero no existen — hay atacantes que
+  registran esos nombres con malware adentro, apostando a que alguien los
+  instale por confiar en la sugerencia de la IA.
+- 🟡 Correr `npm audit` periódicamente — tira las vulnerabilidades conocidas de
+  las dependencias directas y transitivas.
+- 🔴 **Meta-punto de todo el documento**: cada cambio relevante que genere
+  Fable 5/Claude (sobre todo en auth, base de datos, o cualquier endpoint que
+  toque datos de otro usuario) conviene leerlo antes de aceptarlo, no solo
+  correrlo porque "compila".
+
+### 6.15 Control de versiones y deploys seguros
+
+- 🔴 Commits chicos y frecuentes, no un commit gigante cada tanto. Si un cambio
+  generado por IA rompe algo, con commits chicos se puede hacer un
+  `git revert` quirúrgico de ese cambio puntual. Con un commit gigante, revertir
+  hace perder todo lo bueno que vino junto con lo malo.
+- 🟡 Probar en local (o en un branch/preview deploy de Vercel) antes de mergear a
+  `main`/producción — Vercel arma automáticamente un preview deploy por cada PR.
+- 🔴 Backup de base de datos antes de cualquier migración de schema (ya
+  mencionado en backups, pero es el punto de mayor riesgo en cualquier
+  "actualización").
+- 🔴 Revisar el SQL generado para migraciones antes de correrlo — nunca dejarlo
+  en automático contra producción.
+
+### 6.16 Gestión de usuarios (operativa real)
+
+- 🟡 Cambiar contraseña: con Supabase Auth este flujo ya viene resuelto — no
+  programarlo a mano. "Forgot password" con link por mail con expiración, y
+  desde el perfil logueado un "Change password" que pide la actual + la nueva.
+  Lo que sí hay que garantizar: que ese endpoint también tenga rate limiting
+  (si no, alguien puede hacer fuerza bruta de la contraseña actual).
+- 🔴 Borrar un usuario sin romper la base — el error típico es un
+  `DELETE FROM users` directo que deja huérfanos (materias, sesiones que
+  apuntaban a ese `user_id` quedan flotando, o la query rompe por foreign key
+  constraint). Dos enfoques, recomendado usar los dos juntos:
+    1. **Soft delete**: en vez de borrar la fila, agregar una columna
+       `deleted_at` y marcarla con la fecha. La cuenta deja de poder loguearse
+       pero los datos quedan intactos por si fue un error o hay que recuperar
+       algo.
+    2. **Hard delete con `ON DELETE CASCADE`**: configurar las foreign keys
+       (materias/sesiones → `user_id`) para que al borrar el usuario en serio,
+       Postgres borre automáticamente todo lo asociado sin dejar huérfanos.
+       Necesario igual si en algún momento alguien pide "borrame todos mis
+       datos" en serio.
+    - Recomendado: soft delete por default (reversible), y un proceso aparte
+      que haga hard delete con cascade después de X días para los pedidos de
+      borrado definitivo.
+
+---
+
+## 7. Apéndice — Las 50 vulnerabilidades, checklist final rápido
+
+Usar esto como pasada final antes de cada lanzamiento importante — tildar cada una a
+medida que se confirma resuelta (ya están desarrolladas en detalle en la sección 6):
+
+1. Credenciales de base de datos expuestas
+2. Archivos `.env` públicos
+3. API keys hardcodeadas
+4. Autenticación débil o ausente
+5. Sin chequeos de autorización
+6. Usuarios accediendo a datos de otros usuarios
+7. Permisos de lectura/escritura abiertos en la base
+8. Firebase / Supabase / S3 mal configurados
+9. Rutas de admin sin proteger
+10. Páginas de debug expuestas en producción
+11. Logs de build filtrando secrets
+12. Mensajes de error verbosos filtrando stack traces
+13. Repos de GitHub o historial de commits filtrados
+14. Secrets incluidos en el JavaScript del frontend
+15. Chequeos de seguridad solo del lado del cliente
+16. Falta de validación de inputs
+17. SQL injection
+18. NoSQL injection
+19. Cross-site scripting (XSS)
+20. Cross-site request forgery (CSRF)
+21. Uploads de archivos inseguros
+22. Path traversal
+23. Server-side request forgery (SSRF)
+24. Flujos de reset de contraseña rotos
+25. Manejo de sesión débil
+26. JWT secrets débiles, filtrados o reusados
+27. CORS demasiado permisivo
+28. Rate limits faltantes en login, signup, APIs y endpoints de IA
+29. Entornos de test/staging públicos
+30. Credenciales por defecto sin cambiar
+31. Webhooks sin verificación de firma
+32. Checks de pago/suscripción solo en frontend
+33. IDOR (Insecure Direct Object Reference)
+34. Endpoints que confían en IDs/roles controlados por el usuario
+35. Logs con tokens, emails, contraseñas o datos privados
+36. Source maps expuestos en producción
+37. Vulnerabilidades de dependencias
+38. Paquetes desactualizados
+39. Prompt injection en features de IA
+40. Herramientas/acciones de IA accediendo a datos sin chequeo de permisos
+41. Permisos excesivos del usuario técnico de la app sobre la base
+42. Sin audit logs
+43. Sin monitoreo ni alertas
+44. Sin plan de backup/restore
+45. Dashboards internos expuestos públicamente
+46. Headers de seguridad faltantes
+47. Cookies sin `HttpOnly`, `Secure`, o `SameSite`
+48. Datos sensibles sin encriptar
+49. Mala aislación entre tenants en apps multi-usuario
+50. Confiar en código generado por IA sin revisión
+
+### Prompt de auditoría pre-lanzamiento (usar en un chat nuevo, después de completar la Fase 0)
+
+```
+Act as a senior security engineer. Audit my entire codebase for vulnerabilities,
+specifically checking for exposed environment variables, missing rate limits, and
+database security rules.
+```
+
+---
+
+## 8. Orden sugerido de ejecución (fases, sobre el checklist de la sección 6)
+
+- **Fase 0 — bloqueante, antes de que exista un segundo usuario**: todo lo marcado
+  🔴 arriba. Es, en esencia: migrar a Postgres/Supabase con RLS en todas las
+  tablas, Supabase Auth con logout real e IDOR resuelto, updates atómicos por
+  fila, secrets solo server-side, backups activados, y ningún commit de
+  base de datos sin revisión humana.
+- **Fase 1 — antes de abrir la app públicamente (aunque sea a pocos usuarios)**:
+  todo lo marcado 🟡 — rate limiting, headers de seguridad, CORS, cookies
+  confirmadas, paginación, `npm audit` limpio, monitoreo básico (Sentry).
+- **Fase 2/condicional — según lo que se agregue con el tiempo**: todo lo
+  marcado ⚪ — pagos/webhooks (solo si se monetiza), prompt injection (solo si
+  se agrega IA de cara al usuario), uploads/path traversal/SSRF (solo si se
+  agregan esas features puntuales).
+
+## 9. Reglas para Fable 5 al ejecutar esta migración
 
 - **Proponer un plan por fases y esperar confirmación antes de ejecutar** —
-  sobre todo la Fase 0 (auth + base de datos), que es irreversible si se hace mal.
-  Esto no se decide solo agente, se avisa antes (así trabaja Jano siempre acá,
-  ver `PROYECTO.md` → "Cómo le gusta trabajar a Jano").
-- **Commits chicos y frecuentes**, no un commit gigante con toda la migración —
-  así un `git revert` puntual es posible si algo rompe.
+  sobre todo la Fase 0 (auth + base de datos), que es irreversible si se hace
+  mal. Esto no se decide solo agente, se avisa antes (así trabaja Jano siempre
+  acá, ver `PROYECTO.md` → "Cómo le gusta trabajar a Jano").
+- **Commits chicos y frecuentes**, no un commit gigante con toda la migración.
 - **Nunca correr una migración de schema directo contra producción** sin: (1)
   probarla en local/desarrollo primero, (2) backup previo, (3) el SQL generado
   revisado a mano por Jano antes de ejecutar.
-- **Nunca dejar un comando destructivo (DROP, DELETE sin WHERE, etc.) en manos de
-  un agente sin revisión humana previa.**
+- **Nunca dejar un comando destructivo (DROP, DELETE sin WHERE, etc.) en manos
+  de un agente sin revisión humana previa.**
 - Actualizar `PROYECTO.md` con cada fase completada (infraestructura, stack,
   modelo de datos) — es la regla que ya rige el resto del proyecto.
-- Definir por escrito una **Access Control Matrix** simple (qué puede hacer un
-  usuario normal vs. un admin, si llega a existir un rol admin) y dejarla en
-  `PROYECTO.md` o en un `CLAUDE.md` — la mayoría de vulnerabilidades en apps
-  "vibecodeadas" no son código malo, son falta de este contexto explícito.
+- **Access Control Matrix**: definir por escrito qué puede hacer cada tipo de
+  usuario según su nivel de permisos (usuario normal, admin si llega a existir),
+  y dejarlo en `PROYECTO.md` o en un `CLAUDE.md` del repo. La mayoría de
+  vulnerabilidades en apps "vibecodeadas" no son código malo — es que el agente
+  no tenía el contexto de qué debía estar permitido o no.
+- Si en algún momento se trabaja con reglas locales de IDE (Claude Code,
+  Cursor), que esas reglas tengan seguridad por defecto desde el arranque de
+  cada sesión, no como ocurrencia tardía.
 - Mantener todo en tiers gratuitos (Supabase free, Vercel free/hobby) mientras
   el número de usuarios lo permita; si algo va a generar costo, avisar antes de
   activarlo, no después.
-
-## 8. Qué evitar en pantallas nuevas (pulido de producto, no seguridad)
-
-Esto no afecta la seguridad pero vale la pena tenerlo presente en las pantallas de
-login/registro/onboarding que se agreguen:
-- No abusar de badges/tags redondeados en cada título de sección.
-- No agrupar métricas siempre de a 3 o de a 4 en cajitas por costumbre.
-- No abusar del efecto glass en TODO — Stuniv ya tiene su propio modo Vidrio 3D
-  cuidado a mano, no hace falta imitar el patrón genérico de IA en pantallas nuevas.
-- Sin marquesinas/loops infinitos de texto salvo que cumplan una función real.
 
 ---
 
@@ -187,35 +572,41 @@ login/registro/onboarding que se agreguen:
 Vas a ayudarme a migrar Stuniv (app de gestión de estudio, hoy funcional para un
 solo usuario) de Vercel KV a una arquitectura multi-usuario segura: Postgres
 (Supabase) con Row Level Security, Supabase Auth para el login, y todo lo necesario
-para que un usuario nunca pueda ver ni tocar datos de otro.
+para que ningún hacker pueda robarle datos a un usuario ni que un usuario pueda ver
+o tocar los datos de otro. La seguridad es la prioridad número uno de esta migración,
+por encima de todo lo demás.
 
 Te adjunto MIGRACION-MULTIUSUARIO.md con todo el contexto: las 5 prioridades (en
 este orden de peso: seguridad, fluidez/ligereza, que no se rompa, que no cueste
 dinero, que se pueda seguir mejorando), la decisión de arquitectura ya tomada
-(Postgres/Supabase + RLS + Supabase Auth), y un checklist priorizado en fases
-(Fase 0 = bloqueante, Fase 1 = antes de abrir la app, Fase 2 y 3 = más adelante).
+(Postgres/Supabase + RLS + Supabase Auth), el checklist COMPLETO de seguridad y
+robustez (sección 6, con cada ítem marcado 🔴 bloqueante / 🟡 antes de abrir la app /
+⚪ condicional), el apéndice de las 50 vulnerabilidades como checklist final (sección
+7), y el orden de ejecución sugerido (sección 8).
 
 Quiero que:
 1. Leas el documento completo y el PROYECTO.md del repo (estado actual real del
    stack) antes de proponer nada.
-2. Me propongas un plan de migración por fases, empezando SOLO por la Fase 0, con
-   pasos concretos y el orden en que los harías. No empieces a programar todavía —
-   quiero revisar el plan primero.
+2. Me propongas un plan de migración por fases, empezando SOLO por la Fase 0 (todo
+   lo marcado 🔴 en la sección 6), con pasos concretos y el orden en que los harías.
+   No empieces a programar todavía — quiero revisar el plan primero.
 3. Cada paso que toque autenticación o el schema de la base de datos me lo
    expliques antes de ejecutarlo, con el SQL o la migración a la vista para que
    lo revise yo antes de correrlo contra cualquier base real.
-4. Mantengas todo en tiers gratuitos (Supabase free, Vercel free/hobby) — avisame
+4. No des ningún punto de seguridad de la sección 6 por sobreentendido o ya
+   cubierto por Supabase/Next.js "por default" sin confirmarlo explícitamente vos
+   mismo contra la documentación oficial — quiero que cada 🔴 y 🟡 quede
+   verificado, no asumido.
+5. Mantengas todo en tiers gratuitos (Supabase free, Vercel free/hobby) — avisame
    si algún paso puede generar costo antes de activarlo.
-5. Sigas las reglas de ejecución de la sección 7 del documento adjunto (commits
-   chicos, nunca migraciones destructivas automáticas, actualizar PROYECTO.md al
-   cerrar cada fase).
+6. Sigas las reglas de ejecución de la sección 9 del documento adjunto (commits
+   chicos, nunca migraciones destructivas automáticas, Access Control Matrix por
+   escrito, actualizar PROYECTO.md al cerrar cada fase).
 
-Cuando terminemos la Fase 0 y esté probada, corré como auditoría final este check
-(es el prompt de auditoría del checklist de seguridad original):
-
-"Act as a senior security engineer. Audit my entire codebase for vulnerabilities,
-specifically checking for exposed environment variables, missing rate limits, and
-database security rules."
+Cuando termine la Fase 0 y esté probada en un entorno de prueba, corré como
+auditoría final el prompt de la sección 7 del documento adjunto ("Act as a senior
+security engineer...") antes de que consideremos la migración lista para un
+segundo usuario real.
 
 Empezá pidiéndome lo que necesites para arrancar (acceso al repo, si ya tengo
 cuenta de Supabase creada, etc.) y después mostrame el plan de la Fase 0.
