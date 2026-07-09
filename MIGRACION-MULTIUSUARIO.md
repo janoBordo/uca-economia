@@ -17,7 +17,7 @@ la puerta abierta a una versión descargable (PWA / mobile) más adelante". Nadi
 usa la app hoy — es la ventana ideal para hacer el cambio de arquitectura bien, antes
 de tener datos reales de terceros en juego.
 
-## 2. Las 5 prioridades de Jano (en ese orden de peso, no de secuencia)
+## 2. Las prioridades de Jano — NINGUNA se negocia (ese orden de peso, no de secuencia)
 
 1. **Seguridad** — que un usuario nunca pueda ver ni tocar datos de otro, y que ningún
    hacker pueda robarle datos a ningún usuario. Esta es LA prioridad de esta migración.
@@ -25,13 +25,20 @@ de tener datos reales de terceros en juego.
    ver v8.4/v8.6 en `PROYECTO.md`, performance del modo Vidrio 3D).
 3. **Que no se rompa ni se caiga** — robustez ante errores, condiciones de carrera,
    deploys.
-4. **Que no cueste dinero tenerla ni mantenerla** — todo en tiers gratuitos mientras
-   la escala lo permita.
-5. **Que se pueda seguir actualizando y mejorando** — arquitectura que no se vuelva
-   una bola de barro a medida que crece.
+4. **Que no cueste dinero tenerla ni mantenerla** — presupuesto $0 por el momento,
+   todo en tiers gratuitos mientras la escala lo permita.
+5. **Que se pueda seguir actualizando y mejorando, sin cerrar puertas a futuro** —
+   arquitectura que no se vuelva una bola de barro a medida que crece, y que no
+   bloquee agregar cosas más adelante (ej. pasarelas de pago) aunque hoy no se
+   construyan.
+6. **Que quede práctico acceder a la app, al backend y a la base de datos — todo
+   ordenado, sin sobrecomplejizar.** No apilar piezas nuevas si una ya alcanza.
 
-Estas cinco no compiten entre sí en este caso: la misma decisión de arquitectura
-(abajo) las resuelve todas a la vez.
+Estas seis no compiten entre sí en este caso: la misma decisión de arquitectura
+(abajo) las resuelve todas a la vez. Supabase en particular pega fuerte con la
+prioridad 6: un solo dashboard para ver la base, correr SQL, gestionar usuarios y
+revisar Auth — no hay que aprender ni pagar por herramientas separadas para cada
+cosa.
 
 ## 3. Decisión de arquitectura ancla (recomendada)
 
@@ -95,20 +102,31 @@ gratis) es el que se toca primero, por lejos** — no la cantidad de usuarios de
 (aguanta 50.000), no el espacio de la base (con el modelo de datos liviano de
 Stuniv, ahí entran decenas de miles de usuarios).
 
-Estimación aproximada con el patrón de uso de Stuniv (requests chicos, cacheados
-15s): **entre 300 y 1.000 usuarios activos reales por mes** antes de necesitar
-pagar algo, dependiendo de qué tan seguido entren (uso diario ≈ más cerca de 300;
-uso más esporádico ≈ más cerca de 1.000).
+**Estimación conservadora inicial** (asumiendo el patrón de hoy, donde `/api/db`
+trae TODO el blob en cada request): entre 300 y 1.000 usuarios activos/mes.
 
-Qué pasa al llegar ahí: no se "cae" ni se "rompe" — es activar Supabase Pro
-(~US$25/mes) para más ancho de banda. La arquitectura (RLS, tablas separadas,
-índices) ya está pensada para escalar sin rediseñar nada; a ese punto es solo
-pagar más cómputo, no reconstruir la app. **PostHog es la forma de ver este
-número venir** (cuántos usuarios activos por mes, a qué velocidad crece la curva)
-para decidir con tiempo cuándo pasar a Supabase Pro, en vez de que sea una
-sorpresa. Nota: no hay certeza total de si Supabase corta de golpe o degrada
-gradualmente al pasarse del límite gratis — confirmar en su documentación al
-implementar, y vigilar desde su dashboard de uso.
+**Por qué ese número sube bastante con la propia migración, sin sumar nada extra:**
+al pasar a tablas separadas (sección 6.11), cada pantalla deja de traer el blob
+entero y pasa a pedir sólo lo que necesita (ej. la vista del timer no necesita el
+historial completo de semestres archivados) — eso solo, sin ninguna pieza nueva,
+puede reducir el peso por request varias veces. Sumado a subir el cache del
+cliente de 15s a algo como 60-120s para datos que no cambian a cada segundo
+(materias, metas), y a usar el cacheo de rutas que ya trae Next.js de fábrica
+(`revalidate`, sin agregar ningún servicio nuevo) para las consultas de lectura
+más pedidas — **con esto, unos pocos miles de usuarios activos por mes gratis es
+un objetivo realista**, no una promesa vacía. Esto respeta la arista 6 (nada de
+piezas nuevas: son ajustes al mismo Supabase + las herramientas que Next.js ya
+trae incluidas).
+
+**El techo real, honesto**: no existe una versión 100% gratis que aguante
+cualquier volumen para siempre — en algún punto de crecimiento genuino, algo hay
+que pagar. Acá el objetivo no es evitarlo para siempre, es correrlo lo más lejos
+posible sin complejizar, y que cuando llegue sea una decisión tomada con datos
+(PostHog + el dashboard de uso de Supabase avisando con anticipación), no una
+sorpresa. Y cuando llegue, la solución sigue siendo la misma de siempre: activar
+Supabase Pro (~US$25/mes) — sin rediseñar nada, sin migrar de proveedor, un clic.
+Nota: no hay certeza total de si Supabase corta de golpe o degrada gradualmente
+al pasarse del límite gratis — confirmar en su documentación al implementar.
 
 ### 3.3 Checklist de cuentas y tokens a preparar antes de arrancar con Fable 5
 
@@ -189,10 +207,23 @@ puntual — igual queda documentado para no perderlo de vista).
 - 🔴 Autenticación (quién sos) y autorización (qué podés hacer) son cosas
   distintas — se puede estar logueado y aun así no tener permiso para una acción
   puntual (ej: borrar el examen de otro usuario). Verificar ambas por separado.
-- 🟡 Flujos de reset de contraseña: el link tiene que expirar, ser de un solo uso, y
-  no filtrar si un email existe o no en la base (evita que alguien use el formulario
-  para enumerar usuarios registrados). Con Supabase Auth esto ya viene resuelto —
-  no programarlo a mano.
+- 🔴 **Recuperación de cuenta por código (OTP), no solo link** — así un usuario
+  nunca pierde su cuenta aunque se olvide la contraseña: pide recuperarla, recibe
+  un código de 6 dígitos por mail, lo ingresa en la app, define una contraseña
+  nueva. Esto es una configuración nativa de Supabase Auth (no hay que programar
+  nada desde cero, es elegir la plantilla de email "OTP" en vez de "magic link").
+  Parámetros de seguridad no negociables para que esto sea seguro como en
+  cualquier app seria:
+    - El código expira rápido (~10 minutos) y es de un solo uso — al pedir uno
+      nuevo, el anterior queda inválido automáticamente.
+    - **Límite estricto de intentos** en el endpoint que verifica el código (vía
+      Upstash, sección 3.1) — un código de 6 dígitos es adivinable por fuerza
+      bruta si no se limitan los intentos; con un tope bajo (ej. 5 intentos y
+      hay que pedir un código nuevo) queda impracticable de forzar.
+    - La respuesta es igual exista o no ese email en la base (evita que alguien
+      use el formulario para enumerar usuarios registrados).
+    - Al confirmar la nueva contraseña, cerrar sesión en todos los demás
+      dispositivos donde el usuario estuviera logueado.
 - 🔴 Manejo de sesión: nunca sesiones que no expiran, ni que sigan válidas después
   de cambiar la contraseña.
 - ⚪ Credenciales por defecto sin cambiar — si en algún momento se usa un servicio
@@ -372,6 +403,22 @@ Esta es la sección más importante de todo el documento para Stuniv.
 
 ### 6.8 Pagos y webhooks (⚪ condicional — solo si en algún momento se monetiza)
 
+**No construir nada de esto ahora — pero dejar constancia expresa de que la
+arquitectura decidida (Postgres/Supabase + RLS) NO cierra esta puerta para
+siempre.** Si más adelante Jano quiere vender Stuniv con Stripe (u otra
+pasarela), lo único que hace falta agregar en ese momento es:
+- Una tabla `suscripciones` (o una columna de plan en el perfil del usuario),
+  vinculada por `user_id` con RLS igual que el resto — encaja directo en el
+  mismo esquema relacional, no requiere cambiar de base ni de proveedor de auth.
+- Un endpoint `/api/webhooks/stripe` que verifique la firma que manda Stripe.
+- Que el chequeo de "¿este usuario tiene plan pago?" se haga siempre
+  server-side (nunca confiar en un flag mandado por el cliente).
+
+Stripe en sí tampoco rompe la arista de presupuesto $0: no cobra nada hasta que
+se procesa un cobro real (se lleva un % de cada transacción, no una cuota fija
+mensual) — se puede integrar el día que se decida monetizar sin haber pagado un
+peso antes de esa fecha.
+
 - Webhooks sin verificación de firma: si se integra Stripe o similar, cada
   webhook recibido tiene que verificar la firma que manda el proveedor — sin
   esto, cualquiera puede mandar un POST falso simulando "pago confirmado".
@@ -523,11 +570,16 @@ Esta es la sección más importante de todo el documento para Stuniv.
 
 ### 6.16 Gestión de usuarios (operativa real)
 
-- 🟡 Cambiar contraseña: con Supabase Auth este flujo ya viene resuelto — no
-  programarlo a mano. "Forgot password" con link por mail con expiración, y
-  desde el perfil logueado un "Change password" que pide la actual + la nueva.
-  Lo que sí hay que garantizar: que ese endpoint también tenga rate limiting
-  (si no, alguien puede hacer fuerza bruta de la contraseña actual).
+- 🔴 Olvidé mi contraseña: ver el flujo de recuperación por código (sección
+  6.1) — así ningún usuario pierde el acceso a su cuenta para siempre por
+  olvidarse la clave.
+- 🟡 Cambiar contraseña estando logueado: exigir re-ingresar la contraseña
+  actual antes de aceptar la nueva (Supabase no lo fuerza por default, hay que
+  pedirlo explícito) — si no, alguien con acceso momentáneo a una sesión abierta
+  (compu compartida, etc.) podría apropiarse la cuenta sin saber la clave vieja.
+  Ese endpoint también necesita rate limiting (si no, alguien puede hacer fuerza
+  bruta de la contraseña actual). Al confirmar el cambio, cerrar sesión en todos
+  los demás dispositivos.
 - 🔴 Borrar un usuario sin romper la base — el error típico es un
   `DELETE FROM users` directo que deja huérfanos (materias, sesiones que
   apuntaban a ese `user_id` quedan flotando, o la query rompe por foreign key
@@ -684,19 +736,37 @@ todo lo demás tiene que quedar en tiers gratuitos. Hoy la app la uso solo yo, n
 hay otros usuarios en riesgo todavía, así que podés avanzar sin pedirme
 confirmación en cada paso.
 
-Te adjunto MIGRACION-MULTIUSUARIO.md con todo el contexto: las 5 prioridades (en
-este orden de peso: seguridad, fluidez/ligereza, que no se rompa, que no cueste
-dinero, que se pueda seguir mejorando), la arquitectura ya decidida (Postgres/
-Supabase + RLS + Supabase Auth), el plan completo de servicios de terceros ya
-resuelto (sección 3.1: Vercel Hobby, dominio propio, Supabase free, Upstash Redis
-para rate limiting, Resend para email transaccional con el dominio verificado,
-Sentry, PostHog para analytics de producto, backup propio vía GitHub Action +
-pg_dump — todo gratis salvo el dominio, no hace falta que propongas alternativas
-ni preguntes por presupuesto), la capacidad estimada y qué vigilar a medida que
-crece (sección 3.2), el checklist de cuentas/tokens ya resuelto (sección 3.3), el
-checklist completo de seguridad y robustez (sección 6, marcado 🔴 bloqueante /
-🟡 antes de abrir la app / ⚪ condicional), y el apéndice de las 50 vulnerabilidades
-(sección 7).
+Te adjunto MIGRACION-MULTIUSUARIO.md con todo el contexto: las prioridades, NINGUNA
+negociable (sección 2: seguridad, fluidez/ligereza, que no se rompa, que no cueste
+dinero, que se pueda seguir mejorando sin cerrar puertas a futuro, y que sea
+práctico de acceder/ordenado sin sobrecomplejizar), la arquitectura ya decidida
+(Postgres/Supabase + RLS + Supabase Auth), el plan completo de servicios de
+terceros ya resuelto (sección 3.1: Vercel Hobby, dominio propio, Supabase free,
+Upstash Redis para rate limiting, Resend para email transaccional con el dominio
+verificado, Sentry, PostHog para analytics de producto, backup propio vía GitHub
+Action + pg_dump — todo gratis salvo el dominio, no hace falta que propongas
+alternativas ni preguntes por presupuesto), la capacidad estimada y las palancas
+gratis para estirarla a varios miles sin sumar complejidad (sección 3.2), el
+checklist de cuentas/tokens ya resuelto (sección 3.3), el checklist completo de
+seguridad y robustez (sección 6, marcado 🔴 bloqueante / 🟡 antes de abrir la app /
+⚪ condicional), y el apéndice de las 50 vulnerabilidades (sección 7).
+
+Tres puntos específicos que quiero remarcar:
+- **Recuperación de cuenta (sección 6.1 y 6.16)**: quiero que la recuperación de
+  contraseña sea por CÓDIGO de 6 dígitos mandado al mail (no solo un link), con
+  expiración corta, límite estricto de intentos, y sin filtrar si un email existe
+  en la base — para que ningún usuario pierda su cuenta para siempre por
+  olvidarse la clave, pero que tampoco nadie más pueda entrar sin ser el dueño.
+- **No cerrar puertas a pagos futuros (sección 6.8)**: no construyas nada de
+  Stripe/pagos ahora, pero el esquema de base de datos tiene que quedar armado de
+  forma que agregar una pasarela de pago más adelante (si algún día vendo la
+  app) sea sumar una tabla y un endpoint, no rediseñar todo.
+- **Capacidad para miles, sin complejizar (sección 3.2)**: al armar el schema
+  separado por tabla, asegurate de que cada pantalla pida solo los datos que
+  necesita (no todo el estado del usuario de una), y usá el cacheo que ya trae
+  Next.js de fábrica para las lecturas más frecuentes — sin sumar ningún servicio
+  nuevo de caching. El objetivo es estirar la capacidad gratis lo más posible sin
+  apilar piezas extra.
 
 Reglas para esta sesión:
 1. Único paso obligatorio ANTES de tocar cualquier dato: exportá/hacé backup de mi
@@ -704,18 +774,19 @@ Reglas para esta sesión:
    historial de estudio si algo sale mal. Después de eso, no necesito aprobar nada
    más paso a paso — resolvé todo de corrido.
 2. Ejecutá completo TODO lo marcado 🔴 de la sección 6 (Fase 0, incluyendo dejar
-   configurado el dominio con sus registros DNS), y de ahí seguí con lo marcado
-   🟡 (Fase 1) en la misma sesión si el tiempo/tokens lo permiten: schema
-   separado por tabla con RLS en todas, Supabase Auth con logout real, updates
-   atómicos, secrets solo server-side, rate limiting con Upstash, headers de
-   seguridad, CORS, cookies, email transaccional con Resend, analytics con
-   PostHog (signups, usuarios activos, retención), backup automático propio con
-   GitHub Action.
+   configurado el dominio con sus registros DNS y el flujo de recuperación por
+   código), y de ahí seguí con lo marcado 🟡 (Fase 1) en la misma sesión si el
+   tiempo/tokens lo permiten: schema separado por tabla con RLS en todas,
+   Supabase Auth con logout real, updates atómicos, secrets solo server-side,
+   rate limiting con Upstash, headers de seguridad, CORS, cookies, email
+   transaccional con Resend, analytics con PostHog (signups, usuarios activos,
+   retención), backup automático propio con GitHub Action.
 3. No dejes ningún punto de la sección 6 por sobreentendido "porque Supabase/
    Next.js ya lo hace por default" — confirmalo vos mismo contra la documentación
    real y dejalo explícito en el código o config.
 4. Todo en los tiers gratuitos ya decididos en la sección 3.1 (salvo el dominio) —
-   no propongas servicios pagos.
+   no propongas servicios pagos, y no agregues piezas de infraestructura nuevas
+   que no estén ya en el plan salvo que me lo consultes primero.
 5. Commits chicos y frecuentes a medida que avanzás, no uno gigante al final.
 6. Cuando termines, corré vos mismo la auditoría de la sección 7 ("Act as a senior
    security engineer...") sobre lo que armaste, y arreglá lo que encuentres —
