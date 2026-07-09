@@ -65,6 +65,7 @@ Ver detalle completo de v2 a v6.2 en la sección "Historia completa" al final de
 - **Dominio**: el que da Vercel por defecto (sin dominio propio comprado)
 - **Auth/login**: no tiene — uso personal de un solo usuario, sin cuentas
 - **Servicios externos pagos**: ninguno. (Para el MP3 se usa el TTS gratuito de Google Translate vía proxy `/api/tts`, no oficial y sin costo; si Google lo bloqueara, la descarga MP3 fallaría con aviso, pero escuchar en vivo con Web Speech seguiría andando.)
+- **⚠ Migración pendiente a multi-usuario**: ver [`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md) — plan para pasar de Vercel KV a Postgres (Supabase) con RLS + Supabase Auth antes de abrir la app a más de un usuario. No ejecutar sin revisar ese documento primero.
 
 ## Stack técnico
 - Next.js 14 (App Router), TypeScript, Tailwind CSS
