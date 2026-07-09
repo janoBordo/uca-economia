@@ -56,6 +56,37 @@ válida, pero implica aceptar el trade-off de más integración y un techo de co
 más bajo. Confirmar esto con Fable 5 antes de arrancar si hay dudas — es la decisión
 más grande de toda la migración y conviene decidirla una sola vez.
 
+### 3.1 Plan completo de servicios de terceros (decidido, presupuesto $0)
+
+Contexto: Jano espera potencialmente **cientos/miles de usuarios** (apuntando a la
+facultad/carrera) con **presupuesto cero** para infraestructura. Estas son las
+decisiones tomadas para maximizar gratis sin resignar seguridad ni disponibilidad,
+con los únicos dos puntos reales a vigilar señalados explícitamente (no son
+bloqueantes, son cosas para monitorear a medida que crece el tráfico real).
+
+| Servicio | Elegido | Costo | Nota |
+|---|---|---|---|
+| Hosting/deploy | Vercel (Hobby) | $0 | Ya en uso. Pensado para uso no comercial — Stuniv no cobra, entra bien. Si el tráfico se dispara y se acerca al límite de ancho de banda del plan, ahí (y sólo ahí) evaluar Vercel Pro. |
+| Dominio | `*.vercel.app` (el que da Vercel) | $0 | Sin dominio propio por ahora. Comprar uno (~US$10-15/año) es un paso cosmético para más adelante, no bloqueante ni necesario para la seguridad. |
+| Base de datos + Auth | Supabase (free tier) | $0 | RLS activado desde el día uno (sección 6.3). Auth free tier soporta hasta 50.000 usuarios activos/mes — sobra para "miles". |
+| Backups | Script propio: GitHub Action programada + `pg_dump`, sube el dump a un repo privado de backups | $0 | Los backups automáticos gestionados de Supabase son de plan Pro (pago). Este es el reemplazo gratis — corre solo, sin mantenimiento manual día a día. |
+| "Keep-alive" anti-pausa | Ping gratuito programado (ej. cron-job.org, gratis) a un endpoint de health-check cada pocos días | $0 | Los proyectos free de Supabase se pausan tras ~7 días sin actividad. Sólo importa en el arranque, antes de tener usuarios reales — una vez que hay tráfico real y constante, el propio uso mantiene el proyecto activo y este ping deja de ser necesario. |
+| Rate limiting | Upstash Redis + librería `@upstash/ratelimit` | $0 | Tier gratis generoso. Upstash es, de hecho, el mismo proveedor que hoy está detrás de Vercel KV — no es un vendor nuevo para Jano. |
+| Email transaccional (reset de contraseña, confirmación) | Resend | $0 (tier gratis ~100 emails/día) | El SMTP gratuito integrado de Supabase Auth es solo para testing (pocos emails/hora) — no sirve para producción real. Resend con dominio verificado evita que estos mails cuna a spam. |
+| Error tracking | Sentry (free tier) | $0 | Ya contemplado en el checklist (sección 6.9). |
+| CDN / edge | Vercel (incluido) | $0 | Ya viene con el hosting, sin configuración extra. |
+
+**Los dos puntos reales a vigilar a medida que crece (ninguno bloquea el arranque):**
+1. **Ancho de banda de Supabase** (5GB/mes en el free tier) es el límite más
+   realista de tocar antes que cualquier otro con tráfico alto — se mitiga con
+   el cache que ya tiene la app (`app/lib/api.ts`, TTL 15s) y con paginar
+   cualquier endpoint que devuelva listas (sección 6.12). Si se acerca al
+   límite, recién ahí evaluar Supabase Pro (~US$25/mes) — no antes.
+2. **Vercel Hobby** es para uso no comercial — mientras Stuniv no cobre nada,
+   corresponde. Si el uso se vuelve masivo y Vercel lo señala, el camino es
+   Vercel Pro (~US$20/mes). Es una decisión para el día que realmente haga
+   falta, no para hoy.
+
 ## 4. Por qué es urgente resolver esto ahora (no es solo teoría)
 
 El bug histórico de `addMinutos` sobreescribiendo minutos de otras materias (por eso
@@ -540,74 +571,92 @@ database security rules.
 
 ## 9. Reglas para Fable 5 al ejecutar esta migración
 
-- **Proponer un plan por fases y esperar confirmación antes de ejecutar** —
-  sobre todo la Fase 0 (auth + base de datos), que es irreversible si se hace
-  mal. Esto no se decide solo agente, se avisa antes (así trabaja Jano siempre
-  acá, ver `PROYECTO.md` → "Cómo le gusta trabajar a Jano").
-- **Commits chicos y frecuentes**, no un commit gigante con toda la migración.
-- **Nunca correr una migración de schema directo contra producción** sin: (1)
-  probarla en local/desarrollo primero, (2) backup previo, (3) el SQL generado
-  revisado a mano por Jano antes de ejecutar.
-- **Nunca dejar un comando destructivo (DROP, DELETE sin WHERE, etc.) en manos
-  de un agente sin revisión humana previa.**
-- Actualizar `PROYECTO.md` con cada fase completada (infraestructura, stack,
-  modelo de datos) — es la regla que ya rige el resto del proyecto.
+**Modo de ejecución: una sola pasada, no ida y vuelta por mensaje.** Fable 5 es un
+modelo caro de correr — no tiene sentido gastar tokens en microcorrecciones paso a
+paso. Como hoy Stuniv la usa un solo usuario (Jano), no hay datos de terceros en
+riesgo todavía: eso baja mucho el costo de un error durante la migración, así que
+se justifica darle autonomía para resolver toda la Fase 0 de corrido en la misma
+sesión, en vez del modelo de "proponé y esperá confirmación en cada paso".
+
+- **Único paso obligatorio antes de tocar cualquier dato real**: exportar/hacer
+  backup del `uca_data` actual de Vercel KV (el único dato en juego hoy es el de
+  Jano mismo). Hecho eso, no hace falta aprobación intermedia para el resto.
+- **Commits chicos y frecuentes** a medida que avanza, no un commit gigante al
+  final — así un `git revert` puntual sigue siendo posible aunque la sesión haya
+  sido de una sola pasada.
+- Ningún punto de la sección 6 se da por sobreentendido "porque Supabase/Next.js
+  ya lo hace por default" — confirmarlo contra la documentación real y dejarlo
+  explícito en código/config.
+- Los servicios de terceros y sus costos ya están decididos en la sección 3.1
+  (todo en tier gratuito: Vercel Hobby, Supabase free, Upstash Redis, Resend,
+  Sentry, backup propio vía GitHub Action) — no hace falta que Fable 5 proponga
+  alternativas ni pregunte por presupuesto, ya está resuelto.
 - **Access Control Matrix**: definir por escrito qué puede hacer cada tipo de
   usuario según su nivel de permisos (usuario normal, admin si llega a existir),
   y dejarlo en `PROYECTO.md` o en un `CLAUDE.md` del repo. La mayoría de
   vulnerabilidades en apps "vibecodeadas" no son código malo — es que el agente
   no tenía el contexto de qué debía estar permitido o no.
-- Si en algún momento se trabaja con reglas locales de IDE (Claude Code,
-  Cursor), que esas reglas tengan seguridad por defecto desde el arranque de
-  cada sesión, no como ocurrencia tardía.
-- Mantener todo en tiers gratuitos (Supabase free, Vercel free/hobby) mientras
-  el número de usuarios lo permita; si algo va a generar costo, avisar antes de
-  activarlo, no después.
+- Al terminar, correr por su cuenta el prompt de auditoría de la sección 7
+  ("Act as a senior security engineer...") sobre lo que armó, y arreglar lo que
+  encuentre — sin esperar que Jano lo pida en otro mensaje.
+- Actualizar `PROYECTO.md` con el nuevo estado (infraestructura, stack, modelo de
+  datos) al terminar — es la regla que ya rige el resto del proyecto.
+- Cerrar con un resumen único: qué quedó resuelto de la sección 6, qué falta (si
+  algo quedó pendiente), y qué tiene que hacer Jano manualmente (crear cuenta de
+  Supabase/Upstash/Resend, cargar variables de entorno en Vercel, etc.).
 
 ---
 
 ## Prompt para pegar en Fable 5 (nueva sesión)
 
 ```
-Vas a ayudarme a migrar Stuniv (app de gestión de estudio, hoy funcional para un
-solo usuario) de Vercel KV a una arquitectura multi-usuario segura: Postgres
-(Supabase) con Row Level Security, Supabase Auth para el login, y todo lo necesario
-para que ningún hacker pueda robarle datos a un usuario ni que un usuario pueda ver
-o tocar los datos de otro. La seguridad es la prioridad número uno de esta migración,
-por encima de todo lo demás.
+Vas a migrar Stuniv (app de gestión de estudio) de Vercel KV a una arquitectura
+multi-usuario segura, de punta a punta, en esta misma sesión: Postgres (Supabase)
+con Row Level Security, Supabase Auth para el login, y todo lo necesario para que
+ningún hacker pueda robarle datos a un usuario ni que un usuario pueda ver o tocar
+los datos de otro. La seguridad es la prioridad número uno, por encima de todo lo
+demás. Espero potencialmente cientos/miles de usuarios (apunto a mi facultad/
+carrera) con presupuesto cero para infraestructura — todo tiene que quedar en tiers
+gratuitos. Hoy la app la uso solo yo, no hay otros usuarios en riesgo todavía, así
+que podés avanzar sin pedirme confirmación en cada paso.
 
 Te adjunto MIGRACION-MULTIUSUARIO.md con todo el contexto: las 5 prioridades (en
 este orden de peso: seguridad, fluidez/ligereza, que no se rompa, que no cueste
-dinero, que se pueda seguir mejorando), la decisión de arquitectura ya tomada
-(Postgres/Supabase + RLS + Supabase Auth), el checklist COMPLETO de seguridad y
-robustez (sección 6, con cada ítem marcado 🔴 bloqueante / 🟡 antes de abrir la app /
-⚪ condicional), el apéndice de las 50 vulnerabilidades como checklist final (sección
-7), y el orden de ejecución sugerido (sección 8).
+dinero, que se pueda seguir mejorando), la arquitectura ya decidida (Postgres/
+Supabase + RLS + Supabase Auth), el plan completo de servicios de terceros ya
+resuelto (sección 3.1: Vercel Hobby, Supabase free, Upstash Redis para rate
+limiting, Resend para email transaccional, Sentry, backup propio vía GitHub Action
++ pg_dump — todo gratis, no hace falta que propongas alternativas ni preguntes por
+presupuesto), el checklist completo de seguridad y robustez (sección 6, marcado
+🔴 bloqueante / 🟡 antes de abrir la app / ⚪ condicional), y el apéndice de las 50
+vulnerabilidades (sección 7).
 
-Quiero que:
-1. Leas el documento completo y el PROYECTO.md del repo (estado actual real del
-   stack) antes de proponer nada.
-2. Me propongas un plan de migración por fases, empezando SOLO por la Fase 0 (todo
-   lo marcado 🔴 en la sección 6), con pasos concretos y el orden en que los harías.
-   No empieces a programar todavía — quiero revisar el plan primero.
-3. Cada paso que toque autenticación o el schema de la base de datos me lo
-   expliques antes de ejecutarlo, con el SQL o la migración a la vista para que
-   lo revise yo antes de correrlo contra cualquier base real.
-4. No des ningún punto de seguridad de la sección 6 por sobreentendido o ya
-   cubierto por Supabase/Next.js "por default" sin confirmarlo explícitamente vos
-   mismo contra la documentación oficial — quiero que cada 🔴 y 🟡 quede
-   verificado, no asumido.
-5. Mantengas todo en tiers gratuitos (Supabase free, Vercel free/hobby) — avisame
-   si algún paso puede generar costo antes de activarlo.
-6. Sigas las reglas de ejecución de la sección 9 del documento adjunto (commits
-   chicos, nunca migraciones destructivas automáticas, Access Control Matrix por
-   escrito, actualizar PROYECTO.md al cerrar cada fase).
+Reglas para esta sesión:
+1. Único paso obligatorio ANTES de tocar cualquier dato: exportá/hacé backup de mi
+   `uca_data` actual de Vercel KV en un archivo del repo, para no perder mi propio
+   historial de estudio si algo sale mal. Después de eso, no necesito aprobar nada
+   más paso a paso — resolvé todo de corrido.
+2. Ejecutá completo TODO lo marcado 🔴 de la sección 6 (Fase 0), y de ahí seguí con
+   lo marcado 🟡 (Fase 1) en la misma sesión si el tiempo/tokens lo permiten:
+   schema separado por tabla con RLS en todas, Supabase Auth con logout real,
+   updates atómicos, secrets solo server-side, rate limiting con Upstash, headers
+   de seguridad, CORS, cookies, email transaccional con Resend, backup automático
+   propio con GitHub Action.
+3. No dejes ningún punto de la sección 6 por sobreentendido "porque Supabase/
+   Next.js ya lo hace por default" — confirmalo vos mismo contra la documentación
+   real y dejalo explícito en el código o config.
+4. Todo en los tiers gratuitos ya decididos en la sección 3.1 — no propongas
+   servicios pagos.
+5. Commits chicos y frecuentes a medida que avanzás, no uno gigante al final.
+6. Cuando termines, corré vos mismo la auditoría de la sección 7 ("Act as a senior
+   security engineer...") sobre lo que armaste, y arreglá lo que encuentres —
+   sin esperar que yo te lo pida en otro mensaje.
+7. Actualizá PROYECTO.md con el nuevo estado (infraestructura, stack, modelo de
+   datos) al terminar.
 
-Cuando termine la Fase 0 y esté probada en un entorno de prueba, corré como
-auditoría final el prompt de la sección 7 del documento adjunto ("Act as a senior
-security engineer...") antes de que consideremos la migración lista para un
-segundo usuario real.
-
-Empezá pidiéndome lo que necesites para arrancar (acceso al repo, si ya tengo
-cuenta de Supabase creada, etc.) y después mostrame el plan de la Fase 0.
+Al final quiero un resumen único: qué quedó resuelto de la sección 6, qué falta
+(si algo quedó pendiente por límite de tiempo/tokens), y qué tengo que hacer yo
+manualmente (crear cuentas de Supabase/Upstash/Resend, cargar variables de entorno
+en Vercel, etc.). No me pidas nada intermedio salvo que te topes con algo
+genuinamente ambiguo o irreversible que no esté ya cubierto acá.
 ```
