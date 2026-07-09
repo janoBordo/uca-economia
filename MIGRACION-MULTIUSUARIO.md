@@ -105,6 +105,12 @@ Stuniv, ahí entran decenas de miles de usuarios).
 **Estimación conservadora inicial** (asumiendo el patrón de hoy, donde `/api/db`
 trae TODO el blob en cada request): entre 300 y 1.000 usuarios activos/mes.
 
+**En usuarios activos POR DÍA (la métrica que realmente importa para dimensionar):**
+5GB/mes ÷ 30 días ≈ 166 MB/día de presupuesto. Con el patrón de hoy (~350-400 KB
+de egress por usuario activo por día), eso da **~400-500 usuarios activos por día,
+sosteniblemente, todos los días, sin acercarse al límite** — ya con la Fase 0 recién
+migrada, sin ningún ajuste extra.
+
 **Por qué ese número sube bastante con la propia migración, sin sumar nada extra:**
 al pasar a tablas separadas (sección 6.11), cada pantalla deja de traer el blob
 entero y pasa a pedir sólo lo que necesita (ej. la vista del timer no necesita el
@@ -113,10 +119,10 @@ puede reducir el peso por request varias veces. Sumado a subir el cache del
 cliente de 15s a algo como 60-120s para datos que no cambian a cada segundo
 (materias, metas), y a usar el cacheo de rutas que ya trae Next.js de fábrica
 (`revalidate`, sin agregar ningún servicio nuevo) para las consultas de lectura
-más pedidas — **con esto, unos pocos miles de usuarios activos por mes gratis es
-un objetivo realista**, no una promesa vacía. Esto respeta la arista 6 (nada de
-piezas nuevas: son ajustes al mismo Supabase + las herramientas que Next.js ya
-trae incluidas).
+más pedidas — el egress por usuario baja a ~80-120 KB/día, lo que lleva el techo a
+**~1.500-2.000 usuarios activos por día**, y unos pocos miles de usuarios activos
+por mes, gratis. Esto respeta la arista 6 (nada de piezas nuevas: son ajustes al
+mismo Supabase + las herramientas que Next.js ya trae incluidas).
 
 **El techo real, honesto**: no existe una versión 100% gratis que aguante
 cualquier volumen para siempre — en algún punto de crecimiento genuino, algo hay
