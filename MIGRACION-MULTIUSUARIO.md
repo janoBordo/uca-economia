@@ -12,10 +12,12 @@ actual de la app.
 
 ## 1. Objetivo
 
-Migrar Stuniv de "app web personal de un solo usuario" a "app web multi-usuario, con
-la puerta abierta a una versión descargable (PWA / mobile) más adelante". Nadie más
-usa la app hoy — es la ventana ideal para hacer el cambio de arquitectura bien, antes
-de tener datos reales de terceros en juego.
+Migrar Stuniv de "app web personal de un solo usuario de UCA" a "app web
+multi-usuario para estudiantes de distintas universidades" (con perfil, carrera y
+tema de color por universidad — sección 6.17), con la puerta abierta a una versión
+descargable (PWA/mobile) más adelante. Nadie más usa la app hoy — es la ventana
+ideal para hacer el cambio de arquitectura bien, antes de tener datos reales de
+terceros en juego.
 
 ## 2. Las prioridades de Jano — NINGUNA se negocia (ese orden de peso, no de secuencia)
 
@@ -541,6 +543,10 @@ peso antes de esa fecha.
   leer filas mucho más pesadas de lo necesario. Separar en tablas relacionadas:
   `users`, `materias`, `sesiones_estudio`, `semestres`, `plan_estudio`, `notas`,
   vinculadas por `user_id`.
+- La tabla/perfil de `users` necesita los campos nuevos de la sección 6.17:
+  nombre, apellido, apodo, universidad, carrera, URL de foto de perfil, y el
+  tema de color elegido — todos de personalización, no cambian la lógica de
+  materias/sesiones.
 - El bug de los emojis (3 bytes vs 4 bytes): en MySQL con charset `utf8` (mal
   llamado así históricamente), el límite es 3 bytes por carácter, pero los
   emojis modernos pesan 4 bytes — un insert con emoji puede tirar error o
@@ -669,12 +675,40 @@ esquina superior derecha (con su avatar/iniciales) abre un menú desplegable** �
 de ahí se accede a "Configuración" (la pantalla de Cuenta en sí), "Ayuda", y
 "Cerrar sesión" directo desde el menú sin entrar a ninguna pantalla.
 
+**Estilo visual**: tipografía, border-radius, cards, etc. usan la identidad que
+Stuniv ya tiene (Inter, navy/ocre/canvas como base, mismo lenguaje de
+`GlassCard`/`GlassButton`) — la referencia que trajo Jano es solo para la
+**distribución de contenido** (qué campos van y dónde), no el look. El look
+final lo define Fable 5 consistente con el resto de la app.
+
 La pantalla de Cuenta/Configuración debe incluir:
-- 🟡 **Editar perfil**: nombre (y lo que ya exista de perfil), con guardado
-  explícito ("Guardar cambios"), no autoguardado silencioso.
-- 🟡 **Apariencia/colores**: es el toggle Clásico 2D ↔ Vidrio 3D que Stuniv ya
-  tiene (`app/components/ThemeToggle.tsx`) — se **reubica** a esta pantalla de
-  Cuenta en vez de vivir al final de la home, no se construye de cero.
+
+- 🟡 **Perfil**: foto de perfil (subir imagen — aplican las reglas de uploads
+  seguros de la sección 6.4: validar tipo real de archivo, tamaño máximo, bucket
+  de Supabase Storage privado por default), nombre, apellido, apodo (visible en
+  la app), universidad, carrera. Guardado explícito ("Guardar cambios"), no
+  autoguardado silencioso.
+    - **Universidad/carrera son campos nuevos de personalización** — Stuniv
+      pasa a soportar estudiantes de distintas universidades, no solo UCA. Son
+      campos de perfil/identidad (se muestran en el header, alimentan el tema de
+      color abajo) — **no cambian ninguna lógica de la app**: las materias
+      siguen siendo 100% editables a mano por el usuario como hoy, no hay un
+      catálogo de carreras/materias por universidad que mantener. Mantener el
+      alcance acotado a esto evita sobrecomplejizar (arista 6).
+- 🟡 **Apariencia**: dos cosas separadas, no una sola:
+    1. El toggle Clásico 2D ↔ Vidrio 3D que Stuniv ya tiene
+       (`app/components/ThemeToggle.tsx`) — se **reubica** acá en vez de vivir
+       al final de la home, no se reconstruye.
+    2. **Nuevo**: tema de color por universidad — el usuario elige una paleta
+       de color entre varias disponibles (sugerida por default según la
+       universidad que puso en Perfil, pero cambiable libremente). Fable 5
+       define las paletas concretas y cómo conviven técnicamente con los
+       colores fijos de marca hoy hardcodeados (navy/ocre) — hay que
+       parametrizarlos, no hay que inventar toda una identidad nueva por
+       universidad (ej. no hace falta logos/escudos, alcanza con la paleta de
+       color). Esta preferencia se guarda en el perfil del usuario en la base
+       (no solo en `localStorage` como hoy el tema Clásico/Vidrio), para que
+       viaje entre dispositivos.
 - 🔴 **Cambiar contraseña** (ver arriba) — con confirmación inline antes de
   aplicar el cambio.
 - 🔴 **Eliminar cuenta** (ver arriba, soft-delete) — con confirmación inline
@@ -685,9 +719,16 @@ La pantalla de Cuenta/Configuración debe incluir:
 - 🟡 **Cerrar sesión**: disponible tanto en el menú desplegable directo como
   dentro de la pantalla de Cuenta.
 
-Las cuatro acciones (editar perfil, apariencia, cambiar contraseña, eliminar
-cuenta) necesitan su propia confirmación inline independiente — ninguna se
-ejecuta con un solo clic accidental.
+Todas las acciones con efecto persistente (perfil, apariencia, cambiar
+contraseña, eliminar cuenta) necesitan su propia confirmación inline
+independiente donde corresponda (obligatorio en cambiar contraseña y eliminar
+cuenta; para perfil/apariencia alcanza con que "Guardar" sea un paso explícito,
+no autoguardado) — ninguna acción irreversible se ejecuta con un solo clic
+accidental.
+
+**Nota para `PROYECTO.md`**: cuando esto se construya, actualizar la sección
+"Reglas de diseño fijas" para incluir el nuevo sistema de temas de color por
+universidad, ya que hoy dice explícitamente "paleta fija navy/ocre/canvas".
 
 ---
 
@@ -895,13 +936,31 @@ Otros puntos específicos que quiero remarcar:
   el nombre del usuario en la esquina superior derecha (con avatar/iniciales)
   abre un menú desplegable → "Configuración" lleva a la pantalla de Cuenta,
   además de "Ayuda" y "Cerrar sesión" directo desde el menú. La pantalla de
-  Cuenta incluye: editar perfil (nombre), apariencia (reubicar el toggle
-  Clásico/Vidrio 3D que ya existe en `ThemeToggle.tsx`, no reconstruirlo),
-  cambiar contraseña, y eliminar cuenta. Cambiar contraseña y eliminar cuenta
-  NO dependen del email/dominio — se construyen ya. Cada una de las cuatro
-  acciones necesita su propia confirmación inline (Sí/No), siguiendo el patrón
-  de diseño que ya usa Stuniv en `/semestre` para "Reiniciar datos" — nunca un
-  solo clic para algo irreversible.
+  Cuenta incluye:
+    - **Perfil**: foto de perfil, nombre, apellido, apodo, universidad, carrera
+      (guardado explícito, no autoguardado). Universidad/carrera son campos
+      nuevos de personalización — Stuniv pasa a servir estudiantes de distintas
+      universidades, no solo UCA, pero esto NO cambia la lógica de materias
+      (siguen siendo 100% editables a mano como hoy, sin catálogo de carreras
+      que mantener — no sobrecomplejizar esto).
+    - **Apariencia**: el toggle Clásico/Vidrio 3D que ya existe (reubicado, no
+      reconstruido) MÁS un tema de color por universidad nuevo — el usuario
+      elige una paleta (sugerida según su universidad, cambiable libremente),
+      guardada en su perfil en la base (no solo `localStorage`). Vos definís
+      las paletas concretas y cómo parametrizar los colores hoy hardcodeados
+      (navy/ocre) — no hace falta logos ni identidades completas por
+      universidad, alcanza con la paleta de color.
+    - **Cambiar contraseña** y **eliminar cuenta** — ninguna de las dos depende
+      del email/dominio, se construyen ya (ver sección 6.16/6.17 para el
+      detalle de seguridad de cada una).
+    - **Cerrar sesión** — disponible en el menú directo y dentro de la pantalla.
+  El estilo visual (tipografía, colores, cards) usa la identidad que Stuniv ya
+  tiene, no inventes una nueva — actualizá también "Reglas de diseño fijas" en
+  PROYECTO.md para reflejar el nuevo sistema de temas de color. Todas las
+  acciones con efecto persistente necesitan confirmación inline explícita
+  (obligatorio en cambiar contraseña y eliminar cuenta), siguiendo el patrón que
+  ya usa Stuniv en `/semestre` para "Reiniciar datos" — nunca un solo clic para
+  algo irreversible.
 
 Reglas para esta sesión:
 1. Único paso obligatorio ANTES de tocar cualquier dato: exportá/hacé backup de mi
