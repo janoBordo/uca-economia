@@ -80,7 +80,7 @@ bloqueantes, son cosas para monitorear a medida que crece el tráfico real).
 | Hosting/deploy | Vercel (Hobby) | $0 | Ya en uso. Pensado para uso no comercial — Stuniv no cobra, entra bien. Si el tráfico se dispara y se acerca al límite de ancho de banda del plan, ahí (y sólo ahí) evaluar Vercel Pro. Aprovechar la migración para renombrar el proyecto de `uca-economia` a `stuniv` (sección 3.3) — sujeto a que el subdominio `stuniv.vercel.app` esté libre. |
 | Dominio | Ninguno por ahora — se sigue con `*.vercel.app` | $0 | Jano no va a pagar dominio por el momento. Esto obliga a resolver el email transaccional sin dominio propio (ver fila de Email abajo). |
 | Base de datos + Auth | Supabase (free tier) | $0 | RLS activado desde el día uno (sección 6.3). Auth free tier soporta hasta 50.000 usuarios activos/mes — sobra para "miles". |
-| Backups | Script propio: GitHub Action programada + `pg_dump`, sube el dump a un repo privado de backups | $0 | Los backups automáticos gestionados de Supabase son de plan Pro (pago). Este es el reemplazo gratis — corre solo, sin mantenimiento manual día a día. |
+| Backups | Mecanismo propio y gratuito, sin depender del plan pago de Supabase | $0 | Los backups automáticos gestionados de Supabase son de plan Pro (pago). Fable 5 decide el mecanismo concreto (ej. un dump programado a un repo privado, u otra opción gratis que conozca) — la única condición es que corra solo, sin mantenimiento manual día a día, y sin sumar un vendor nuevo fuera de lo ya usado (GitHub). |
 | "Keep-alive" anti-pausa | Ping gratuito programado (ej. cron-job.org, gratis) a un endpoint de health-check cada pocos días | $0 | Los proyectos free de Supabase se pausan tras ~7 días sin actividad. Sólo importa en el arranque, antes de tener usuarios reales — una vez que hay tráfico real y constante, el propio uso mantiene el proyecto activo y este ping deja de ser necesario. |
 | Rate limiting | Upstash Redis + librería `@upstash/ratelimit` | $0 | Tier gratis generoso. Upstash es, de hecho, el mismo proveedor que hoy está detrás de Vercel KV — no es un vendor nuevo para Jano. |
 | Email transaccional (reset de contraseña, confirmación) | **Ninguno por ahora — desactivado a propósito** | $0 | Jano decidió no configurar AWS SES por el momento. Cuando compre un dominio propio más adelante, avisa y ahí se habilita un proveedor de email (Resend con el dominio verificado, o AWS SES) y se reactiva la recuperación de contraseña. Ver el impacto concreto de esto en las secciones 6.1 y 6.16. |
@@ -122,14 +122,10 @@ migrada, sin ningún ajuste extra.
 al pasar a tablas separadas (sección 6.11), cada pantalla deja de traer el blob
 entero y pasa a pedir sólo lo que necesita (ej. la vista del timer no necesita el
 historial completo de semestres archivados) — eso solo, sin ninguna pieza nueva,
-puede reducir el peso por request varias veces. Sumado a subir el cache del
-cliente de 15s a algo como 60-120s para datos que no cambian a cada segundo
-(materias, metas), y a usar el cacheo de rutas que ya trae Next.js de fábrica
-(`revalidate`, sin agregar ningún servicio nuevo) para las consultas de lectura
-más pedidas — el egress por usuario baja a ~80-120 KB/día, lo que lleva el techo a
-**~1.500-2.000 usuarios activos por día**, y unos pocos miles de usuarios activos
-por mes, gratis. Esto respeta la arista 6 (nada de piezas nuevas: son ajustes al
-mismo Supabase + las herramientas que Next.js ya trae incluidas).
+puede reducir el peso por request varias veces, y sumado a mejoras de cacheo
+razonables (que Fable 5 diseña, sección 3.2.1) el techo sube a **~1.500-2.000
+usuarios activos por día**, unos pocos miles al mes, gratis. Esto respeta la
+arista 6 — son ajustes dentro del mismo stack, sin piezas nuevas.
 
 **El techo real, honesto**: no existe una versión 100% gratis que aguante
 cualquier volumen para siempre — en algún punto de crecimiento genuino, algo hay
@@ -148,21 +144,15 @@ máximo la cantidad de usuarios/tráfico diario que aguanta gratis, cuanto más
 mejor, sin techo prefijado y sin pasar a ningún plan pago sin autorización
 explícita de Jano.**
 
-Técnicas dentro del mismo stack ya decidido (no suman ningún vendor nuevo, por
-lo tanto no violan la arista 6) que Fable 5 debería evaluar y aplicar según su
-criterio técnico:
-- Consultas por pantalla en vez de traer todo el estado del usuario de una vez
-  (consecuencia natural de pasar a tablas separadas, sección 6.11).
-- Cache del cliente más largo para datos que no cambian todo el tiempo.
-- Cacheo de rutas que ya trae Next.js de fábrica (`revalidate`, sin servicio
-  nuevo) — inclusive cachear en el borde de Vercel respuestas por usuario en
-  ventanas cortas, para que lecturas repetidas no le peguen a Supabase en
-  absoluto (mueve el costo del recurso escaso — el ancho de banda de Supabase —
-  al recurso que sobra — el de Vercel, ~20 veces más generoso).
-- Confirmar que las respuestas viajen comprimidas (gzip/brotli) — si no está
-  activado por default, es gratis activarlo y el JSON comprime muy bien.
-- Cualquier otra técnica que Fable 5 identifique, mientras no agregue un
-  servicio/dashboard nuevo fuera de la tabla de la sección 3.1.
+Cómo lograrlo queda 100% a criterio técnico de Fable 5 — no se le prescribe la
+técnica (ni cache, ni compresión, ni ninguna en particular). Dos condiciones
+fijas nada más:
+- **No agregar ningún servicio/vendor nuevo** fuera de la tabla de la sección
+  3.1 sin consultarle antes a Jano — ese es el límite real de "no
+  sobrecomplejizar" (arista 6), no una restricción a la ingeniería en sí.
+- **La optimización no puede empeorar la app visual ni funcionalmente** — tiene
+  que verse y funcionar exactamente igual que hoy para el usuario; lo único que
+  cambia es cuánto tráfico aguanta por detrás.
 
 **Si después de optimizar en serio el techo gratis sigue sin alcanzar para el
 volumen que Jano espera**, la instrucción es: Fable 5 no activa nada pago por su
@@ -262,12 +252,13 @@ puntual — igual queda documentado para no perderlo de vista).
   app, define contraseña nueva — es una configuración nativa de Supabase Auth,
   no hay que programarla desde cero. Parámetros de seguridad no negociables para
   cuando se active:
-    - El código expira rápido (~10 minutos) y es de un solo uso — al pedir uno
-      nuevo, el anterior queda inválido automáticamente.
+    - El código expira rápido y es de un solo uso — al pedir uno nuevo, el
+      anterior queda inválido automáticamente. El tiempo exacto de expiración
+      lo define Fable 5 según buenas prácticas actuales.
     - **Límite estricto de intentos** en el endpoint que verifica el código (vía
       Upstash, sección 3.1) — un código de 6 dígitos es adivinable por fuerza
-      bruta si no se limitan los intentos; con un tope bajo (ej. 5 intentos y
-      hay que pedir un código nuevo) queda impracticable de forzar.
+      bruta si no se limitan los intentos. El número exacto de intentos
+      permitidos antes de exigir un código nuevo lo define Fable 5.
     - La respuesta es igual exista o no ese email en la base (evita que alguien
       use el formulario para enumerar usuarios registrados).
     - Al confirmar la nueva contraseña, cerrar sesión en todos los demás
@@ -853,8 +844,9 @@ sesión, en vez del modelo de "proponé y esperá confirmación en cada paso".
   explícito en código/config.
 - Los servicios de terceros y sus costos ya están decididos en la sección 3.1
   (todo en tier gratuito: Vercel Hobby, Supabase free, Upstash Redis, Sentry,
-  PostHog, backup propio vía GitHub Action — **sin proveedor de email por
-  ahora, a propósito**) — no hace falta que Fable 5 proponga alternativas ni
+  PostHog, backup propio gratuito (mecanismo a definir por Fable 5) — **sin
+  proveedor de email por ahora, a propósito**) — no hace falta que Fable 5
+  proponga alternativas ni
   pregunte por presupuesto, ya está resuelto.
 - **Optimizar al máximo la capacidad diaria gratis, sin techo fijo** (sección
   3.2.1) — usando técnicas dentro del mismo stack (consultas por pantalla, cache,
@@ -901,8 +893,9 @@ solo con vos —, y que sea práctico de acceder/ordenado sin sobrecomplejizar),
 arquitectura ya decidida (Postgres/Supabase + RLS + Supabase Auth), el plan
 completo de servicios de terceros ya resuelto (sección 3.1: Vercel Hobby sin
 dominio propio, Supabase free, Upstash Redis para rate limiting, Sentry, PostHog
-para analytics de producto, backup propio vía GitHub Action + pg_dump — todo
-gratis, no hace falta que propongas alternativas ni preguntes por presupuesto),
+para analytics de producto, backup propio gratuito (elegís vos el mecanismo) —
+todo gratis, no hace falta que propongas alternativas ni preguntes por
+presupuesto),
 la capacidad estimada y el pedido de optimizarla al máximo sin techo fijo
 (sección 3.2 y 3.2.1), el checklist de cuentas/tokens ya resuelto (sección 3.3),
 el checklist completo de seguridad y robustez (sección 6, marcado 🔴 bloqueante /
@@ -994,7 +987,7 @@ Reglas para esta sesión:
    RLS en todas, Supabase Auth con logout real, updates atómicos, secrets solo
    server-side, rate limiting con Upstash, headers de seguridad, CORS, cookies,
    analytics con PostHog (signups, usuarios activos, retención), backup
-   automático propio con GitHub Action.
+   automático propio y gratuito (elegís vos el mecanismo).
 3. No dejes ningún punto de la sección 6 por sobreentendido "porque Supabase/
    Next.js ya lo hace por default" — confirmalo vos mismo contra la documentación
    real y dejalo explícito en el código o config.
