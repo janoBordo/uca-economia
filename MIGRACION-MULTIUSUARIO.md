@@ -81,7 +81,7 @@ bloqueantes, son cosas para monitorear a medida que crece el tráfico real).
 | Backups | Script propio: GitHub Action programada + `pg_dump`, sube el dump a un repo privado de backups | $0 | Los backups automáticos gestionados de Supabase son de plan Pro (pago). Este es el reemplazo gratis — corre solo, sin mantenimiento manual día a día. |
 | "Keep-alive" anti-pausa | Ping gratuito programado (ej. cron-job.org, gratis) a un endpoint de health-check cada pocos días | $0 | Los proyectos free de Supabase se pausan tras ~7 días sin actividad. Sólo importa en el arranque, antes de tener usuarios reales — una vez que hay tráfico real y constante, el propio uso mantiene el proyecto activo y este ping deja de ser necesario. |
 | Rate limiting | Upstash Redis + librería `@upstash/ratelimit` | $0 | Tier gratis generoso. Upstash es, de hecho, el mismo proveedor que hoy está detrás de Vercel KV — no es un vendor nuevo para Jano. |
-| Email transaccional (reset de contraseña, confirmación) | **Amazon SES** (no Resend) | $0 (~US$0,10 cada 1.000 emails una vez fuera del tier gratis — irrelevante al volumen de Stuniv) | Resend y la mayoría de los proveedores de email exigen verificar un DOMINIO propio (registros DNS) — imposible con `*.vercel.app`, porque esa zona es de Vercel, no de Jano. SES es la excepción: deja verificar una sola DIRECCIÓN de email (un clic en el link que llega a esa casilla, sin DNS) y después pedir "production access" (formulario gratis, aprobación típica en <24hs) para poder mandarle mail a cualquier usuario real. Pedir este acceso de producción el mismo día que se arranca, por la demora de aprobación. Fable 5 debe confirmar que esta sigue siendo la mejor opción sin dominio al momento de implementar. |
+| Email transaccional (reset de contraseña, confirmación) | **Ninguno por ahora — desactivado a propósito** | $0 | Jano decidió no configurar AWS SES por el momento. Cuando compre un dominio propio más adelante, avisa y ahí se habilita un proveedor de email (Resend con el dominio verificado, o AWS SES) y se reactiva la recuperación de contraseña. Ver el impacto concreto de esto en las secciones 6.1 y 6.16. |
 | Error tracking | Sentry (free tier) | $0 | Ya contemplado en el checklist (sección 6.9). |
 | Analytics de producto (cuánta gente usa la app, a qué velocidad crece) | PostHog Cloud (free tier) | $0 | Free tier generoso (del orden de ~1 millón de eventos/mes — confirmar cifra exacta al implementar, cambia con el tiempo). Trackea signups (velocidad de crecimiento), usuarios activos diarios/semanales/mensuales, y retención — sin esto Jano no tiene forma de saber si la gente vuelve a usar la app o no. Ver sección 3.2. |
 | CDN / edge | Vercel (incluido) | $0 | Ya viene con el hosting, sin configuración extra. |
@@ -181,11 +181,15 @@ dashboard:
 |---|---|---|
 | Supabase | Signup (con GitHub) → *Account Settings → Access Tokens* → generar uno | Crear el proyecto entero vía CLI/Management API, sacar URL/anon key/service role key, correr migraciones y políticas RLS |
 | Upstash | Signup (con GitHub) → *Account → API Keys* → generar uno | Crear la base Redis vía API, configurarla para rate limiting |
-| **AWS (para SES)** | Signup → verificar una dirección de email propia (clic en el link que llega a esa casilla) → pedir "production access" en la consola de SES (formulario gratis — **hacer esto el mismo día, antes de arrancar con Fable 5**, la aprobación tarda hasta ~24hs) → generar credenciales SMTP/API | Configurar el envío transaccional (reset de contraseña con código OTP, confirmaciones) con esas credenciales |
 | Sentry | Signup (con GitHub) → *Settings → Auth Tokens* → generar uno (`project:write`) | Crear el proyecto y sacar el DSN |
 | PostHog | Signup (con GitHub) → *Project Settings → API Keys* → generar una | Instrumentar los eventos de signup/login/uso y armar los dashboards de crecimiento |
 | Vercel | Ya hay cuenta → *Settings → Tokens* → generar uno | Cargar TODAS las variables de entorno nuevas vía `vercel env add`, y renombrar el proyecto de `uca-economia` a `stuniv` (verificando que el subdominio `stuniv.vercel.app` esté libre; si no, usar una variante cercana) |
 | GitHub (repo de backups) | Nada si `gh` ya está autenticado en la máquina | `gh repo create stuniv-backups --private` |
+
+**Email transaccional (AWS SES o Resend) — NO preparar ahora.** Jano decidió
+dejarlo desactivado hasta comprar un dominio propio. Cuando eso pase, avisa y se
+agrega este servicio a la lista, junto con reactivar la recuperación de
+contraseña (secciones 6.1 y 6.16).
 
 **Entrega de credenciales**: no pegarlas como texto en el chat — crear un
 `.env.local` en el repo (ya está en `.gitignore`) con todos los tokens, y decirle
@@ -247,13 +251,15 @@ puntual — igual queda documentado para no perderlo de vista).
 - 🔴 Autenticación (quién sos) y autorización (qué podés hacer) son cosas
   distintas — se puede estar logueado y aun así no tener permiso para una acción
   puntual (ej: borrar el examen de otro usuario). Verificar ambas por separado.
-- 🔴 **Recuperación de cuenta por código (OTP), no solo link** — así un usuario
-  nunca pierde su cuenta aunque se olvide la contraseña: pide recuperarla, recibe
-  un código de 6 dígitos por mail, lo ingresa en la app, define una contraseña
-  nueva. Esto es una configuración nativa de Supabase Auth (no hay que programar
-  nada desde cero, es elegir la plantilla de email "OTP" en vez de "magic link").
-  Parámetros de seguridad no negociables para que esto sea seguro como en
-  cualquier app seria:
+- 🟡 **DIFERIDO — Recuperación de cuenta por código (OTP), no solo link.**
+  Jano decidió no configurar ningún proveedor de email todavía (sección 3.1), así
+  que este flujo queda **desactivado en la UI por ahora** (sin botón de "olvidé
+  mi contraseña" visible, o con un mensaje de "próximamente"), no a medio hacer —
+  nada de dejar un flujo roto a la vista. Diseño ya decidido para cuando se
+  active: recibe un código de 6 dígitos por mail (no un link), lo ingresa en la
+  app, define contraseña nueva — es una configuración nativa de Supabase Auth,
+  no hay que programarla desde cero. Parámetros de seguridad no negociables para
+  cuando se active:
     - El código expira rápido (~10 minutos) y es de un solo uso — al pedir uno
       nuevo, el anterior queda inválido automáticamente.
     - **Límite estricto de intentos** en el endpoint que verifica el código (vía
@@ -264,6 +270,19 @@ puntual — igual queda documentado para no perderlo de vista).
       use el formulario para enumerar usuarios registrados).
     - Al confirmar la nueva contraseña, cerrar sesión en todos los demás
       dispositivos donde el usuario estuviera logueado.
+  **Mientras tanto — fallback manual, 🔴 bloqueante esto sí**: Jano tiene que
+  poder resetear la contraseña de un usuario a mano desde el dashboard/Admin API
+  de Supabase (usando la `service_role key`) si alguien le escribe pidiendo
+  ayuda. Sirve para un grupo chico de prueba, no escala a miles — es el motivo
+  por el que activar el email transaccional pasa a ser la primera tarea cuando
+  Jano compre el dominio, antes de sumar más usuarios de los que pueda atender
+  manualmente uno por uno.
+- 🔴 **Signup sin confirmación por email**: como tampoco hay proveedor de email
+  para mandar el mail de "confirmá tu cuenta", configurar Supabase Auth para que
+  las cuentas nuevas queden confirmadas automáticamente al registrarse (sin ese
+  paso intermedio) — si no, nadie podría terminar de crear una cuenta. Revisar
+  esto también cuando se active el email más adelante (ahí sí se puede sumar la
+  confirmación por mail si se quiere).
 - 🔴 Manejo de sesión: nunca sesiones que no expiran, ni que sigan válidas después
   de cambiar la contraseña.
 - ⚪ Credenciales por defecto sin cambiar — si en algún momento se usa un servicio
@@ -610,9 +629,9 @@ peso antes de esa fecha.
 
 ### 6.16 Gestión de usuarios (operativa real)
 
-- 🔴 Olvidé mi contraseña: ver el flujo de recuperación por código (sección
-  6.1) — así ningún usuario pierde el acceso a su cuenta para siempre por
-  olvidarse la clave.
+- 🟡 Olvidé mi contraseña: ver el flujo de recuperación por código, diferido
+  hasta que haya un proveedor de email (sección 6.1) — mientras tanto, fallback
+  manual de Jano vía Supabase.
 - 🟡 Cambiar contraseña estando logueado: exigir re-ingresar la contraseña
   actual antes de aceptar la nueva (Supabase no lo fuerza por default, hay que
   pedirlo explícito) — si no, alguien con acceso momentáneo a una sesión abierta
@@ -708,12 +727,12 @@ database security rules.
 ## 8. Orden sugerido de ejecución (fases, sobre el checklist de la sección 6)
 
 - **Fase 0 — bloqueante, antes de que exista un segundo usuario**: todo lo marcado
-  🔴 arriba, incluyendo dejar el email transaccional andando con AWS SES (sección
-  3.1) — sin esto, la recuperación de contraseña no le llega a nadie que no sea
-  Jano. Es, en esencia: migrar a Postgres/Supabase con RLS en todas las tablas,
-  Supabase Auth con logout real e IDOR resuelto, updates atómicos por fila,
-  secrets solo server-side, backups activados, y ningún commit de base de datos
-  sin revisión humana.
+  🔴 arriba, incluyendo el signup sin confirmación por email y el fallback manual
+  de reset de contraseña por Jano vía Supabase (sección 6.1) — no hay proveedor
+  de email configurado todavía a propósito. Es, en esencia: migrar a
+  Postgres/Supabase con RLS en todas las tablas, Supabase Auth con logout real e
+  IDOR resuelto, updates atómicos por fila, secrets solo server-side, backups
+  activados, y ningún commit de base de datos sin revisión humana.
 - **Fase 1 — antes de abrir la app públicamente (aunque sea a pocos usuarios)**:
   todo lo marcado 🟡 — rate limiting, headers de seguridad, CORS, cookies
   confirmadas, paginación, `npm audit` limpio, monitoreo básico (Sentry),
@@ -742,9 +761,10 @@ sesión, en vez del modelo de "proponé y esperá confirmación en cada paso".
   ya lo hace por default" — confirmarlo contra la documentación real y dejarlo
   explícito en código/config.
 - Los servicios de terceros y sus costos ya están decididos en la sección 3.1
-  (todo en tier gratuito: Vercel Hobby, Supabase free, Upstash Redis, AWS SES,
-  Sentry, PostHog, backup propio vía GitHub Action) — no hace falta que Fable 5
-  proponga alternativas ni pregunte por presupuesto, ya está resuelto.
+  (todo en tier gratuito: Vercel Hobby, Supabase free, Upstash Redis, Sentry,
+  PostHog, backup propio vía GitHub Action — **sin proveedor de email por
+  ahora, a propósito**) — no hace falta que Fable 5 proponga alternativas ni
+  pregunte por presupuesto, ya está resuelto.
 - **Optimizar al máximo la capacidad diaria gratis, sin techo fijo** (sección
   3.2.1) — usando técnicas dentro del mismo stack (consultas por pantalla, cache,
   compresión, cacheo en el borde de Vercel), sin sumar ningún servicio nuevo, y
@@ -764,8 +784,7 @@ sesión, en vez del modelo de "proponé y esperá confirmación en cada paso".
   datos) al terminar — es la regla que ya rige el resto del proyecto.
 - Cerrar con un resumen único: qué quedó resuelto de la sección 6, qué falta (si
   algo quedó pendiente), y qué tiene que hacer Jano manualmente (crear cuenta de
-  Supabase/Upstash/AWS/Sentry/PostHog, cargar variables de entorno en Vercel,
-  etc.).
+  Supabase/Upstash/Sentry/PostHog, cargar variables de entorno en Vercel, etc.).
 
 ---
 
@@ -790,23 +809,36 @@ trabajando con Claude en sesiones separadas agregando cosas después de esto, no
 solo con vos —, y que sea práctico de acceder/ordenado sin sobrecomplejizar), la
 arquitectura ya decidida (Postgres/Supabase + RLS + Supabase Auth), el plan
 completo de servicios de terceros ya resuelto (sección 3.1: Vercel Hobby sin
-dominio propio, Supabase free, Upstash Redis para rate limiting, **Amazon SES**
-para email transaccional (no Resend — sin dominio propio no se puede verificar
-con la mayoría de los proveedores; SES permite verificar solo una dirección de
-email), Sentry, PostHog para analytics de producto, backup propio vía GitHub
-Action + pg_dump — todo gratis, no hace falta que propongas alternativas ni
-preguntes por presupuesto), la capacidad estimada y el pedido de optimizarla al
-máximo sin techo fijo (sección 3.2 y 3.2.1), el checklist de cuentas/tokens ya
-resuelto (sección 3.3), el checklist completo de seguridad y robustez (sección 6,
-marcado 🔴 bloqueante / 🟡 antes de abrir la app / ⚪ condicional), y el apéndice de
-las 50 vulnerabilidades (sección 7).
+dominio propio, Supabase free, Upstash Redis para rate limiting, Sentry, PostHog
+para analytics de producto, backup propio vía GitHub Action + pg_dump — todo
+gratis, no hace falta que propongas alternativas ni preguntes por presupuesto),
+la capacidad estimada y el pedido de optimizarla al máximo sin techo fijo
+(sección 3.2 y 3.2.1), el checklist de cuentas/tokens ya resuelto (sección 3.3),
+el checklist completo de seguridad y robustez (sección 6, marcado 🔴 bloqueante /
+🟡 antes de abrir la app / ⚪ condicional), y el apéndice de las 50 vulnerabilidades
+(sección 7).
 
-Puntos específicos que quiero remarcar:
-- **Recuperación de cuenta (sección 6.1 y 6.16)**: quiero que la recuperación de
-  contraseña sea por CÓDIGO de 6 dígitos mandado al mail (no solo un link), con
-  expiración corta, límite estricto de intentos, y sin filtrar si un email existe
-  en la base — para que ningún usuario pierda su cuenta para siempre por
-  olvidarse la clave, pero que tampoco nadie más pueda entrar sin ser el dueño.
+**Decisión importante: NO configures ningún proveedor de email (ni Resend ni AWS
+SES) en esta sesión.** Decidí no hacerlo todavía porque no quiero comprar un
+dominio propio por ahora, y sin dominio la mayoría de los proveedores de email no
+se pueden verificar. Esto significa:
+- El signup tiene que quedar configurado SIN confirmación por email (cuentas
+  confirmadas automáticamente al registrarse) — Supabase Auth lo permite
+  desactivando ese requisito.
+- La recuperación de contraseña por código (OTP) que se diseñó en la sección 6.1
+  queda con el CÓDIGO YA DISEÑADO pero DESACTIVADA en la interfaz por ahora (sin
+  botón de "olvidé mi contraseña" visible, o con un aviso de "próximamente") —
+  no dejes un flujo a medio hacer ni roto a la vista.
+- Como fallback mientras tanto, asegurate de que YO pueda resetear la contraseña
+  de un usuario a mano desde el dashboard de Supabase si me escribe pidiendo
+  ayuda (usando la `service_role key`) — sirve para pocos usuarios de prueba, no
+  para miles, es temporal.
+- Cuando yo compre un dominio en el futuro y te avise, ahí agregamos el
+  proveedor de email y activamos todo esto — dejá el código ya armado (la
+  plantilla OTP, la ruta, el rate limiting) para que sea solo "conectar el
+  proveedor y prender el flag", no reconstruir nada.
+
+Otros puntos específicos que quiero remarcar:
 - **No cerrar puertas a pagos futuros (sección 6.8)**: no construyas nada de
   Stripe/pagos ahora, pero el esquema de base de datos tiene que quedar armado de
   forma que agregar una pasarela de pago más adelante (si algún día vendo la
@@ -830,14 +862,14 @@ Reglas para esta sesión:
    `uca_data` actual de Vercel KV en un archivo del repo, para no perder mi propio
    historial de estudio si algo sale mal. Después de eso, no necesito aprobar nada
    más paso a paso — resolvé todo de corrido.
-2. Ejecutá completo TODO lo marcado 🔴 de la sección 6 (Fase 0, incluyendo dejar
-   AWS SES aprobado y andando para el flujo de recuperación por código), y de ahí
-   seguí con lo marcado 🟡 (Fase 1) en la misma sesión si el tiempo/tokens lo
-   permiten: schema separado por tabla con RLS en todas, Supabase Auth con logout
-   real, updates atómicos, secrets solo server-side, rate limiting con Upstash,
-   headers de seguridad, CORS, cookies, email transaccional con SES, analytics
-   con PostHog (signups, usuarios activos, retención), backup automático propio
-   con GitHub Action.
+2. Ejecutá completo TODO lo marcado 🔴 de la sección 6 (Fase 0, incluyendo el
+   signup sin confirmación por email y el fallback manual de reset de contraseña
+   — nada de email todavía), y de ahí seguí con lo marcado 🟡 (Fase 1) en la
+   misma sesión si el tiempo/tokens lo permiten: schema separado por tabla con
+   RLS en todas, Supabase Auth con logout real, updates atómicos, secrets solo
+   server-side, rate limiting con Upstash, headers de seguridad, CORS, cookies,
+   analytics con PostHog (signups, usuarios activos, retención), backup
+   automático propio con GitHub Action.
 3. No dejes ningún punto de la sección 6 por sobreentendido "porque Supabase/
    Next.js ya lo hace por default" — confirmalo vos mismo contra la documentación
    real y dejalo explícito en el código o config.
