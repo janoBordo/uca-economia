@@ -631,18 +631,23 @@ peso antes de esa fecha.
 
 - 🟡 Olvidé mi contraseña: ver el flujo de recuperación por código, diferido
   hasta que haya un proveedor de email (sección 6.1) — mientras tanto, fallback
-  manual de Jano vía Supabase.
-- 🟡 Cambiar contraseña estando logueado: exigir re-ingresar la contraseña
-  actual antes de aceptar la nueva (Supabase no lo fuerza por default, hay que
-  pedirlo explícito) — si no, alguien con acceso momentáneo a una sesión abierta
-  (compu compartida, etc.) podría apropiarse la cuenta sin saber la clave vieja.
-  Ese endpoint también necesita rate limiting (si no, alguien puede hacer fuerza
-  bruta de la contraseña actual). Al confirmar el cambio, cerrar sesión en todos
-  los demás dispositivos.
-- 🔴 Borrar un usuario sin romper la base — el error típico es un
-  `DELETE FROM users` directo que deja huérfanos (materias, sesiones que
-  apuntaban a ese `user_id` quedan flotando, o la query rompe por foreign key
-  constraint). Dos enfoques, recomendado usar los dos juntos:
+  manual de Jano vía Supabase. **Esta es la ÚNICA de las cuatro acciones de esta
+  sección que depende del dominio/email — las otras tres no necesitan nada de
+  eso y se construyen ya.**
+- 🔴 Cambiar contraseña estando logueado — **no depende del dominio ni de ningún
+  proveedor de email**, es un flujo 100% distinto de "olvidé mi contraseña": el
+  usuario ya está autenticado, solo confirma la clave actual + define la nueva
+  vía la API de Supabase Auth, sin mandar ningún mail. Exigir re-ingresar la
+  contraseña actual antes de aceptar la nueva (Supabase no lo fuerza por
+  default, hay que pedirlo explícito) — si no, alguien con acceso momentáneo a
+  una sesión abierta (compu compartida, etc.) podría apropiarse la cuenta sin
+  saber la clave vieja. Ese endpoint también necesita rate limiting (si no,
+  alguien puede hacer fuerza bruta de la contraseña actual). Al confirmar el
+  cambio, cerrar sesión en todos los demás dispositivos.
+- 🔴 Borrar un usuario sin romper la base — **tampoco depende del dominio/email**.
+  El error típico es un `DELETE FROM users` directo que deja huérfanos (materias,
+  sesiones que apuntaban a ese `user_id` quedan flotando, o la query rompe por
+  foreign key constraint). Dos enfoques, recomendado usar los dos juntos:
     1. **Soft delete**: en vez de borrar la fila, agregar una columna
        `deleted_at` y marcarla con la fecha. La cuenta deja de poder loguearse
        pero los datos quedan intactos por si fue un error o hay que recuperar
@@ -655,6 +660,34 @@ peso antes de esa fecha.
     - Recomendado: soft delete por default (reversible), y un proceso aparte
       que haga hard delete con cascade después de X días para los pedidos de
       borrado definitivo.
+
+### 6.17 Pantalla de Cuenta (nueva, requerida)
+
+Jano pidió una sección de Cuenta con esta estructura de navegación: **en vez de
+agregar otra pestaña más al nav como las demás, el nombre del usuario en la
+esquina superior derecha (con su avatar/iniciales) abre un menú desplegable** —
+de ahí se accede a "Configuración" (la pantalla de Cuenta en sí), "Ayuda", y
+"Cerrar sesión" directo desde el menú sin entrar a ninguna pantalla.
+
+La pantalla de Cuenta/Configuración debe incluir:
+- 🟡 **Editar perfil**: nombre (y lo que ya exista de perfil), con guardado
+  explícito ("Guardar cambios"), no autoguardado silencioso.
+- 🟡 **Apariencia/colores**: es el toggle Clásico 2D ↔ Vidrio 3D que Stuniv ya
+  tiene (`app/components/ThemeToggle.tsx`) — se **reubica** a esta pantalla de
+  Cuenta en vez de vivir al final de la home, no se construye de cero.
+- 🔴 **Cambiar contraseña** (ver arriba) — con confirmación inline antes de
+  aplicar el cambio.
+- 🔴 **Eliminar cuenta** (ver arriba, soft-delete) — con confirmación inline
+  explícita (no un solo clic), siguiendo la regla de diseño que ya rige Stuniv
+  para toda acción destructiva (`PROYECTO.md` → "Reglas de diseño fijas":
+  *"Acciones destructivas: SIEMPRE confirmación inline (Sí/No)"*) — mismo patrón
+  que ya se usa en `/semestre` para "Reiniciar datos".
+- 🟡 **Cerrar sesión**: disponible tanto en el menú desplegable directo como
+  dentro de la pantalla de Cuenta.
+
+Las cuatro acciones (editar perfil, apariencia, cambiar contraseña, eliminar
+cuenta) necesitan su propia confirmación inline independiente — ninguna se
+ejecuta con un solo clic accidental.
 
 ---
 
@@ -727,12 +760,14 @@ database security rules.
 ## 8. Orden sugerido de ejecución (fases, sobre el checklist de la sección 6)
 
 - **Fase 0 — bloqueante, antes de que exista un segundo usuario**: todo lo marcado
-  🔴 arriba, incluyendo el signup sin confirmación por email y el fallback manual
-  de reset de contraseña por Jano vía Supabase (sección 6.1) — no hay proveedor
-  de email configurado todavía a propósito. Es, en esencia: migrar a
-  Postgres/Supabase con RLS en todas las tablas, Supabase Auth con logout real e
-  IDOR resuelto, updates atómicos por fila, secrets solo server-side, backups
-  activados, y ningún commit de base de datos sin revisión humana.
+  🔴 arriba, incluyendo el signup sin confirmación por email, el fallback manual
+  de reset de contraseña por Jano vía Supabase (sección 6.1), y la pantalla de
+  Cuenta con cambiar contraseña + eliminar cuenta (sección 6.17, ambas sin
+  dependencia de email). No hay proveedor de email configurado todavía a
+  propósito. Es, en esencia: migrar a Postgres/Supabase con RLS en todas las
+  tablas, Supabase Auth con logout real e IDOR resuelto, updates atómicos por
+  fila, secrets solo server-side, backups activados, y ningún commit de base de
+  datos sin revisión humana.
 - **Fase 1 — antes de abrir la app públicamente (aunque sea a pocos usuarios)**:
   todo lo marcado 🟡 — rate limiting, headers de seguridad, CORS, cookies
   confirmadas, paginación, `npm audit` limpio, monitoreo básico (Sentry),
@@ -856,6 +891,17 @@ Otros puntos específicos que quiero remarcar:
   y reportame el número al que llegaste.
 - **Renombrar el proyecto de Vercel** de `uca-economia` a `stuniv` (verificando
   que `stuniv.vercel.app` esté libre; si no, una variante cercana).
+- **Pantalla de Cuenta (sección 6.17, nueva)**: en vez de otra pestaña en el nav,
+  el nombre del usuario en la esquina superior derecha (con avatar/iniciales)
+  abre un menú desplegable → "Configuración" lleva a la pantalla de Cuenta,
+  además de "Ayuda" y "Cerrar sesión" directo desde el menú. La pantalla de
+  Cuenta incluye: editar perfil (nombre), apariencia (reubicar el toggle
+  Clásico/Vidrio 3D que ya existe en `ThemeToggle.tsx`, no reconstruirlo),
+  cambiar contraseña, y eliminar cuenta. Cambiar contraseña y eliminar cuenta
+  NO dependen del email/dominio — se construyen ya. Cada una de las cuatro
+  acciones necesita su propia confirmación inline (Sí/No), siguiendo el patrón
+  de diseño que ya usa Stuniv en `/semestre` para "Reiniciar datos" — nunca un
+  solo clic para algo irreversible.
 
 Reglas para esta sesión:
 1. Único paso obligatorio ANTES de tocar cualquier dato: exportá/hacé backup de mi
