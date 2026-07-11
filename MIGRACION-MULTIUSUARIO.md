@@ -1,12 +1,14 @@
-# Stuniv → Multi-usuario: documento de contexto para la migración
+# Stuniv → Multi-usuario: instrucciones para esta sesión
 
-Este documento es para pegarle/adjuntarle a Fable 5 (u otra sesión de Claude dedicada)
-al arrancar la migración de Stuniv de app personal a app multi-usuario. Incluye **todo**
-lo relacionado a seguridad y a que la app no se rompa/caiga del checklist que trajo
-Jano, sin recortar — la prioridad número uno de esta migración es que ningún atacante
-pueda robarle los datos a un usuario ni tocar los de otro. No es el registro de cambios
-del día a día — ese es `PROYECTO.md`, que sigue siendo la fuente de verdad del estado
-actual de la app.
+Estas son las instrucciones completas para migrar Stuniv de app personal a app
+multi-usuario. Vas a operar sobre el repo `janoBordo/uca-economia` (carpeta de
+Stuniv) y ejecutar toda la Fase 0 de una sola pasada — ver el modo de ejecución
+en la sección 9. Incluye **todo** lo relacionado a seguridad y a que la app no se
+rompa/caiga del checklist de seguridad que Jano armó a partir de un PDF, sin
+recortar — la prioridad número uno de esta migración es que ningún atacante
+pueda robarle los datos a un usuario ni tocar los de otro. Este documento no es
+el registro de cambios del día a día — ese es `PROYECTO.md` del mismo repo,
+leelo también antes de empezar para tener el estado real del stack.
 
 ---
 
@@ -30,13 +32,13 @@ terceros en juego.
 4. **Que no cueste dinero tenerla ni mantenerla** — presupuesto $0 por el momento,
    todo en tiers gratuitos mientras la escala lo permita.
 5. **Que se pueda seguir actualizando y mejorando, sin cerrar puertas a futuro** —
-   Jano va a seguir trabajando con Claude (esta misma sesión, no Fable 5) después
-   de la migración, agregando secciones y pusheando versiones nuevas como viene
-   pasando desde v2 hasta v8.6. La arquitectura no puede volverse una bola de
-   barro que trabe ese flujo normal, ni bloquear cosas que se agreguen más
-   adelante (pagos con Stripe es solo un ejemplo posible, no el único).
+   después de esta migración, Jano va a seguir pidiendo cambios en sesiones nuevas
+   (agregando secciones, pusheando versiones, como viene pasando desde v2 hasta
+   v8.6). La arquitectura no puede volverse una bola de barro que trabe ese flujo
+   normal, ni bloquear cosas que se agreguen más adelante (pagos con Stripe es
+   solo un ejemplo posible, no el único).
 6. **Que quede práctico acceder a la app, al backend y a la base de datos — todo
-   ordenado, sin sobrecomplejizar.** No apilar piezas nuevas si una ya alcanza.
+   ordenado, sin sobrecomplejizar.** No apiles piezas nuevas si una ya alcanza.
 
 Estas seis no compiten entre sí en este caso: la misma decisión de arquitectura
 (abajo) las resuelve todas a la vez. Supabase en particular pega fuerte con la
@@ -44,7 +46,7 @@ prioridad 6: un solo dashboard para ver la base, correr SQL, gestionar usuarios 
 revisar Auth — no hay que aprender ni pagar por herramientas separadas para cada
 cosa.
 
-## 3. Decisión de arquitectura ancla (recomendada)
+## 3. Decisión de arquitectura ancla (ya tomada)
 
 **Migrar de Vercel KV (clave-valor plano) a Postgres, específicamente Supabase, con
 Row Level Security (RLS) activado desde el día uno, y usar Supabase Auth para el
@@ -62,10 +64,9 @@ Por qué Supabase Auth y no Clerk en este caso puntual:
 - Supabase Auth también soporta Google y Apple Sign-In, así que no se pierde el
   onboarding con OAuth que pedía el checklist original.
 
-Si en algún momento se quiere la UI de login más pulida de Clerk, es una opción
-válida, pero implica aceptar el trade-off de más integración y un techo de costo
-más bajo. Confirmar esto con Fable 5 antes de arrancar si hay dudas — es la decisión
-más grande de toda la migración y conviene decidirla una sola vez.
+Esta ya es la decisión tomada — no la relitigues. Si encontrás un problema técnico
+real al implementarla (no una preferencia, un impedimento concreto), avisale a
+Jano antes de cambiar de rumbo — es la decisión más grande de toda la migración.
 
 ### 3.1 Plan completo de servicios de terceros (decidido, presupuesto $0)
 
@@ -77,15 +78,15 @@ bloqueantes, son cosas para monitorear a medida que crece el tráfico real).
 
 | Servicio | Elegido | Costo | Nota |
 |---|---|---|---|
-| Hosting/deploy | Vercel (Hobby) | $0 | Ya en uso. Pensado para uso no comercial — Stuniv no cobra, entra bien. Si el tráfico se dispara y se acerca al límite de ancho de banda del plan, ahí (y sólo ahí) evaluar Vercel Pro. Aprovechar la migración para renombrar el proyecto de `uca-economia` a `stuniv` (sección 3.3) — sujeto a que el subdominio `stuniv.vercel.app` esté libre. |
+| Hosting/deploy | Vercel (Hobby) | $0 | Ya en uso. Pensado para uso no comercial — Stuniv no cobra, entra bien. Si el tráfico se dispara y se acerca al límite de ancho de banda del plan, ahí (y sólo ahí) evaluar Vercel Pro. Aprovechá la migración para renombrar el proyecto de `uca-economia` a `stuniv` (sección 3.3) — sujeto a que el subdominio `stuniv.vercel.app` esté libre. |
 | Dominio | Ninguno por ahora — se sigue con `*.vercel.app` | $0 | Jano no va a pagar dominio por el momento. Esto obliga a resolver el email transaccional sin dominio propio (ver fila de Email abajo). |
 | Base de datos + Auth | Supabase (free tier) | $0 | RLS activado desde el día uno (sección 6.3). Auth free tier soporta hasta 50.000 usuarios activos/mes — sobra para "miles". |
-| Backups | Mecanismo propio y gratuito, sin depender del plan pago de Supabase | $0 | Los backups automáticos gestionados de Supabase son de plan Pro (pago). Fable 5 decide el mecanismo concreto (ej. un dump programado a un repo privado, u otra opción gratis que conozca) — la única condición es que corra solo, sin mantenimiento manual día a día, y sin sumar un vendor nuevo fuera de lo ya usado (GitHub). |
+| Backups | Mecanismo propio y gratuito, sin depender del plan pago de Supabase | $0 | Los backups automáticos gestionados de Supabase son de plan Pro (pago). Elegís vos el mecanismo concreto (ej. un dump programado a un repo privado, u otra opción gratis que conozcas) — la única condición es que corra solo, sin mantenimiento manual día a día, y sin sumar un vendor nuevo fuera de lo ya usado (GitHub). |
 | "Keep-alive" anti-pausa | Ping gratuito programado (ej. cron-job.org, gratis) a un endpoint de health-check cada pocos días | $0 | Los proyectos free de Supabase se pausan tras ~7 días sin actividad. Sólo importa en el arranque, antes de tener usuarios reales — una vez que hay tráfico real y constante, el propio uso mantiene el proyecto activo y este ping deja de ser necesario. |
 | Rate limiting | Upstash Redis + librería `@upstash/ratelimit` | $0 | Tier gratis generoso. Upstash es, de hecho, el mismo proveedor que hoy está detrás de Vercel KV — no es un vendor nuevo para Jano. |
-| Email transaccional (reset de contraseña, confirmación) | **Ninguno por ahora — desactivado a propósito** | $0 | Jano decidió no configurar AWS SES por el momento. Cuando compre un dominio propio más adelante, avisa y ahí se habilita un proveedor de email (Resend con el dominio verificado, o AWS SES) y se reactiva la recuperación de contraseña. Ver el impacto concreto de esto en las secciones 6.1 y 6.16. |
+| Email transaccional (reset de contraseña, confirmación) | **Ninguno por ahora — desactivado a propósito** | $0 | Jano decidió no configurar ningún proveedor de email por el momento. Cuando compre un dominio propio más adelante, va a avisar y ahí se habilita un proveedor de email (Resend con el dominio verificado, o AWS SES) y se reactiva la recuperación de contraseña. Ver el impacto concreto de esto en las secciones 6.1 y 6.16. |
 | Error tracking | Sentry (free tier) | $0 | Ya contemplado en el checklist (sección 6.9). |
-| Analytics de producto (cuánta gente usa la app, a qué velocidad crece) | PostHog Cloud (free tier) | $0 | Free tier generoso (del orden de ~1 millón de eventos/mes — confirmar cifra exacta al implementar, cambia con el tiempo). Trackea signups (velocidad de crecimiento), usuarios activos diarios/semanales/mensuales, y retención — sin esto Jano no tiene forma de saber si la gente vuelve a usar la app o no. Ver sección 3.2. |
+| Analytics de producto (cuánta gente usa la app, a qué velocidad crece) | PostHog Cloud (free tier) | $0 | Free tier generoso (del orden de ~1 millón de eventos/mes — confirmá la cifra exacta al implementar, cambia con el tiempo). Trackeá signups (velocidad de crecimiento), usuarios activos diarios/semanales/mensuales, y retención — sin esto Jano no tiene forma de saber si la gente vuelve a usar la app o no. Ver sección 3.2. |
 | CDN / edge | Vercel (incluido) | $0 | Ya viene con el hosting, sin configuración extra. |
 
 **Los dos puntos reales a vigilar a medida que crece (ninguno bloquea el arranque):**
@@ -95,8 +96,8 @@ bloqueantes, son cosas para monitorear a medida que crece el tráfico real).
    cualquier endpoint que devuelva listas (sección 6.12). Si se acerca al
    límite, ahí se evalúa Supabase Pro (~US$25/mes) — pero **esa decisión es
    siempre de Jano, nunca automática**: sin una tarjeta cargada en la cuenta de
-   Supabase, ningún agente podría activarlo aunque quisiera, así que esto no es
-   una restricción operativa hoy, es sólo la aclaración de quién decide si en
+   Supabase, vos no podrías activarlo aunque quisieras, así que esto no es una
+   restricción operativa hoy, es sólo la aclaración de quién decide si en
    algún momento se agrega un medio de pago ahí.
 2. **Vercel Hobby** es para uso no comercial — mientras Stuniv no cobre nada,
    corresponde. Si el uso se vuelve masivo y Vercel lo señala, el camino es
@@ -123,31 +124,29 @@ al pasar a tablas separadas (sección 6.11), cada pantalla deja de traer el blob
 entero y pasa a pedir sólo lo que necesita (ej. la vista del timer no necesita el
 historial completo de semestres archivados) — eso solo, sin ninguna pieza nueva,
 puede reducir el peso por request varias veces, y sumado a mejoras de cacheo
-razonables (que Fable 5 diseña, sección 3.2.1) el techo sube a **~1.500-2.000
+razonables (que vos diseñás, sección 3.2.1) el techo sube a **~1.500-2.000
 usuarios activos por día**, unos pocos miles al mes, gratis. Esto respeta la
 arista 6 — son ajustes dentro del mismo stack, sin piezas nuevas.
 
 **El techo real, honesto**: no existe una versión 100% gratis que aguante
 cualquier volumen para siempre — en algún punto de crecimiento genuino, algo hay
-que pagar. Acá el objetivo no es evitarlo para siempre, es correrlo lo más lejos
+que pagar. El objetivo acá no es evitarlo para siempre, es correrlo lo más lejos
 posible sin complejizar, y que cuando llegue sea una decisión tomada con datos
 (PostHog + el dashboard de uso de Supabase avisando con anticipación), no una
 sorpresa. Y cuando llegue, la solución sigue siendo la misma de siempre: activar
 Supabase Pro (~US$25/mes) — sin rediseñar nada, sin migrar de proveedor, un clic.
 Nota: no hay certeza total de si Supabase corta de golpe o degrada gradualmente
-al pasarse del límite gratis — confirmar en su documentación al implementar.
+al pasarse del límite gratis — confirmá esto en su documentación al implementar.
 
-### 3.2.1 El pedido real a Fable 5: maximizar, sin techo fijo
+### 3.2.1 El objetivo de capacidad: maximizar, sin techo fijo
 
-Jano no quiere un número exacto a cumplir — quiere que Fable 5 **optimice al
-máximo la cantidad de usuarios/tráfico diario que aguanta gratis, cuanto más
-mejor, sin techo prefijado y sin pasar a ningún plan pago sin autorización
-explícita de Jano.**
+No hay un número exacto a cumplir — **optimizá al máximo la cantidad de
+usuarios/tráfico diario que la app aguanta gratis, cuanto más mejor, sin techo
+prefijado y sin pasar a ningún plan pago sin autorización explícita de Jano.**
 
-Cómo lograrlo queda 100% a criterio técnico de Fable 5 — no se le prescribe la
-técnica (ni cache, ni compresión, ni ninguna en particular). Dos condiciones
-fijas nada más:
-- **No agregar ningún servicio/vendor nuevo** fuera de la tabla de la sección
+Cómo lograrlo queda 100% a tu criterio técnico — no se prescribe la técnica (ni
+cache, ni compresión, ni ninguna en particular). Dos condiciones fijas nada más:
+- **No agregues ningún servicio/vendor nuevo** fuera de la tabla de la sección
   3.1 sin consultarle antes a Jano — ese es el límite real de "no
   sobrecomplejizar" (arista 6), no una restricción a la ingeniería en sí.
 - **La optimización no puede empeorar la app visual ni funcionalmente** — tiene
@@ -155,42 +154,42 @@ fijas nada más:
   cambia es cuánto tráfico aguanta por detrás.
 
 **Si después de optimizar en serio el techo gratis sigue sin alcanzar para el
-volumen que Jano espera**, la instrucción es: Fable 5 no activa nada pago por su
-cuenta — reporta el número real al que llegó optimizando, y qué pasaría con
-Supabase Pro (~US$25/mes) si se activara, para que Jano decida. Esa decisión
-siempre es de Jano, y en la práctica ni siquiera es algo que Fable 5 pueda
-ejecutar solo (necesita una tarjeta cargada en la cuenta, que no existe hoy).
+volumen que Jano espera**: no actives nada pago por tu cuenta — reportá el
+número real al que llegaste optimizando, y qué pasaría con Supabase Pro
+(~US$25/mes) si se activara, para que Jano decida. Esa decisión siempre es de
+Jano, y en la práctica ni siquiera es algo que puedas ejecutar vos solo
+(necesita una tarjeta cargada en la cuenta, que no existe hoy).
 
-### 3.3 Checklist de cuentas y tokens a preparar antes de arrancar con Fable 5
+### 3.3 Cuentas y tokens que Jano ya preparó antes de esta sesión
 
 Las cuentas en sí no se pueden delegar (los signups tienen CAPTCHA/verificación de
-mail a propósito para que un bot no los haga solo) — pero es lo único manual.
-Con un token de acceso generado una vez por servicio, Fable 5 hace el resto
-(crear el proyecto, la base, las políticas, todo) sin que Jano vuelva a tocar un
-dashboard:
+mail a propósito para que un bot no los haga solo) — por eso Jano las creó él mismo
+de antemano y generó un token de acceso por servicio. Con esos tokens, vos hacés
+el resto (crear el proyecto, la base, las políticas, todo) sin que Jano tenga que
+tocar ningún dashboard:
 
-| Servicio | Lo único manual | Con eso, Fable 5 automatiza |
+| Servicio | Lo que Jano ya preparó | Con eso, vos automatizás |
 |---|---|---|
-| Supabase | Signup (con GitHub) → *Account Settings → Access Tokens* → generar uno | Crear el proyecto entero vía CLI/Management API, sacar URL/anon key/service role key, correr migraciones y políticas RLS |
-| Upstash | Signup (con GitHub) → *Account → API Keys* → generar uno | Crear la base Redis vía API, configurarla para rate limiting |
-| Sentry | Signup (con GitHub) → *Settings → Auth Tokens* → generar uno (`project:write`) | Crear el proyecto y sacar el DSN |
-| PostHog | Signup (con GitHub) → *Project Settings → API Keys* → generar una | Instrumentar los eventos de signup/login/uso y armar los dashboards de crecimiento |
-| Vercel | Ya hay cuenta → *Settings → Tokens* → generar uno | Cargar TODAS las variables de entorno nuevas vía `vercel env add`, y renombrar el proyecto de `uca-economia` a `stuniv` (verificando que el subdominio `stuniv.vercel.app` esté libre; si no, usar una variante cercana) |
+| Supabase | Cuenta + Access Token generado | Creás el proyecto entero vía CLI/Management API, sacás URL/anon key/service role key, corrés migraciones y políticas RLS |
+| Upstash | Cuenta + API Key generada | Creás la base Redis vía API, la configurás para rate limiting |
+| Sentry | Cuenta + Auth Token generado (`project:write`) | Creás el proyecto y sacás el DSN |
+| PostHog | Cuenta + API Key generada | Instrumentás los eventos de signup/login/uso y armás los dashboards de crecimiento |
+| Vercel | Token generado | Cargás TODAS las variables de entorno nuevas vía `vercel env add`, y renombrás el proyecto de `uca-economia` a `stuniv` (verificando que el subdominio `stuniv.vercel.app` esté libre; si no, una variante cercana) |
 | GitHub (repo de backups) | Nada si `gh` ya está autenticado en la máquina | `gh repo create stuniv-backups --private` |
 
-**Email transaccional (AWS SES o Resend) — NO preparar ahora.** Jano decidió
-dejarlo desactivado hasta comprar un dominio propio. Cuando eso pase, avisa y se
-agrega este servicio a la lista, junto con reactivar la recuperación de
+**Email transaccional (AWS SES o Resend) — no está preparado a propósito.** Jano
+decidió dejarlo desactivado hasta comprar un dominio propio. Cuando eso pase, va a
+avisar y ahí se agrega este servicio, junto con reactivar la recuperación de
 contraseña (secciones 6.1 y 6.16).
 
-**Entrega de credenciales**: no pegarlas como texto en el chat — crear un
-`.env.local` en el repo (ya está en `.gitignore`) con todos los tokens, y decirle
-a Fable 5 que los lea de ahí.
+**Credenciales**: están en `.env.local` en la raíz del repo (ya está en
+`.gitignore`) — leelas de ahí, no le pidas a Jano que las pegue como texto.
 
-**Al terminar la migración**: revocar los tokens de gestión amplia (los que
-pueden crear/borrar proyectos enteros) y dejar activas solo las keys angostas que
-la app usa en producción (la `anon key`, no el access token que crea proyectos) —
-mismo criterio de mínimo privilegio que rige toda la sección 6.
+**Al terminar la migración**: decile a Jano cuáles de los tokens de gestión amplia
+(los que pueden crear/borrar proyectos enteros) ya cumplieron su función y puede
+revocar, dejando activas solo las keys angostas que la app usa en producción (la
+`anon key`, no el access token que crea proyectos) — mismo criterio de mínimo
+privilegio que rige toda la sección 6.
 
 ## 4. Por qué es urgente resolver esto ahora (no es solo teoría)
 
@@ -238,30 +237,30 @@ puntual — igual queda documentado para no perderlo de vista).
   invalidada, no solo borrada del cliente.
 - 🔴 Un usuario logueado no puede acceder a URLs o datos de otro usuario aunque
   adivine o modifique el ID en la URL.
-- 🔴 Chequear que cada ruta protegida realmente verifique sesión server-side, no
+- 🔴 Chequeá que cada ruta protegida realmente verifique sesión server-side, no
   solo que "parezca" protegida en el frontend.
 - 🔴 Autenticación (quién sos) y autorización (qué podés hacer) son cosas
   distintas — se puede estar logueado y aun así no tener permiso para una acción
-  puntual (ej: borrar el examen de otro usuario). Verificar ambas por separado.
+  puntual (ej: borrar el examen de otro usuario). Verificá ambas por separado.
 - 🟡 **DIFERIDO — Recuperación de cuenta por código (OTP), no solo link.**
   Jano decidió no configurar ningún proveedor de email todavía (sección 3.1), así
   que este flujo queda **desactivado en la UI por ahora** (sin botón de "olvidé
-  mi contraseña" visible, o con un mensaje de "próximamente"), no a medio hacer —
-  nada de dejar un flujo roto a la vista. Diseño ya decidido para cuando se
-  active: recibe un código de 6 dígitos por mail (no un link), lo ingresa en la
-  app, define contraseña nueva — es una configuración nativa de Supabase Auth,
-  no hay que programarla desde cero. Parámetros de seguridad no negociables para
-  cuando se active:
+  mi contraseña" visible, o con un mensaje de "próximamente") — no dejes un flujo
+  a medio hacer ni roto a la vista. Diseño ya decidido para cuando se active:
+  recibe un código de 6 dígitos por mail (no un link), lo ingresa en la app,
+  define contraseña nueva — es una configuración nativa de Supabase Auth, no hay
+  que programarla desde cero. Parámetros de seguridad no negociables para cuando
+  se active:
     - El código expira rápido y es de un solo uso — al pedir uno nuevo, el
-      anterior queda inválido automáticamente. El tiempo exacto de expiración
-      lo define Fable 5 según buenas prácticas actuales.
+      anterior queda inválido automáticamente. El tiempo exacto de expiración lo
+      definís vos según buenas prácticas actuales.
     - **Límite estricto de intentos** en el endpoint que verifica el código (vía
       Upstash, sección 3.1) — un código de 6 dígitos es adivinable por fuerza
       bruta si no se limitan los intentos. El número exacto de intentos
-      permitidos antes de exigir un código nuevo lo define Fable 5.
+      permitidos antes de exigir un código nuevo lo definís vos.
     - La respuesta es igual exista o no ese email en la base (evita que alguien
       use el formulario para enumerar usuarios registrados).
-    - Al confirmar la nueva contraseña, cerrar sesión en todos los demás
+    - Al confirmar la nueva contraseña, cerrá sesión en todos los demás
       dispositivos donde el usuario estuviera logueado.
   **Mientras tanto — fallback manual, 🔴 bloqueante esto sí**: Jano tiene que
   poder resetear la contraseña de un usuario a mano desde el dashboard/Admin API
@@ -271,10 +270,10 @@ puntual — igual queda documentado para no perderlo de vista).
   Jano compre el dominio, antes de sumar más usuarios de los que pueda atender
   manualmente uno por uno.
 - 🔴 **Signup sin confirmación por email**: como tampoco hay proveedor de email
-  para mandar el mail de "confirmá tu cuenta", configurar Supabase Auth para que
+  para mandar el mail de "confirmá tu cuenta", configurá Supabase Auth para que
   las cuentas nuevas queden confirmadas automáticamente al registrarse (sin ese
-  paso intermedio) — si no, nadie podría terminar de crear una cuenta. Revisar
-  esto también cuando se active el email más adelante (ahí sí se puede sumar la
+  paso intermedio) — si no, nadie podría terminar de crear una cuenta. Esto se
+  revisa también cuando se active el email más adelante (ahí sí se puede sumar la
   confirmación por mail si se quiere).
 - 🔴 Manejo de sesión: nunca sesiones que no expiran, ni que sigan válidas después
   de cambiar la contraseña.
@@ -288,28 +287,28 @@ puntual — igual queda documentado para no perderlo de vista).
   Network/Sources), no debe ver nada sensible.
 - 🔴 Todas las keys van en `.env` del servidor, nunca en el cliente (la única
   excepción es la `anon key` pública de Supabase, diseñada para ir en el frontend —
-  confirmar con Fable 5 cuál va en cada lado).
+  confirmá vos cuál va en cada lado).
 - ⚪ Preferir credenciales de corta duración (short-lived) sobre keys estáticas
   fijas, cuando el servicio lo permita.
 - 🔴 Las llamadas a APIs externas (Anthropic, Stripe, ElevenLabs, lo que sea)
   siempre pasan por el servidor propio — nunca directo desde el browser.
 - 🔴 `.env` en `.gitignore` desde el primer commit del proyecto (ya está así en
-  Stuniv). Si en algún momento se sospecha que algo se subió igual, correr
+  Stuniv). Si en algún momento se sospecha que algo se subió igual, corré
   `git log --all --full-history -- .env` para chequear el historial completo.
-- 🔴 Si se descubre que una key se filtró: rotarla de inmediato (y todas las del
+- 🔴 Si se descubre que una key se filtró: rotala de inmediato (y todas las del
   mismo archivo, no solo la sospechosa) — recién después limpiar el historial de
   Git con `git filter-repo` o BFG Repo-Cleaner. El orden importa: mientras la key
   vieja siga activa, sirve igual aunque se borre el archivo del repo.
 - 🔴 Secrets filtrados en el JavaScript del frontend: pasa cuando una variable de
   entorno sin el prefijo correcto (en Next.js, `NEXT_PUBLIC_` puesto donde no
   corresponde, o al revés, faltando donde sí correspondía) termina bundleada y
-  visible en el código que llega al navegador. Revisar cada `NEXT_PUBLIC_*`
+  visible en el código que llega al navegador. Revisá cada `NEXT_PUBLIC_*`
   manualmente antes de cada release.
-- 🟡 Revisar que los logs de build de Vercel no impriman variables de entorno
+- 🟡 Revisá que los logs de build de Vercel no impriman variables de entorno
   completas en consola durante el deploy.
 - 🟡 Source maps expuestos en producción: facilitan a un atacante leer el código
-  fuente original. Confirmar `productionBrowserSourceMaps: false` en
-  `next.config.mjs` (es el default de Next.js, pero confirmarlo explícitamente).
+  fuente original. Confirmá `productionBrowserSourceMaps: false` en
+  `next.config.mjs` (es el default de Next.js, pero confirmalo explícitamente).
 - ⚪ Si el repo de GitHub es público: cualquiera puede ver todo el historial de
   commits, no solo el código actual — si se subió algo sensible alguna vez, sigue
   ahí aunque se haya "borrado" en un commit posterior.
@@ -318,27 +317,27 @@ puntual — igual queda documentado para no perderlo de vista).
 
 Esta es la sección más importante de todo el documento para Stuniv.
 
-- 🔴 Activar **Row Level Security (RLS)** en TODAS las tablas — el 70% de las apps
+- 🔴 Activá **Row Level Security (RLS)** en TODAS las tablas — el 70% de las apps
   hechas con IA lo tienen desactivado. Sin RLS, cualquier usuario logueado puede
   leer datos de cualquier otro con una API call básica.
 - 🔴 Supabase tiene un Security Advisor integrado que dice exactamente qué política
-  falta — pasarle el output a Fable 5/Claude para que lo arregle.
+  falta — usá ese output para arreglarlo.
 - 🔴 Cada usuario solo lee/escribe lo suyo, sin excepción — sin este punto no tiene
   sentido nada más de este documento.
 - 🔴 Las políticas de RLS tienen que cubrir tanto `SELECT` como
   `INSERT`/`UPDATE`/`DELETE`, no solo lectura.
 - 🔴 Si en algún momento se usa un bucket de storage (fotos de perfil, archivos
-  subidos): confirmar que no quede público por error — es de las fugas más
+  subidos): confirmá que no quede público por error — es de las fugas más
   comunes y silenciosas (nadie se entera hasta que ya pasó).
 - 🔴 **IDOR (Insecure Direct Object Reference)**: cuando un endpoint confía en el ID
   que manda el cliente sin verificar que le pertenezca a quien hace el request.
   Ejemplo concreto para Stuniv: `GET /api/materias/123` tiene que chequear
   server-side que la materia `123` sea del usuario logueado, no devolverla solo
   porque el ID es válido.
-- 🔴 Nunca mandar `role: "admin"` (o cualquier rol/permiso) desde el frontend y
-  confiar en eso — el rol se determina siempre server-side contra la base.
+- 🔴 Nunca mandes `role: "admin"` (o cualquier rol/permiso) desde el frontend y
+  confíes en eso — el rol se determina siempre server-side contra la base.
 - 🟡 El usuario/rol técnico de base de datos que usa el backend no debería tener
-  permisos de superadmin sobre toda la base — darle sólo lo que necesita.
+  permisos de superadmin sobre toda la base — dale sólo lo que necesita.
 - 🔴 **Este es EL punto central de la migración**: cada query tiene que estar
   filtrada por `user_id` a nivel de política de base de datos (RLS), no solo a
   nivel de código de la app — porque un bug en el código puede saltarse un filtro
@@ -348,17 +347,19 @@ Esta es la sección más importante de todo el documento para Stuniv.
   propios límites (y los de otros), lo que en teoría podía generar una factura de
   $10.000 de costos de API. Es el ejemplo perfecto de por qué RLS no es opcional
   si en algún momento Stuniv tiene cualquier feature con límites de uso o cuotas.
-- ⚪ Si en algún momento se arma un panel de admin: confirmar que no quede
+- ⚪ Si en algún momento se arma un panel de admin: confirmá que no quede
   accesible sin login para cualquiera que encuentre la URL.
 
 ### 6.4 Protección contra ataques (inyecciones, XSS, CSRF, etc.)
 
-- 🔴 Validar y sanitizar todos los campos en el servidor, no solo en el frontend —
+- 🔴 Validá y sanitizá todos los campos en el servidor, no solo en el frontend —
   el cliente se puede bypassear siempre.
 - 🔴 **SQL injection**: la defensa estructural es usar ORM y prepared statements
-  (Prisma, el client de Supabase, etc.), no escapar manualmente. Un ORM separa el
-  código SQL de los datos del usuario a nivel de protocolo — aunque alguien meta
-  `admin' --` en un campo, nunca se interpreta como parte de la query SQL en sí.
+  — evaluá qué opción te convence más (Prisma, el client nativo de Supabase, u
+  otra; no hace falta que sea una en particular), en vez de escapar manualmente.
+  Un ORM separa el código SQL de los datos del usuario a nivel de protocolo —
+  aunque alguien meta `admin' --` en un campo, nunca se interpreta como parte de
+  la query SQL en sí.
     - *Mecánica del ataque*: cuando un login arma la query con un `WHERE` y el
       atacante mete una comilla seguida de `--`, esa comilla cierra el string y los
       dos guiones convierten el resto de la query en comentario — el chequeo de
@@ -373,46 +374,47 @@ Esta es la sección más importante de todo el documento para Stuniv.
   cuida, un atacante mete un script entre etiquetas, y cuando se renderiza para
   cualquier otro usuario el navegador lo ejecuta como parte legítima del sitio —
   puede robar cookies, leer `localStorage`, o redirigir a otra página.
-    - Defensa en dos capas: (1) validar todo lo que entra con esquemas (Zod), y
-      (2) escapar las salidas — convertir `<` y `>` a texto plano para que el
-      navegador no los reconozca como etiquetas ejecutables.
+    - Defensa en dos capas: (1) validá todo lo que entra con esquemas (Zod es una
+      opción a evaluar, no la única), y (2) escapá las salidas — convertí `<` y
+      `>` a texto plano para que el navegador no los reconozca como etiquetas
+      ejecutables.
     - React ya escapa esto automáticamente en el render normal (`{variable}`
       dentro de JSX). Donde se rompe esa protección es si en algún momento se usa
       `dangerouslySetInnerHTML` — si se agrega texto con formato rico (negrita,
-      itálica en notas, por ejemplo), ahí hay que sanitizar con una librería como
-      DOMPurify antes de renderizar.
+      itálica en notas, por ejemplo), ahí hay que sanitizar con alguna librería
+      confiable (DOMPurify es una opción a evaluar) antes de renderizar.
     - 🟡 Header `Content-Security-Policy` (CSP): le dice al navegador que no
       ejecute ningún script que no venga del servidor propio — segunda capa de
       defensa por si algo se cuela pese al escape.
 - 🟡 **CSRF (Cross-Site Request Forgery)**: ataque donde un sitio malicioso hace
   que el navegador del usuario logueado mande requests no autorizados a la propia
   API, aprovechando que ya tiene la cookie de sesión activa. Supabase Auth maneja
-  esto con tokens anti-CSRF o `SameSite` cookies — confirmar que esté activo, no
-  asumirlo.
+  esto con tokens anti-CSRF o `SameSite` cookies — confirmá que esté activo, no
+  lo asumas.
 - ⚪ **Uploads de archivos inseguros**: si en algún momento se deja subir archivos
   (PDFs para Lectura ya se hace hoy client-side; si se sube el procesamiento al
-  servidor, o se agregan fotos de perfil), validar tipo de archivo real (no solo
-  la extensión, que se puede falsear), tamaño máximo, y nunca ejecutar ni servir
+  servidor, o se agregan fotos de perfil), validá tipo de archivo real (no solo
+  la extensión, que se puede falsear), tamaño máximo, y nunca ejecutes ni sirvas
   el archivo desde el mismo dominio sin sandboxing.
 - ⚪ **Path traversal**: si algún endpoint arma una ruta de archivo a partir de un
-  input del usuario, validar que no pueda meter `../../` para escaparse del
+  input del usuario, validá que no pueda meter `../../` para escaparse del
   directorio esperado y leer archivos del servidor que no debería.
 - ⚪ **SSRF (Server-Side Request Forgery)**: si el backend hace requests a una URL
   que viene de un input del usuario (poco común hoy en Stuniv, pero si en algún
-  momento se agrega "importar desde una URL" o similar), validar que esa URL no
+  momento se agrega "importar desde una URL" o similar), validá que esa URL no
   apunte a infraestructura interna (`localhost`, IPs internas de Vercel/AWS).
 
 ### 6.5 Rate limiting y abuso de API
 
-- 🔴 Limitar requests por usuario y por IP en todos los endpoints públicos. Sin
+- 🔴 Limitá requests por usuario y por IP en todos los endpoints públicos. Sin
   esto, bots pueden spamear la API y generar una factura enorme en
   Vercel/Supabase.
 - 🔴 Aplica especialmente a: login, registro, búsqueda, y cualquier endpoint que
   llame a una API paga o con cuota — incluido `/api/tts` en Stuniv.
 - ⚪ **Prompt injection en features de IA**: si en algún momento la app manda texto
   del usuario a un modelo de lenguaje, un atacante puede escribir instrucciones
-  diseñadas para sobreescribir el prompt de sistema. Defensa: envolver siempre el
-  input del usuario en delimitadores claros y nunca dejar que el contenido del
+  diseñadas para sobreescribir el prompt de sistema. Defensa: envolvé siempre el
+  input del usuario en delimitadores claros y nunca dejes que el contenido del
   usuario llegue a la posición de "system prompt" — tiene que quedar marcado como
   "esto es input externo, no instrucción".
 - ⚪ Herramientas o acciones de IA con acceso a datos: si alguna vez un agente de
@@ -422,17 +424,16 @@ Esta es la sección más importante de todo el documento para Stuniv.
 
 ### 6.6 CORS, headers y configuración de red
 
-- 🔴 Configurar CORS para que solo acepte requests desde el dominio propio. Sin
+- 🔴 Configurá CORS para que solo acepte requests desde el dominio propio. Sin
   esto, páginas externas pueden hacer requests a la API usando la sesión de un
   usuario que tenga el sitio abierto.
-- 🟡 Security Headers HTTP para evitar que la página se pueda embeber en un
-  iframe falso (clickjacking) — se le puede pedir directo a Fable 5: "Agregá
-  Security Headers en mi aplicación".
+- 🟡 Agregá Security Headers HTTP para evitar que la página se pueda embeber en un
+  iframe falso (clickjacking).
 - 🟡 Además del anti-clickjacking: `X-Content-Type-Options`,
   `Strict-Transport-Security` (fuerza HTTPS), y el `Content-Security-Policy` ya
   mencionado arriba.
 - ⚪ Si en algún momento existe un entorno de staging/test público
-  (`staging.stuniv.com`), protegerlo con auth básica o IP allowlist — muchos
+  (`staging.stuniv.com`), protegelo con auth básica o IP allowlist — muchos
   atacantes buscan específicamente subdominios de staging porque suelen tener
   menos seguridad que producción.
 
@@ -443,19 +444,19 @@ Esta es la sección más importante de todo el documento para Stuniv.
 - 🔴 Cookies de sesión con `HttpOnly` (evita que JavaScript, incluido un script de
   XSS, pueda leerla), `Secure` (fuerza que solo viaje por HTTPS), y `SameSite`
   (mitiga CSRF). Con Supabase Auth bien configurado esto ya se maneja por
-  default — confirmar, no asumir.
-- 🔴 Nunca guardar tokens de sesión en `localStorage` — es una señal clásica de
+  default — confirmalo, no lo asumas.
+- 🔴 Nunca guardes tokens de sesión en `localStorage` — es una señal clásica de
   auth mal hecho. Si el token de sesión vive en `localStorage` en vez de una
   cookie HTTP-only, cualquier extensión de Chrome maliciosa o ataque de XSS
-  exitoso puede robar la sesión directamente leyendo el `localStorage`. Confirmar
+  exitoso puede robar la sesión directamente leyendo el `localStorage`. Confirmá
   que no se esté guardando nada de sesión manualmente en `localStorage` en ningún
   lado del código (hoy Stuniv sólo guarda ahí el timer y la preferencia de tema —
-  ninguno es sesión, está bien, pero prestar atención a que la migración no
+  ninguno es sesión, está bien, pero prestá atención a que la migración no
   agregue esto por error).
 
 ### 6.8 Pagos y webhooks (⚪ condicional — solo si en algún momento se monetiza)
 
-**No construir nada de esto ahora — pero dejar constancia expresa de que la
+**No construyas nada de esto ahora — pero dejá constancia expresa de que la
 arquitectura decidida (Postgres/Supabase + RLS) NO cierra esta puerta para
 siempre.** Si más adelante Jano quiere vender Stuniv con Stripe (u otra
 pasarela), lo único que hace falta agregar en ese momento es:
@@ -480,7 +481,7 @@ peso antes de esa fecha.
 
 ### 6.9 Logs, monitoreo y auditoría
 
-- 🔴 Revisar qué loguea la app en consola/logs de Vercel — es común que por error
+- 🔴 Revisá qué loguea la app en consola/logs de Vercel — es común que por error
   se loguee el body completo de un request que incluye datos sensibles (tokens,
   emails, contraseñas).
 - 🟡 Mensajes de error: uno genérico tipo "Algo salió mal" sin código ni contexto
@@ -489,9 +490,9 @@ peso antes de esa fecha.
   dentro. El equilibrio correcto: loguear el detalle completo del lado del
   servidor (idealmente en una herramienta como Sentry), y mostrarle al usuario un
   mensaje genérico con un código de referencia.
-- 🔴 Confirmar que ninguna ruta de diagnóstico/debug usada durante desarrollo
+- 🔴 Confirmá que ninguna ruta de diagnóstico/debug usada durante desarrollo
   (`/api/debug`, `/test`) quede accesible una vez en producción.
-- ⚪ Si en algún momento hay panel de administración: confirmar que tiene su
+- ⚪ Si en algún momento hay panel de administración: confirmá que tiene su
   propio chequeo de auth + rol admin, no solo "está logueado".
 - ⚪ Audit logs: para el arranque es secundario, pero si la app crece y en algún
   momento hay que investigar "¿qué pasó acá?", tener un registro de acciones
@@ -503,7 +504,7 @@ peso antes de esa fecha.
 - 🟡 **Analytics de producto** (PostHog, free tier — ver sección 3.1 y 3.3): Jano
   necesita ver cuánta gente usa la app y a qué velocidad crece, tanto para
   entender adopción como para anticipar cuándo se acerca al límite de ancho de
-  banda de Supabase (sección 3.2). Trackear como mínimo: signups (fecha de
+  banda de Supabase (sección 3.2). Trackeá como mínimo: signups (fecha de
   registro, para la curva de crecimiento), inicios de sesión (usuarios activos
   diarios/semanales/mensuales), y retención básica (¿vuelve al día 1/7/30?). Ojo
   con no mandar datos personales de más como propiedades de evento (nombre,
@@ -511,27 +512,25 @@ peso antes de esa fecha.
 
 ### 6.10 Backups y recuperación
 
-- 🔴 Configurar backups automáticos diarios (Supabase los tiene como feature del
-  plan — confirmar que estén activos) y **probar el proceso de restore al menos
-  una vez** antes de necesitarlo de verdad. El error que se repite en apps sin
-  esto: alguien pierde la base de producción entera por una migración mal
-  corrida, y la única respuesta posible es "estamos investigando el problema"
-  porque no hay backup.
-- 🔴 Migraciones de base de datos con IA: **nunca automáticas en producción**. Si
-  en algún momento se le pide a Fable 5/Claude que modifique el schema (agregar
-  columna, renombrar tabla, cambiar un tipo de dato): revisar el SQL generado a
-  mano antes de correrlo, probarlo primero en una base local o de desarrollo,
-  hacer backup antes de aplicarlo en producción, y nunca dejar que el agente
-  ejecute directamente un comando destructivo contra la base real. Esto aplica
-  especialmente a Stuniv porque viene trabajando con Claude generando código de
-  base de datos directamente.
+- 🔴 Configurá backups automáticos diarios (con el mecanismo propio de la sección
+  3.1) y **probá el proceso de restore al menos una vez** antes de necesitarlo de
+  verdad. El error que se repite en apps sin esto: alguien pierde la base de
+  producción entera por una migración mal corrida, y la única respuesta posible
+  es "estamos investigando el problema" porque no hay backup.
+- 🔴 Migraciones de base de datos con IA: **nunca automáticas en producción**.
+  Antes de correr cualquier cambio de schema (agregar columna, renombrar tabla,
+  cambiar un tipo de dato): revisalo a mano, probalo primero en una base local o
+  de desarrollo, hacé backup antes de aplicarlo en producción, y nunca ejecutes
+  directamente un comando destructivo contra la base real sin que Jano lo revise.
+  Esto aplica especialmente a Stuniv porque viene trabajando con Claude generando
+  código de base de datos directamente.
 
 ### 6.11 Arquitectura de base de datos (que no se rompa al crecer)
 
-- 🔴 No usar una sola tabla gigante con todo adentro (perfil + settings +
+- 🔴 No uses una sola tabla gigante con todo adentro (perfil + settings +
   historial + lo que sea) — es exactamente lo que hoy es el blob `uca_data` en
   Vercel KV. Cuando esa tabla crece, cada query se pone lenta porque tiene que
-  leer filas mucho más pesadas de lo necesario. Separar en tablas relacionadas:
+  leer filas mucho más pesadas de lo necesario. Separá en tablas relacionadas:
   `users`, `materias`, `sesiones_estudio`, `semestres`, `plan_estudio`, `notas`,
   vinculadas por `user_id`.
 - La tabla/perfil de `users` necesita los campos nuevos de la sección 6.17:
@@ -541,33 +540,33 @@ peso antes de esa fecha.
 - El bug de los emojis (3 bytes vs 4 bytes): en MySQL con charset `utf8` (mal
   llamado así históricamente), el límite es 3 bytes por carácter, pero los
   emojis modernos pesan 4 bytes — un insert con emoji puede tirar error o
-  truncar el dato en silencio. Esto no le va a pasar a Stuniv si se migra a
+  truncar el dato en silencio. Esto no le va a pasar a Stuniv al migrar a
   Postgres (Supabase), porque soporta UTF-8 completo nativamente sin
-  configuración extra — buena noticia dado que ya está decidido usar Supabase.
-- 🟡 Indexing: pedirle a Fable 5 que revise las queries más frecuentes y agregue
-  índices en las columnas que más se filtran/ordenan (típicamente `user_id`,
-  fechas de examen).
+  configuración extra.
+- 🟡 Indexing: revisá las queries más frecuentes y agregá índices en las
+  columnas que más se filtran/ordenan (típicamente `user_id`, fechas de examen).
 - 🔴 La connection string de la base (usuario y contraseña incluidos) tiene que
   vivir únicamente en variables de entorno del servidor, nunca en código ni en
   logs.
 - 🔴 Cada campo que llega a la base debería pasar por una validación de
-  tipo/formato (Zod) antes de tocar la query, así un dato corrupto nunca llega a
-  romper una columna con un tipo incompatible.
+  tipo/formato (esquemas tipo Zod, u otra opción equivalente) antes de tocar la
+  query, así un dato corrupto nunca llega a romper una columna con un tipo
+  incompatible.
 
 ### 6.12 Performance y que no se ponga lenta
 
-- 🟡 Caching: calcular una vez, cachear, servir desde cache — no reprocesar lo
+- 🟡 Caching: calculá una vez, cacheá, serví desde cache — no reproceses lo
   mismo en cada request (Stuniv ya hace esto client-side con el cache de 15s en
-  `app/lib/api.ts` — mantener el equivalente del lado del servidor/DB).
+  `app/lib/api.ts` — mantené el equivalente del lado del servidor/DB).
 - ⚪ Async / procesamiento en background: operaciones pesadas (mandar emails,
   generar reportes, procesos largos) van a una cola en background, el usuario no
   se queda esperando bloqueado.
 - 🟡 Paginación: los endpoints que devuelven listas tienen que paginar siempre —
   nunca devolver la tabla entera de una. Esto es además un punto de seguridad:
   sin paginación, un solo GET puede dumpear toda la base de un saque.
-- 🟡 Load testing antes de lanzar: pedirle a Fable 5 que simule tráfico para
-  encontrar cuellos de botella antes de que pase con usuarios reales — mejor que
-  reviente en testing que en producción.
+- 🟡 Load testing antes de lanzar: simulá tráfico para encontrar cuellos de
+  botella antes de que pase con usuarios reales — mejor que reviente en testing
+  que en producción.
 - ⚪ Performance de frontend: comprimir imágenes antes de subir, eliminar
   animaciones pesadas innecesarias (ya se viene trabajando esto en Stuniv, ver
   v8.4/v8.6), testear con Google PageSpeed Insights.
@@ -596,19 +595,19 @@ peso antes de esa fecha.
 
 ### 6.14 Dependencias y código generado por IA
 
-- 🔴 No confiar a ciegas en lo que un agente de IA instala. Antes de aceptar un
-  `npm install` sugerido, fijarse en `package.json` que el paquete exista de
-  verdad (buscarlo en npmjs.com) y que no sea una versión vieja con
-  vulnerabilidades conocidas. Los modelos de lenguaje a veces "alucinan" nombres
-  de paquetes que suenan plausibles pero no existen — hay atacantes que
-  registran esos nombres con malware adentro, apostando a que alguien los
-  instale por confiar en la sugerencia de la IA.
-- 🟡 Correr `npm audit` periódicamente — tira las vulnerabilidades conocidas de
+- 🔴 No confíes a ciegas en lo que instalás. Antes de aceptar un `npm install`
+  sugerido, fijate en `package.json` que el paquete exista de verdad (buscalo en
+  npmjs.com) y que no sea una versión vieja con vulnerabilidades conocidas. Los
+  modelos de lenguaje a veces "alucinan" nombres de paquetes que suenan
+  plausibles pero no existen — hay atacantes que registran esos nombres con
+  malware adentro, apostando a que alguien los instale por confiar en la
+  sugerencia de la IA.
+- 🟡 Corré `npm audit` periódicamente — tira las vulnerabilidades conocidas de
   las dependencias directas y transitivas.
-- 🔴 **Meta-punto de todo el documento**: cada cambio relevante que genere
-  Fable 5/Claude (sobre todo en auth, base de datos, o cualquier endpoint que
-  toque datos de otro usuario) conviene leerlo antes de aceptarlo, no solo
-  correrlo porque "compila".
+- 🔴 **Meta-punto de todo el documento**: cada cambio relevante que generés vos
+  (sobre todo en auth, base de datos, o cualquier endpoint que toque datos de
+  otro usuario), dejá que Jano lo pueda revisar antes de darlo por terminado, no
+  lo corras solo porque "compila".
 
 ### 6.15 Control de versiones y deploys seguros
 
@@ -616,12 +615,12 @@ peso antes de esa fecha.
   generado por IA rompe algo, con commits chicos se puede hacer un
   `git revert` quirúrgico de ese cambio puntual. Con un commit gigante, revertir
   hace perder todo lo bueno que vino junto con lo malo.
-- 🟡 Probar en local (o en un branch/preview deploy de Vercel) antes de mergear a
+- 🟡 Probá en local (o en un branch/preview deploy de Vercel) antes de mergear a
   `main`/producción — Vercel arma automáticamente un preview deploy por cada PR.
 - 🔴 Backup de base de datos antes de cualquier migración de schema (ya
   mencionado en backups, pero es el punto de mayor riesgo en cualquier
   "actualización").
-- 🔴 Revisar el SQL generado para migraciones antes de correrlo — nunca dejarlo
+- 🔴 Revisá el SQL generado para migraciones antes de correrlo — nunca lo dejes
   en automático contra producción.
 
 ### 6.16 Gestión de usuarios (operativa real)
@@ -634,13 +633,13 @@ peso antes de esa fecha.
 - 🔴 Cambiar contraseña estando logueado — **no depende del dominio ni de ningún
   proveedor de email**, es un flujo 100% distinto de "olvidé mi contraseña": el
   usuario ya está autenticado, solo confirma la clave actual + define la nueva
-  vía la API de Supabase Auth, sin mandar ningún mail. Exigir re-ingresar la
+  vía la API de Supabase Auth, sin mandar ningún mail. Exigí re-ingresar la
   contraseña actual antes de aceptar la nueva (Supabase no lo fuerza por
   default, hay que pedirlo explícito) — si no, alguien con acceso momentáneo a
   una sesión abierta (compu compartida, etc.) podría apropiarse la cuenta sin
   saber la clave vieja. Ese endpoint también necesita rate limiting (si no,
   alguien puede hacer fuerza bruta de la contraseña actual). Al confirmar el
-  cambio, cerrar sesión en todos los demás dispositivos.
+  cambio, cerrá sesión en todos los demás dispositivos.
 - 🔴 Borrar un usuario sin romper la base — **tampoco depende del dominio/email**.
   El error típico es un `DELETE FROM users` directo que deja huérfanos (materias,
   sesiones que apuntaban a ese `user_id` quedan flotando, o la query rompe por
@@ -669,8 +668,8 @@ de ahí se accede a "Configuración" (la pantalla de Cuenta en sí), "Ayuda", y
 **Estilo visual**: tipografía, border-radius, cards, etc. usan la identidad que
 Stuniv ya tiene (Inter, navy/ocre/canvas como base, mismo lenguaje de
 `GlassCard`/`GlassButton`) — la referencia que trajo Jano es solo para la
-**distribución de contenido** (qué campos van y dónde), no el look. El look
-final lo define Fable 5 consistente con el resto de la app.
+**distribución de contenido** (qué campos van y dónde), no el look. Definí el
+look final vos, consistente con el resto de la app.
 
 La pantalla de Cuenta/Configuración debe incluir:
 
@@ -685,12 +684,12 @@ La pantalla de Cuenta/Configuración debe incluir:
       campos de perfil/identidad (se muestran en el header, alimentan el tema de
       color abajo) — **no cambian ninguna lógica de la app**: las materias
       siguen siendo 100% editables a mano por el usuario como hoy, no hay un
-      catálogo de carreras/materias por universidad que mantener. Mantener el
-      alcance acotado a esto evita sobrecomplejizar (arista 6).
+      catálogo de carreras/materias por universidad que mantener. Mantené el
+      alcance acotado a esto para no sobrecomplejizar (arista 6).
 - 🟡 **Apariencia**: dos cosas separadas, no una sola:
     1. El toggle Clásico 2D ↔ Vidrio 3D que Stuniv ya tiene
-       (`app/components/ThemeToggle.tsx`) — se **reubica** acá en vez de vivir
-       al final de la home, no se reconstruye.
+       (`app/components/ThemeToggle.tsx`) — **reubicalo** acá en vez de dejarlo
+       al final de la home, no lo reconstruyas.
     2. **Nuevo**: tema de color por universidad — cambia la paleta de color
        global de la app (reemplaza el ocre/navy de acento) según la
        universidad elegida en Perfil. Mapeo fijo, decidido por Jano:
@@ -709,9 +708,9 @@ La pantalla de Cuenta/Configuración debe incluir:
       mano. **El usuario siempre puede volver a esta pantalla y cambiar la
       paleta manualmente**, sin importar qué universidad haya puesto en
       Perfil — la asignación automática es solo el valor sugerido inicial, no
-      una restricción. Fable 5 define los tonos exactos de cada paleta y cómo
-      parametrizar técnicamente los colores hoy hardcodeados (navy/ocre) —
-      no hace falta logos/escudos por universidad, alcanza con la paleta de
+      una restricción. Definí vos los tonos exactos de cada paleta y cómo
+      parametrizar técnicamente los colores hoy hardcodeados (navy/ocre) — no
+      hace falta logos/escudos por universidad, alcanza con la paleta de
       color. Esta preferencia se guarda en el perfil del usuario en la base
       (no solo en `localStorage` como hoy el tema Clásico/Vidrio), para que
       viaje entre dispositivos.
@@ -732,16 +731,16 @@ cuenta; para perfil/apariencia alcanza con que "Guardar" sea un paso explícito,
 no autoguardado) — ninguna acción irreversible se ejecuta con un solo clic
 accidental.
 
-**Nota para `PROYECTO.md`**: cuando esto se construya, actualizar la sección
-"Reglas de diseño fijas" para incluir el nuevo sistema de temas de color por
+**Actualizá `PROYECTO.md`** cuando esto quede construido: la sección "Reglas de
+diseño fijas" tiene que incluir el nuevo sistema de temas de color por
 universidad, ya que hoy dice explícitamente "paleta fija navy/ocre/canvas".
 
 ---
 
 ## 7. Apéndice — Las 50 vulnerabilidades, checklist final rápido
 
-Usar esto como pasada final antes de cada lanzamiento importante — tildar cada una a
-medida que se confirma resuelta (ya están desarrolladas en detalle en la sección 6):
+Usá esto como pasada final antes de cada lanzamiento importante — tildá cada una a
+medida que la confirmás resuelta (ya están desarrolladas en detalle en la sección 6):
 
 1. Credenciales de base de datos expuestas
 2. Archivos `.env` públicos
@@ -794,7 +793,11 @@ medida que se confirma resuelta (ya están desarrolladas en detalle en la secci�
 49. Mala aislación entre tenants en apps multi-usuario
 50. Confiar en código generado por IA sin revisión
 
-### Prompt de auditoría pre-lanzamiento (usar en un chat nuevo, después de completar la Fase 0)
+### Auditoría pre-lanzamiento
+
+Cuando termines la Fase 0 y esté probada, corré vos mismo esto sobre lo que
+armaste (no esperes que Jano te lo pida en otro mensaje) y arreglá lo que
+encuentres:
 
 ```
 Act as a senior security engineer. Audit my entire codebase for vulnerabilities,
@@ -804,7 +807,7 @@ database security rules.
 
 ---
 
-## 8. Orden sugerido de ejecución (fases, sobre el checklist de la sección 6)
+## 8. Orden de ejecución (fases, sobre el checklist de la sección 6)
 
 - **Fase 0 — bloqueante, antes de que exista un segundo usuario**: todo lo marcado
   🔴 arriba, incluyendo el signup sin confirmación por email, el fallback manual
@@ -824,188 +827,46 @@ database security rules.
   se agrega IA de cara al usuario), uploads/path traversal/SSRF (solo si se
   agregan esas features puntuales).
 
-## 9. Reglas para Fable 5 al ejecutar esta migración
+## 9. Modo de ejecución y reglas para esta migración
 
-**Modo de ejecución: una sola pasada, no ida y vuelta por mensaje.** Fable 5 es un
-modelo caro de correr — no tiene sentido gastar tokens en microcorrecciones paso a
-paso. Como hoy Stuniv la usa un solo usuario (Jano), no hay datos de terceros en
-riesgo todavía: eso baja mucho el costo de un error durante la migración, así que
-se justifica darle autonomía para resolver toda la Fase 0 de corrido en la misma
-sesión, en vez del modelo de "proponé y esperá confirmación en cada paso".
+**Una sola pasada, no ida y vuelta por mensaje.** Como hoy Stuniv la usa un solo
+usuario (Jano), no hay datos de terceros en riesgo todavía — eso baja mucho el
+costo de un error durante la migración, así que tenés autonomía para resolver
+toda la Fase 0 de corrido en esta misma sesión, sin pedir confirmación paso a
+paso.
 
-- **Único paso obligatorio antes de tocar cualquier dato real**: exportar/hacer
-  backup del `uca_data` actual de Vercel KV (el único dato en juego hoy es el de
-  Jano mismo). Hecho eso, no hace falta aprobación intermedia para el resto.
-- **Commits chicos y frecuentes** a medida que avanza, no un commit gigante al
+- **Único paso obligatorio antes de tocar cualquier dato real**: exportá/hacé
+  backup del `uca_data` actual de Vercel KV en un archivo del repo (el único dato
+  en juego hoy es el de Jano mismo). Hecho eso, no necesitás aprobación
+  intermedia para el resto.
+- **Commits chicos y frecuentes** a medida que avanzás, no un commit gigante al
   final — así un `git revert` puntual sigue siendo posible aunque la sesión haya
   sido de una sola pasada.
 - Ningún punto de la sección 6 se da por sobreentendido "porque Supabase/Next.js
-  ya lo hace por default" — confirmarlo contra la documentación real y dejarlo
+  ya lo hace por default" — confirmalo contra la documentación real y dejalo
   explícito en código/config.
 - Los servicios de terceros y sus costos ya están decididos en la sección 3.1
   (todo en tier gratuito: Vercel Hobby, Supabase free, Upstash Redis, Sentry,
-  PostHog, backup propio gratuito (mecanismo a definir por Fable 5) — **sin
-  proveedor de email por ahora, a propósito**) — no hace falta que Fable 5
-  proponga alternativas ni
-  pregunte por presupuesto, ya está resuelto.
-- **Optimizar al máximo la capacidad diaria gratis, sin techo fijo** (sección
-  3.2.1) — usando técnicas dentro del mismo stack (consultas por pantalla, cache,
-  compresión, cacheo en el borde de Vercel), sin sumar ningún servicio nuevo, y
-  sin activar ningún plan pago sin autorización explícita de Jano.
-- **Renombrar el proyecto de Vercel** de `uca-economia` a `stuniv` (sección 3.3).
-- **Versionar esta migración como v10 de Stuniv en `PROYECTO.md`** (no como una
+  PostHog, backup propio gratuito con mecanismo a definir por vos — sin
+  proveedor de email por ahora, a propósito) — no hace falta que propongas
+  alternativas ni preguntes por presupuesto, ya está resuelto.
+- **Optimizá al máximo la capacidad diaria gratis, sin techo fijo** (sección
+  3.2.1), sin sumar ningún servicio nuevo, y sin activar ningún plan pago sin
+  autorización explícita de Jano.
+- **Renombrá el proyecto de Vercel** de `uca-economia` a `stuniv` (sección 3.3).
+- **Versioná esta migración como v10 de Stuniv en `PROYECTO.md`** (no como una
   continuación incremental de v8.6), dado el peso del cambio de arquitectura.
-- **Access Control Matrix**: definir por escrito qué puede hacer cada tipo de
+- **Access Control Matrix**: definí por escrito qué puede hacer cada tipo de
   usuario según su nivel de permisos (usuario normal, admin si llega a existir),
-  y dejarlo en `PROYECTO.md` o en un `CLAUDE.md` del repo. La mayoría de
+  y dejalo en `PROYECTO.md` o en un `CLAUDE.md` del repo. La mayoría de
   vulnerabilidades en apps "vibecodeadas" no son código malo — es que el agente
   no tenía el contexto de qué debía estar permitido o no.
-- Al terminar, correr por su cuenta el prompt de auditoría de la sección 7
-  ("Act as a senior security engineer...") sobre lo que armó, y arreglar lo que
-  encuentre — sin esperar que Jano lo pida en otro mensaje.
-- Actualizar `PROYECTO.md` con el nuevo estado (infraestructura, stack, modelo de
+- Al terminar, corré vos mismo el prompt de auditoría de la sección 7 sobre lo
+  que armaste, y arreglá lo que encuentres — sin esperar que Jano lo pida en
+  otro mensaje.
+- Actualizá `PROYECTO.md` con el nuevo estado (infraestructura, stack, modelo de
   datos) al terminar — es la regla que ya rige el resto del proyecto.
-- Cerrar con un resumen único: qué quedó resuelto de la sección 6, qué falta (si
-  algo quedó pendiente), y qué tiene que hacer Jano manualmente (crear cuenta de
-  Supabase/Upstash/Sentry/PostHog, cargar variables de entorno en Vercel, etc.).
-
----
-
-## Prompt para pegar en Fable 5 (nueva sesión)
-
-```
-Vas a migrar Stuniv (app de gestión de estudio) de Vercel KV a una arquitectura
-multi-usuario segura, de punta a punta, en esta misma sesión: Postgres (Supabase)
-con Row Level Security, Supabase Auth para el login, y todo lo necesario para que
-ningún hacker pueda robarle datos a un usuario ni que un usuario pueda ver o tocar
-los datos de otro. La seguridad es la prioridad número uno, por encima de todo lo
-demás. Espero potencialmente miles de usuarios (apunto a mi facultad/carrera) con
-presupuesto cero para infraestructura — no voy a pagar un dominio propio, así que
-todo se resuelve sobre `*.vercel.app`. Hoy la app la uso solo yo, no hay otros
-usuarios en riesgo todavía, así que podés avanzar sin pedirme confirmación en cada
-paso. Esta migración es la v10 de Stuniv.
-
-Te adjunto MIGRACION-MULTIUSUARIO.md con todo el contexto: las prioridades, NINGUNA
-negociable (sección 2: seguridad, fluidez/ligereza, que no se rompa, que no cueste
-dinero, que se pueda seguir mejorando sin cerrar puertas a futuro — voy a seguir
-trabajando con Claude en sesiones separadas agregando cosas después de esto, no
-solo con vos —, y que sea práctico de acceder/ordenado sin sobrecomplejizar), la
-arquitectura ya decidida (Postgres/Supabase + RLS + Supabase Auth), el plan
-completo de servicios de terceros ya resuelto (sección 3.1: Vercel Hobby sin
-dominio propio, Supabase free, Upstash Redis para rate limiting, Sentry, PostHog
-para analytics de producto, backup propio gratuito (elegís vos el mecanismo) —
-todo gratis, no hace falta que propongas alternativas ni preguntes por
-presupuesto),
-la capacidad estimada y el pedido de optimizarla al máximo sin techo fijo
-(sección 3.2 y 3.2.1), el checklist de cuentas/tokens ya resuelto (sección 3.3),
-el checklist completo de seguridad y robustez (sección 6, marcado 🔴 bloqueante /
-🟡 antes de abrir la app / ⚪ condicional), y el apéndice de las 50 vulnerabilidades
-(sección 7).
-
-**Decisión importante: NO configures ningún proveedor de email (ni Resend ni AWS
-SES) en esta sesión.** Decidí no hacerlo todavía porque no quiero comprar un
-dominio propio por ahora, y sin dominio la mayoría de los proveedores de email no
-se pueden verificar. Esto significa:
-- El signup tiene que quedar configurado SIN confirmación por email (cuentas
-  confirmadas automáticamente al registrarse) — Supabase Auth lo permite
-  desactivando ese requisito.
-- La recuperación de contraseña por código (OTP) que se diseñó en la sección 6.1
-  queda con el CÓDIGO YA DISEÑADO pero DESACTIVADA en la interfaz por ahora (sin
-  botón de "olvidé mi contraseña" visible, o con un aviso de "próximamente") —
-  no dejes un flujo a medio hacer ni roto a la vista.
-- Como fallback mientras tanto, asegurate de que YO pueda resetear la contraseña
-  de un usuario a mano desde el dashboard de Supabase si me escribe pidiendo
-  ayuda (usando la `service_role key`) — sirve para pocos usuarios de prueba, no
-  para miles, es temporal.
-- Cuando yo compre un dominio en el futuro y te avise, ahí agregamos el
-  proveedor de email y activamos todo esto — dejá el código ya armado (la
-  plantilla OTP, la ruta, el rate limiting) para que sea solo "conectar el
-  proveedor y prender el flag", no reconstruir nada.
-
-Otros puntos específicos que quiero remarcar:
-- **No cerrar puertas a pagos futuros (sección 6.8)**: no construyas nada de
-  Stripe/pagos ahora, pero el esquema de base de datos tiene que quedar armado de
-  forma que agregar una pasarela de pago más adelante (si algún día vendo la
-  app, o cualquier otra cosa que se me ocurra con el tiempo) sea sumar una tabla
-  y un endpoint, no rediseñar todo.
-- **Maximizar capacidad diaria gratis, SIN techo fijo (sección 3.2.1)**: no
-  apunto a un número exacto — cuantos más usuarios/tráfico aguante gratis, mejor.
-  Usá las técnicas que consideres dentro del mismo stack ya decidido (consultas
-  por pantalla en vez de todo el estado de una, cache, compresión, cacheo en el
-  borde de Vercel), pero NO agregues ningún servicio/vendor nuevo fuera de la
-  sección 3.1 sin consultarme primero — ese es el límite real de "no
-  sobrecomplejizar", no evitar buena ingeniería. Si después de optimizar en
-  serio hay un techo real, no actives ningún plan pago por tu cuenta (además,
-  no tenés forma de hacerlo: no hay tarjeta cargada en ninguna cuenta) — parame
-  y reportame el número al que llegaste.
-- **Renombrar el proyecto de Vercel** de `uca-economia` a `stuniv` (verificando
-  que `stuniv.vercel.app` esté libre; si no, una variante cercana).
-- **Pantalla de Cuenta (sección 6.17, nueva)**: en vez de otra pestaña en el nav,
-  el nombre del usuario en la esquina superior derecha (con avatar/iniciales)
-  abre un menú desplegable → "Configuración" lleva a la pantalla de Cuenta,
-  además de "Ayuda" y "Cerrar sesión" directo desde el menú. La pantalla de
-  Cuenta incluye:
-    - **Perfil**: foto de perfil, nombre, apellido, apodo, universidad (dropdown
-      de opciones fijas + "Otra" con texto libre — ver mapeo de paletas en la
-      sección 6.17), carrera (texto libre) — guardado explícito, no
-      autoguardado. Universidad/carrera son campos nuevos de personalización —
-      Stuniv pasa a servir estudiantes de distintas universidades, no solo UCA,
-      pero esto NO cambia la lógica de materias (siguen siendo 100% editables a
-      mano como hoy, sin catálogo de carreras que mantener — no sobrecomplejizar
-      esto).
-    - **Apariencia**: el toggle Clásico/Vidrio 3D que ya existe (reubicado, no
-      reconstruido) MÁS un tema de color por universidad nuevo — 5 paletas fijas
-      (Azul y Blanco, Bordó y Blanco, Negro y Blanco, Verde y Blanco, Amarillo/
-      Dorado y Blanco) asignadas automáticamente según la universidad elegida
-      (el mapeo exacto está en la sección 6.17), pero **siempre modificable a
-      mano** después sin importar la universidad puesta en Perfil. Guardada en
-      el perfil del usuario en la base (no solo `localStorage`). Vos definís los
-      tonos exactos y cómo parametrizar los colores hoy hardcodeados
-      (navy/ocre) — no hace falta logos ni identidades completas por
-      universidad, alcanza con la paleta de color.
-    - **Cambiar contraseña** y **eliminar cuenta** — ninguna de las dos depende
-      del email/dominio, se construyen ya (ver sección 6.16/6.17 para el
-      detalle de seguridad de cada una).
-    - **Cerrar sesión** — disponible en el menú directo y dentro de la pantalla.
-  El estilo visual (tipografía, colores, cards) usa la identidad que Stuniv ya
-  tiene, no inventes una nueva — actualizá también "Reglas de diseño fijas" en
-  PROYECTO.md para reflejar el nuevo sistema de temas de color. Todas las
-  acciones con efecto persistente necesitan confirmación inline explícita
-  (obligatorio en cambiar contraseña y eliminar cuenta), siguiendo el patrón que
-  ya usa Stuniv en `/semestre` para "Reiniciar datos" — nunca un solo clic para
-  algo irreversible.
-
-Reglas para esta sesión:
-1. Único paso obligatorio ANTES de tocar cualquier dato: exportá/hacé backup de mi
-   `uca_data` actual de Vercel KV en un archivo del repo, para no perder mi propio
-   historial de estudio si algo sale mal. Después de eso, no necesito aprobar nada
-   más paso a paso — resolvé todo de corrido.
-2. Ejecutá completo TODO lo marcado 🔴 de la sección 6 (Fase 0, incluyendo el
-   signup sin confirmación por email y el fallback manual de reset de contraseña
-   — nada de email todavía), y de ahí seguí con lo marcado 🟡 (Fase 1) en la
-   misma sesión si el tiempo/tokens lo permiten: schema separado por tabla con
-   RLS en todas, Supabase Auth con logout real, updates atómicos, secrets solo
-   server-side, rate limiting con Upstash, headers de seguridad, CORS, cookies,
-   analytics con PostHog (signups, usuarios activos, retención), backup
-   automático propio y gratuito (elegís vos el mecanismo).
-3. No dejes ningún punto de la sección 6 por sobreentendido "porque Supabase/
-   Next.js ya lo hace por default" — confirmalo vos mismo contra la documentación
-   real y dejalo explícito en el código o config.
-4. Todo en los tiers gratuitos ya decididos en la sección 3.1 — no propongas
-   servicios pagos, y no agregues piezas de infraestructura nuevas que no estén
-   ya en el plan salvo que me lo consultes primero.
-5. Commits chicos y frecuentes a medida que avanzás, no uno gigante al final.
-6. Cuando termines, corré vos mismo la auditoría de la sección 7 ("Act as a senior
-   security engineer...") sobre lo que armaste, y arreglá lo que encuentres —
-   sin esperar que yo te lo pida en otro mensaje.
-7. Actualizá PROYECTO.md con el nuevo estado (infraestructura, stack, modelo de
-   datos), versionado como v10.
-
-Al final quiero un resumen único: qué quedó resuelto de la sección 6, el número
-real de usuarios/día al que llegó la optimización de capacidad, qué falta (si algo
-quedó pendiente por límite de tiempo/tokens), y qué tengo que hacer yo manualmente
-(crear cuentas de Supabase/Upstash/AWS/Sentry/PostHog, cargar variables de entorno
-en Vercel, etc. — la lista completa ya está en la sección 3.3). No me pidas nada
-intermedio salvo que te topes con algo genuinamente ambiguo o irreversible que no
-esté ya cubierto acá.
-```
+- Cerrá con un resumen único: qué quedó resuelto de la sección 6, el número real
+  de usuarios/día al que llegó la optimización de capacidad, qué falta (si algo
+  quedó pendiente), y qué tiene que hacer Jano manualmente (revocar tokens de
+  gestión amplia, comprar el dominio cuando quiera activar el email, etc.).
