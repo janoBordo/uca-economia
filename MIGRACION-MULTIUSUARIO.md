@@ -84,7 +84,7 @@ bloqueantes, son cosas para monitorear a medida que crece el tráfico real).
 | Backups | Mecanismo propio y gratuito, sin depender del plan pago de Supabase | $0 | Los backups automáticos gestionados de Supabase son de plan Pro (pago). Elegís vos el mecanismo concreto (ej. un dump programado a un repo privado, u otra opción gratis que conozcas) — la única condición es que corra solo, sin mantenimiento manual día a día, y sin sumar un vendor nuevo fuera de lo ya usado (GitHub). |
 | "Keep-alive" anti-pausa | Ping gratuito programado (ej. cron-job.org, gratis) a un endpoint de health-check cada pocos días | $0 | Los proyectos free de Supabase se pausan tras ~7 días sin actividad. Sólo importa en el arranque, antes de tener usuarios reales — una vez que hay tráfico real y constante, el propio uso mantiene el proyecto activo y este ping deja de ser necesario. |
 | Rate limiting | Upstash Redis + librería `@upstash/ratelimit` | $0 | Tier gratis generoso. Upstash es, de hecho, el mismo proveedor que hoy está detrás de Vercel KV — no es un vendor nuevo para Jano. |
-| Email transaccional (reset de contraseña, confirmación) | **Ninguno por ahora — desactivado a propósito** | $0 | Jano decidió no configurar ningún proveedor de email por el momento. Cuando compre un dominio propio más adelante, va a avisar y ahí se habilita un proveedor de email (Resend con el dominio verificado, o AWS SES) y se reactiva la recuperación de contraseña. Ver el impacto concreto de esto en las secciones 6.1 y 6.16. |
+| Email transaccional (reset de contraseña, confirmación de cuenta) | **SendGrid** (Single Sender Verification) | $0 (100 emails/día gratis) | Necesario desde la Fase 0 — sin verificar el email al registrarse, la app queda expuesta a robo de identidad (alguien registra un email ajeno) y a bloqueo irreversible de usuarios que se equivocan al tipear el suyo. SendGrid no necesita dominio propio: se verifica una sola dirección de email (un clic en el link que llega a esa casilla, **sin espera de aprobación** — a diferencia de AWS SES, que exige un formulario de "production access" revisado a mano y puede tardar hasta 24hs) y ya se puede mandar mail a cualquier usuario real. |
 | Error tracking | Sentry (free tier) | $0 | Ya contemplado en el checklist (sección 6.9). |
 | Analytics de producto (cuánta gente usa la app, a qué velocidad crece) | PostHog Cloud (free tier) | $0 | Free tier generoso (del orden de ~1 millón de eventos/mes — confirmá la cifra exacta al implementar, cambia con el tiempo). Trackeá signups (velocidad de crecimiento), usuarios activos diarios/semanales/mensuales, y retención — sin esto Jano no tiene forma de saber si la gente vuelve a usar la app o no. Ver sección 3.2. |
 | CDN / edge | Vercel (incluido) | $0 | Ya viene con el hosting, sin configuración extra. |
@@ -172,15 +172,16 @@ tocar ningún dashboard:
 |---|---|---|
 | Supabase | Cuenta + Access Token generado | Creás el proyecto entero vía CLI/Management API, sacás URL/anon key/service role key, corrés migraciones y políticas RLS |
 | Upstash | Cuenta + API Key generada | Creás la base Redis vía API, la configurás para rate limiting |
+| **SendGrid** | Cuenta + una dirección de email verificada (Single Sender Verification, instantáneo) + API Key generada | Configurás el envío transaccional (confirmación de cuenta, reset de contraseña con código OTP) con esas credenciales |
 | Sentry | Cuenta + Auth Token generado (`project:write`) | Creás el proyecto y sacás el DSN |
 | PostHog | Cuenta + API Key generada | Instrumentás los eventos de signup/login/uso y armás los dashboards de crecimiento |
 | Vercel | Token generado | Cargás TODAS las variables de entorno nuevas vía `vercel env add`, y renombrás el proyecto de `uca-economia` a `stuniv` (verificando que el subdominio `stuniv.vercel.app` esté libre; si no, una variante cercana) |
 | GitHub (repo de backups) | Nada si `gh` ya está autenticado en la máquina | `gh repo create stuniv-backups --private` |
+| Cloudflare Turnstile (CAPTCHA) | Cuenta + site key generada para el hostname `*.vercel.app` | Lo conectás a Supabase Auth como proveedor de CAPTCHA en signup |
 
-**Email transaccional (AWS SES o Resend) — no está preparado a propósito.** Jano
-decidió dejarlo desactivado hasta comprar un dominio propio. Cuando eso pase, va a
-avisar y ahí se agrega este servicio, junto con reactivar la recuperación de
-contraseña (secciones 6.1 y 6.16).
+SendGrid con Single Sender Verification no tiene espera de aprobación (a
+diferencia de AWS SES) — se puede tener funcionando el mismo día, sin bloquear
+el resto de la Fase 0 esperando a un tercero.
 
 **Credenciales**: están en `.env.local` en la raíz del repo (ya está en
 `.gitignore`) — leelas de ahí, no le pidas a Jano que las pegue como texto.
@@ -242,15 +243,37 @@ puntual — igual queda documentado para no perderlo de vista).
 - 🔴 Autenticación (quién sos) y autorización (qué podés hacer) son cosas
   distintas — se puede estar logueado y aun así no tener permiso para una acción
   puntual (ej: borrar el examen de otro usuario). Verificá ambas por separado.
-- 🟡 **DIFERIDO — Recuperación de cuenta por código (OTP), no solo link.**
-  Jano decidió no configurar ningún proveedor de email todavía (sección 3.1), así
-  que este flujo queda **desactivado en la UI por ahora** (sin botón de "olvidé
-  mi contraseña" visible, o con un mensaje de "próximamente") — no dejes un flujo
-  a medio hacer ni roto a la vista. Diseño ya decidido para cuando se active:
-  recibe un código de 6 dígitos por mail (no un link), lo ingresa en la app,
-  define contraseña nueva — es una configuración nativa de Supabase Auth, no hay
-  que programarla desde cero. Parámetros de seguridad no negociables para cuando
-  se active:
+- 🔴 **Confirmación de cuenta por email, activa desde la Fase 0.** Se decidió
+  activar SendGrid (sección 3.1) en vez de dejar esto sin resolver, porque sin
+  verificar el email al registrarse hay dos problemas reales que NO tienen
+  mitigación gratis alternativa:
+    1. *Squatting de identidad*: sin verificación, cualquiera puede registrarse
+       con un email que no le pertenece (ej. el de otra persona), bloqueando
+       que el dueño real lo use después. Se resuelve exigiendo confirmar el
+       email antes de que la cuenta quede operativa.
+    2. *Typo irrecuperable*: si alguien se equivoca al tipear su propio email al
+       registrarse, sin verificación nunca se entera hasta que intenta
+       recuperar la contraseña y el mail nunca llega. Se resuelve porque el
+       mail de confirmación falla o rebota al instante si el email está mal
+       escrito — el problema se detecta en el momento, no meses después.
+  La cuenta no queda utilizable hasta confirmar el mail (click en el link o
+  código que llega a esa casilla).
+- 🔴 **CAPTCHA en el signup** (Cloudflare Turnstile u otra opción equivalente —
+  se registra el hostname `*.vercel.app` directo en su dashboard, sin necesitar
+  DNS ni dominio propio, gratis): mitiga ataques Sybil — sin esto, un script
+  puede crear miles de cuentas en minutos, saturando la base, ensuciando las
+  métricas de PostHog, y generando costo de infraestructura de la nada. Esto es
+  necesario aunque el email ya esté verificado (la verificación de email sola no
+  frena un script que usa direcciones descartables reales).
+- 🔴 **Confirmar el email dos veces en el formulario de signup** (campo de
+  confirmación), como capa extra contra typos, sumado a la verificación por
+  mail — atajarlo en el momento es mejor que depender solo del rebote del mail
+  de confirmación.
+- 🔴 **Recuperación de cuenta por código (OTP), no solo link — activa desde la
+  Fase 0**, usando el mismo SendGrid ya configurado arriba: pide recuperarla,
+  recibe un código de 6 dígitos por mail, lo ingresa en la app, define
+  contraseña nueva. Es una configuración nativa de Supabase Auth, no hay que
+  programarla desde cero. Parámetros de seguridad no negociables:
     - El código expira rápido y es de un solo uso — al pedir uno nuevo, el
       anterior queda inválido automáticamente. El tiempo exacto de expiración lo
       definís vos según buenas prácticas actuales.
@@ -262,19 +285,11 @@ puntual — igual queda documentado para no perderlo de vista).
       use el formulario para enumerar usuarios registrados).
     - Al confirmar la nueva contraseña, cerrá sesión en todos los demás
       dispositivos donde el usuario estuviera logueado.
-  **Mientras tanto — fallback manual, 🔴 bloqueante esto sí**: Jano tiene que
-  poder resetear la contraseña de un usuario a mano desde el dashboard/Admin API
-  de Supabase (usando la `service_role key`) si alguien le escribe pidiendo
-  ayuda. Sirve para un grupo chico de prueba, no escala a miles — es el motivo
-  por el que activar el email transaccional pasa a ser la primera tarea cuando
-  Jano compre el dominio, antes de sumar más usuarios de los que pueda atender
-  manualmente uno por uno.
-- 🔴 **Signup sin confirmación por email**: como tampoco hay proveedor de email
-  para mandar el mail de "confirmá tu cuenta", configurá Supabase Auth para que
-  las cuentas nuevas queden confirmadas automáticamente al registrarse (sin ese
-  paso intermedio) — si no, nadie podría terminar de crear una cuenta. Esto se
-  revisa también cuando se active el email más adelante (ahí sí se puede sumar la
-  confirmación por mail si se quiere).
+- ⚪ *Ingeniería social interna* (alguien registra `soporte@stuniv...` o similar
+  para hacerse pasar por autoridad y pedirle datos a otros usuarios): no aplica
+  hoy — Stuniv no tiene mensajería ni interacción entre usuarios en ninguna
+  feature actual. Tenerlo en cuenta recién si en el futuro se agrega alguna
+  forma de que los usuarios se contacten/compartan cosas entre sí.
 - 🔴 Manejo de sesión: nunca sesiones que no expiran, ni que sigan válidas después
   de cambiar la contraseña.
 - ⚪ Credenciales por defecto sin cambiar — si en algún momento se usa un servicio
@@ -625,11 +640,9 @@ peso antes de esa fecha.
 
 ### 6.16 Gestión de usuarios (operativa real)
 
-- 🟡 Olvidé mi contraseña: ver el flujo de recuperación por código, diferido
-  hasta que haya un proveedor de email (sección 6.1) — mientras tanto, fallback
-  manual de Jano vía Supabase. **Esta es la ÚNICA de las cuatro acciones de esta
-  sección que depende del dominio/email — las otras tres no necesitan nada de
-  eso y se construyen ya.**
+- 🔴 Olvidé mi contraseña: ver el flujo de recuperación por código (sección
+  6.1), activo desde la Fase 0 con SendGrid — así ningún usuario pierde el
+  acceso a su cuenta para siempre por olvidarse la clave.
 - 🔴 Cambiar contraseña estando logueado — **no depende del dominio ni de ningún
   proveedor de email**, es un flujo 100% distinto de "olvidé mi contraseña": el
   usuario ya está autenticado, solo confirma la clave actual + define la nueva
@@ -810,14 +823,13 @@ database security rules.
 ## 8. Orden de ejecución (fases, sobre el checklist de la sección 6)
 
 - **Fase 0 — bloqueante, antes de que exista un segundo usuario**: todo lo marcado
-  🔴 arriba, incluyendo el signup sin confirmación por email, el fallback manual
-  de reset de contraseña por Jano vía Supabase (sección 6.1), y la pantalla de
-  Cuenta con cambiar contraseña + eliminar cuenta (sección 6.17, ambas sin
-  dependencia de email). No hay proveedor de email configurado todavía a
-  propósito. Es, en esencia: migrar a Postgres/Supabase con RLS en todas las
-  tablas, Supabase Auth con logout real e IDOR resuelto, updates atómicos por
-  fila, secrets solo server-side, backups activados, y ningún commit de base de
-  datos sin revisión humana.
+  🔴 arriba, incluyendo SendGrid configurado para confirmación de cuenta y
+  recuperación por código (sección 6.1), CAPTCHA en el signup, y la pantalla de
+  Cuenta con cambiar contraseña + eliminar cuenta (sección 6.17). Es, en
+  esencia: migrar a Postgres/Supabase con RLS en todas las tablas, Supabase
+  Auth con logout real e IDOR resuelto, updates atómicos por fila, secrets solo
+  server-side, backups activados, y ningún commit de base de datos sin revisión
+  humana.
 - **Fase 1 — antes de abrir la app públicamente (aunque sea a pocos usuarios)**:
   todo lo marcado 🟡 — rate limiting, headers de seguridad, CORS, cookies
   confirmadas, paginación, `npm audit` limpio, monitoreo básico (Sentry),
@@ -846,10 +858,10 @@ paso.
   ya lo hace por default" — confirmalo contra la documentación real y dejalo
   explícito en código/config.
 - Los servicios de terceros y sus costos ya están decididos en la sección 3.1
-  (todo en tier gratuito: Vercel Hobby, Supabase free, Upstash Redis, Sentry,
-  PostHog, backup propio gratuito con mecanismo a definir por vos — sin
-  proveedor de email por ahora, a propósito) — no hace falta que propongas
-  alternativas ni preguntes por presupuesto, ya está resuelto.
+  (todo en tier gratuito: Vercel Hobby, Supabase free, Upstash Redis, SendGrid,
+  Sentry, PostHog, backup propio gratuito con mecanismo a definir por vos) — no
+  hace falta que propongas alternativas ni preguntes por presupuesto, ya está
+  resuelto.
 - **Optimizá al máximo la capacidad diaria gratis, sin techo fijo** (sección
   3.2.1), sin sumar ningún servicio nuevo, y sin activar ningún plan pago sin
   autorización explícita de Jano.
@@ -869,4 +881,4 @@ paso.
 - Cerrá con un resumen único: qué quedó resuelto de la sección 6, el número real
   de usuarios/día al que llegó la optimización de capacidad, qué falta (si algo
   quedó pendiente), y qué tiene que hacer Jano manualmente (revocar tokens de
-  gestión amplia, comprar el dominio cuando quiera activar el email, etc.).
+  gestión amplia, etc.).
