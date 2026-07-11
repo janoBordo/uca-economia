@@ -166,18 +166,29 @@ Las cuentas en sí no se pueden delegar (los signups tienen CAPTCHA/verificació
 mail a propósito para que un bot no los haga solo) — por eso Jano las creó él mismo
 de antemano y generó un token de acceso por servicio. Con esos tokens, vos hacés
 el resto (crear el proyecto, la base, las políticas, todo) sin que Jano tenga que
-tocar ningún dashboard:
+tocar ningún dashboard.
 
-| Servicio | Lo que Jano ya preparó | Con eso, vos automatizás |
-|---|---|---|
-| Supabase | Cuenta + Access Token generado | Creás el proyecto entero vía CLI/Management API, sacás URL/anon key/service role key, corrés migraciones y políticas RLS |
-| Upstash | Cuenta + API Key generada | Creás la base Redis vía API, la configurás para rate limiting |
-| **SendGrid** | Cuenta + una dirección de email verificada (Single Sender Verification, instantáneo) + API Key generada | Configurás el envío transaccional (confirmación de cuenta, reset de contraseña con código OTP) con esas credenciales |
-| Sentry | Cuenta + Auth Token generado (`project:write`) | Creás el proyecto y sacás el DSN |
-| PostHog | Cuenta + API Key generada | Instrumentás los eventos de signup/login/uso y armás los dashboards de crecimiento |
-| Vercel | Token generado | Cargás TODAS las variables de entorno nuevas vía `vercel env add`, y renombrás el proyecto de `uca-economia` a `stuniv` (verificando que el subdominio `stuniv.vercel.app` esté libre; si no, una variante cercana) |
-| GitHub (repo de backups) | Nada si `gh` ya está autenticado en la máquina | `gh repo create stuniv-backups --private` |
-| Cloudflare Turnstile (CAPTCHA) | Cuenta + site key generada para el hostname `*.vercel.app` | Lo conectás a Supabase Auth como proveedor de CAPTCHA en signup |
+**Dos identidades separadas, a propósito** (separación entre infraestructura e
+interfaz pública, más profesional):
+- **Cuenta de servicio `soporte.stuniv@gmail.com`**: registra Supabase, Upstash,
+  SendGrid, Sentry, PostHog y Cloudflare Turnstile. Es también el remitente
+  verificado en SendGrid — los mails de confirmación/recuperación que le llegan
+  a los usuarios finales van a decir que vienen de esta dirección, no de la
+  personal de Jano.
+- **Cuenta personal `janobordo@gmail.com`**: sigue siendo la dueña de GitHub, del
+  repo (`janoBordo/uca-economia`) y de Vercel — el backend operativo es invisible
+  al usuario final, no hace falta separarlo.
+
+| Servicio | Cuenta | Lo que Jano ya preparó | Con eso, vos automatizás |
+|---|---|---|---|
+| Supabase | Servicio | Cuenta + Access Token generado | Creás el proyecto entero vía CLI/Management API, sacás URL/anon key/service role key, corrés migraciones y políticas RLS |
+| Upstash | Servicio | Cuenta + API Key generada | Creás la base Redis vía API, la configurás para rate limiting |
+| **SendGrid** | Servicio | Cuenta + `soporte.stuniv@gmail.com` verificado como remitente (Single Sender Verification, instantáneo) + API Key generada | Configurás el envío transaccional (confirmación de cuenta, reset de contraseña con código OTP) con esas credenciales — los mails a usuarios salen de `soporte.stuniv@gmail.com` |
+| Sentry | Servicio | Cuenta + Auth Token generado (`project:write`) | Creás el proyecto y sacás el DSN |
+| PostHog | Servicio | Cuenta + API Key generada | Instrumentás los eventos de signup/login/uso y armás los dashboards de crecimiento |
+| Cloudflare Turnstile (CAPTCHA) | Servicio | Cuenta + site key generada para el hostname `*.vercel.app` | Lo conectás a Supabase Auth como proveedor de CAPTCHA en signup |
+| Vercel | Personal | Token generado | Cargás TODAS las variables de entorno nuevas vía `vercel env add`, y renombrás el proyecto de `uca-economia` a `stuniv` (verificando que el subdominio `stuniv.vercel.app` esté libre; si no, una variante cercana) |
+| GitHub (repo de backups) | Personal | Nada si `gh` ya está autenticado en la máquina | `gh repo create stuniv-backups --private` |
 
 SendGrid con Single Sender Verification no tiene espera de aprobación (a
 diferencia de AWS SES) — se puede tener funcionando el mismo día, sin bloquear
