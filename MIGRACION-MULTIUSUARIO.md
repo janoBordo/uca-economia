@@ -686,8 +686,9 @@ La pantalla de Cuenta/Configuración debe incluir:
 - 🟡 **Perfil**: foto de perfil (subir imagen — aplican las reglas de uploads
   seguros de la sección 6.4: validar tipo real de archivo, tamaño máximo, bucket
   de Supabase Storage privado por default), nombre, apellido, apodo (visible en
-  la app), universidad, carrera. Guardado explícito ("Guardar cambios"), no
-  autoguardado silencioso.
+  la app), **universidad** (dropdown de opciones fijas, ver abajo — NO texto
+  libre, salvo la opción "Otra"), **carrera** (texto libre, sin restricción).
+  Guardado explícito ("Guardar cambios"), no autoguardado silencioso.
     - **Universidad/carrera son campos nuevos de personalización** — Stuniv
       pasa a soportar estudiantes de distintas universidades, no solo UCA. Son
       campos de perfil/identidad (se muestran en el header, alimentan el tema de
@@ -699,16 +700,30 @@ La pantalla de Cuenta/Configuración debe incluir:
     1. El toggle Clásico 2D ↔ Vidrio 3D que Stuniv ya tiene
        (`app/components/ThemeToggle.tsx`) — se **reubica** acá en vez de vivir
        al final de la home, no se reconstruye.
-    2. **Nuevo**: tema de color por universidad — el usuario elige una paleta
-       de color entre varias disponibles (sugerida por default según la
-       universidad que puso en Perfil, pero cambiable libremente). Fable 5
-       define las paletas concretas y cómo conviven técnicamente con los
-       colores fijos de marca hoy hardcodeados (navy/ocre) — hay que
-       parametrizarlos, no hay que inventar toda una identidad nueva por
-       universidad (ej. no hace falta logos/escudos, alcanza con la paleta de
-       color). Esta preferencia se guarda en el perfil del usuario en la base
-       (no solo en `localStorage` como hoy el tema Clásico/Vidrio), para que
-       viaje entre dispositivos.
+    2. **Nuevo**: tema de color por universidad — cambia la paleta de color
+       global de la app (reemplaza el ocre/navy de acento) según la
+       universidad elegida en Perfil. Mapeo fijo, decidido por Jano:
+
+      | Paleta | Universidades |
+      |---|---|
+      | Azul y Blanco | UCA, UADE, ITBA, Austral, Udesa |
+      | Bordó y Blanco | UAI, UCEMA, Kennedy, UB |
+      | Negro y Blanco | UBA, UTN, UP |
+      | Verde y Blanco | USAL, UNLP |
+      | Amarillo/Dorado y Blanco | (sin universidad asociada — solo disponible como opción manual) |
+
+      El dropdown de Universidad en Perfil tiene estas opciones fijas más
+      **"Otra"** (ahí sí se escribe el nombre libremente) — si elige "Otra", no
+      hay paleta automática, se le ofrece elegir cualquiera de las cinco a
+      mano. **El usuario siempre puede volver a esta pantalla y cambiar la
+      paleta manualmente**, sin importar qué universidad haya puesto en
+      Perfil — la asignación automática es solo el valor sugerido inicial, no
+      una restricción. Fable 5 define los tonos exactos de cada paleta y cómo
+      parametrizar técnicamente los colores hoy hardcodeados (navy/ocre) —
+      no hace falta logos/escudos por universidad, alcanza con la paleta de
+      color. Esta preferencia se guarda en el perfil del usuario en la base
+      (no solo en `localStorage` como hoy el tema Clásico/Vidrio), para que
+      viaje entre dispositivos.
 - 🔴 **Cambiar contraseña** (ver arriba) — con confirmación inline antes de
   aplicar el cambio.
 - 🔴 **Eliminar cuenta** (ver arriba, soft-delete) — con confirmación inline
@@ -937,17 +952,22 @@ Otros puntos específicos que quiero remarcar:
   abre un menú desplegable → "Configuración" lleva a la pantalla de Cuenta,
   además de "Ayuda" y "Cerrar sesión" directo desde el menú. La pantalla de
   Cuenta incluye:
-    - **Perfil**: foto de perfil, nombre, apellido, apodo, universidad, carrera
-      (guardado explícito, no autoguardado). Universidad/carrera son campos
-      nuevos de personalización — Stuniv pasa a servir estudiantes de distintas
-      universidades, no solo UCA, pero esto NO cambia la lógica de materias
-      (siguen siendo 100% editables a mano como hoy, sin catálogo de carreras
-      que mantener — no sobrecomplejizar esto).
+    - **Perfil**: foto de perfil, nombre, apellido, apodo, universidad (dropdown
+      de opciones fijas + "Otra" con texto libre — ver mapeo de paletas en la
+      sección 6.17), carrera (texto libre) — guardado explícito, no
+      autoguardado. Universidad/carrera son campos nuevos de personalización —
+      Stuniv pasa a servir estudiantes de distintas universidades, no solo UCA,
+      pero esto NO cambia la lógica de materias (siguen siendo 100% editables a
+      mano como hoy, sin catálogo de carreras que mantener — no sobrecomplejizar
+      esto).
     - **Apariencia**: el toggle Clásico/Vidrio 3D que ya existe (reubicado, no
-      reconstruido) MÁS un tema de color por universidad nuevo — el usuario
-      elige una paleta (sugerida según su universidad, cambiable libremente),
-      guardada en su perfil en la base (no solo `localStorage`). Vos definís
-      las paletas concretas y cómo parametrizar los colores hoy hardcodeados
+      reconstruido) MÁS un tema de color por universidad nuevo — 5 paletas fijas
+      (Azul y Blanco, Bordó y Blanco, Negro y Blanco, Verde y Blanco, Amarillo/
+      Dorado y Blanco) asignadas automáticamente según la universidad elegida
+      (el mapeo exacto está en la sección 6.17), pero **siempre modificable a
+      mano** después sin importar la universidad puesta en Perfil. Guardada en
+      el perfil del usuario en la base (no solo `localStorage`). Vos definís los
+      tonos exactos y cómo parametrizar los colores hoy hardcodeados
       (navy/ocre) — no hace falta logos ni identidades completas por
       universidad, alcanza con la paleta de color.
     - **Cambiar contraseña** y **eliminar cuenta** — ninguna de las dos depende
