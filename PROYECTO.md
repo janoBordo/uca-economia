@@ -6,7 +6,47 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
-## Versión actual: v8.6
+## Versión actual: v10 — Fase 1 de 3 de la migración multi-usuario (branch `migracion-v10`, NO mergeado a main todavía)
+
+Infraestructura y backend de seguridad para multi-usuario, según [`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md). **Sin ningún cambio visual ni de UI** — la app sigue funcionando igual (todavía sobre Vercel KV); lo nuevo es la base sobre la que las Fases 2-3 migran datos y construyen login/pantallas.
+
+**Base de datos (Supabase, proyecto `stuniv`, ref `sfwntnljelgxrtyrizht`, región `sa-east-1`, Postgres 17):**
+- 6 tablas: `profiles`, `materias`, `sesiones_estudio`, `semestres`, `plan_estudio`, `notas` — todas con `user_id → auth.users ON DELETE CASCADE`, RLS **habilitado y forzado**, políticas separadas por operación (23 en total, solo rol `authenticated`, siempre `auth.uid()` + perfil activo). `anon` tiene REVOKE total sobre `public`. Migraciones versionadas en `supabase/migrations/`.
+- RPCs atómicos (fix definitivo del bug histórico `addMinutos`/`_delta`): `add_minutos(materia, delta)` (upsert con incremento en una sentencia), `archivar_semestre(nombre)` (snapshot + limpieza en una transacción). `purge_deleted_accounts(días)` solo ejecutable server-side.
+- Trigger `on_auth_user_created` crea el profile automáticamente al registrarse.
+- Security Advisor de Supabase: **0 hallazgos**.
+
+**Supabase Auth (configurado vía Management API, sin pantallas todavía):**
+- Confirmación de cuenta por email obligatoria; SMTP = SendGrid (remitente `soporte.stuniv@gmail.com`); recuperación por código OTP de 6 dígitos, 10 min, un solo uso (template en español).
+- CAPTCHA Cloudflare Turnstile activo en signup/login; contraseña mínima 8; `jwt_exp` 900s; cambio de contraseña requiere re-autenticación; `rate_limit_email_sent` 10/h.
+
+**Backend nuevo en el repo:**
+- `app/lib/supabase/server.ts` (cliente por-request con RLS + cliente admin), `app/lib/ratelimit.ts` (Upstash), `app/lib/turnstile.ts` (verificación server-side).
+- `POST /api/account/change-password`: exige contraseña actual (verificada contra Auth), rate limit 5/15min fail-closed, cierra sesión en los demás dispositivos.
+- `POST /api/account/delete`: soft delete (`profiles.deleted_at`) + ban + signOut global; RLS corta el acceso a datos al instante aunque el JWT viejo siga vivo; hard delete automático a los 30 días.
+- `/api/db` y `/api/tts`: rate limit por IP + validación Zod estricta del body; errores 500 genéricos al cliente.
+- `next.config.mjs`: CSP completa, HSTS, X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy, sin CORS cross-origin, `productionBrowserSourceMaps: false`.
+- `scripts/test-seguridad-e2e.mjs`: 24 checks de seguridad (aislación entre usuarios, IDOR, RLS, rate limit, cambio de contraseña, eliminación) — **24/24 PASS**.
+- Next.js 14.2.5 → 14.2.35 (CVEs críticos parchados).
+
+**Backups (repo privado `janoBordo/stuniv-backups`):** GitHub Actions diario 03:00 AR — `pg_dump` de `public` + `auth.users/identities`, **prueba de restore contra un Postgres limpio en cada corrida** (verificado en verde), purga de cuentas eliminadas >30 días, retención 90 días. La conexión diaria además mantiene activo el proyecto free de Supabase. Ya activo (no depende del merge).
+
+**Backup único pre-migración:** `backups/uca_data-backup-2026-07-12.json` (export completo del Vercel KV actual).
+
+**Access Control Matrix (regla de autorización de toda la app):**
+| Rol | Puede |
+|---|---|
+| Visitante sin sesión (`anon`) | Nada sobre datos: REVOKE total en `public`, ninguna política lo incluye. Solo signup/login (con CAPTCHA). |
+| Usuario autenticado activo | CRUD **exclusivamente sobre sus propias filas** (`auth.uid() = user_id`, forzado por RLS en la base, no en JS). No existe forma de leer/tocar datos ajenos ni adivinando IDs. |
+| Usuario soft-deleted | Nada: login bloqueado (ban) y RLS niega toda lectura/escritura aunque tenga un JWT aún válido. |
+| Server (secret key) | Bypass de RLS solo en `app/lib/supabase/server.ts` → usos puntuales: marcar soft-delete, cambiar contraseña ya verificada. Nunca para servir lecturas de datos. |
+| Admin humano | No existe rol admin en la app. Gestión = dashboard de Supabase con la cuenta de servicio. |
+
+**Pendiente para Fase 2/3** (ver resumen estructurado del cierre de Fase 1): migración de datos KV→Supabase, `/api/db` sobre Supabase con sesión, pantallas de login/registro/cuenta, middleware de sesión, OAuth, Sentry/PostHog, rename del proyecto Vercel a `stuniv`.
+
+---
+
+## v8.6
 Fix de fondo del pausado en Lectura + performance del Vidrio 3D en esa pantalla:
 - **Lectura — pausa/resume EXACTO por carácter**: v8.5 pausaba cancelando y recordaba sólo la "parte" (~160 chars) → al reanudar releía la parte entera desde el principio, sonaba raro. Ahora se usa el evento `onboundary` de Web Speech (dispara con el carácter exacto que se está leyendo) para guardar el punto preciso al pausar; al reanudar, se lee sólo el texto restante desde ese carácter (`fullText.slice(offset)`), no la parte completa. 100% cliente: sin llamadas de red ni escrituras a Vercel KV, sólo un par de refs (`offsetRef`, `boundaryRef`) — cero peso extra. Si el navegador no dispara `onboundary` (pasa en Safari/iPhone), cae automáticamente al comportamiento de v8.5 (retoma la parte desde su inicio) — nunca peor que antes.
 - **Vidrio 3D — Lectura más liviana**: nuevo marcador CSS `.glass-lite` (mismo patrón que ya se usaba para las celdas del calendario) que mantiene el vidrio (tinte + borde + reflejo) pero sin `backdrop-filter` (el blur, lo caro en GPU). Aplicado a las dos superficies más grandes de `/tts`: el textarea y el panel del reproductor. Se ve prácticamente igual, pesa bastante menos. También se sacó `framer-motion` de la barra de progreso del MP3 (ahora CSS puro).
@@ -61,11 +101,14 @@ Ver detalle completo de v2 a v6.2 en la sección "Historia completa" al final de
 ## Infraestructura (ESTO PUEDE CAMBIAR — mantener actualizado)
 - **Hosting**: Vercel
 - **Repo**: GitHub `janoBordo/uca-economia`, branch `main`
-- **Base de datos**: Vercel KV (Upstash Redis), una sola key `uca_data`
+- **Base de datos (en uso por la app)**: Vercel KV (Upstash Redis), una sola key `uca_data` — la migración de datos a Supabase es la Fase 2
+- **Base de datos nueva (lista, aún sin datos)**: Supabase Postgres 17, proyecto `stuniv` (`sfwntnljelgxrtyrizht`, `sa-east-1`), schema v10 con RLS forzado + Supabase Auth configurado (email SendGrid, CAPTCHA Turnstile) — ver entrada v10 arriba
+- **Rate limiting**: Upstash Redis `stuniv-ratelimit` (`sa-east-1`), activo en todos los endpoints
+- **Backups**: repo privado `janoBordo/stuniv-backups`, diario 03:00 AR con prueba de restore
 - **Dominio**: el que da Vercel por defecto (sin dominio propio comprado)
-- **Auth/login**: no tiene — uso personal de un solo usuario, sin cuentas
+- **Auth/login**: motor configurado (Supabase Auth) — sin pantallas todavía, la app sigue sin login hasta la Fase 3
 - **Servicios externos pagos**: ninguno. (Para el MP3 se usa el TTS gratuito de Google Translate vía proxy `/api/tts`, no oficial y sin costo; si Google lo bloqueara, la descarga MP3 fallaría con aviso, pero escuchar en vivo con Web Speech seguiría andando.)
-- **⚠ Migración pendiente a multi-usuario**: ver [`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md) — plan para pasar de Vercel KV a Postgres (Supabase) con RLS + Supabase Auth antes de abrir la app a más de un usuario. No ejecutar sin revisar ese documento primero.
+- **⚠ Migración multi-usuario EN CURSO (branch `migracion-v10`)**: ver [`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md). Fase 1 (infra + seguridad) completada; Fases 2-3 (migración de datos, login y pantallas) pendientes.
 
 ## Stack técnico
 - Next.js 14 (App Router), TypeScript, Tailwind CSS
