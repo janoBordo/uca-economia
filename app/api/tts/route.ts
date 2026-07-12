@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rlTts, checkLimit, clientIp, tooMany } from "../../lib/ratelimit";
 
 // Proxy liviano al TTS gratuito de Google Translate.
 // - No usa API key ni servicios pagos (nada de ElevenLabs).
@@ -10,6 +11,10 @@ import { NextResponse } from "next/server";
 export const runtime = "edge";
 
 export async function GET(req: Request) {
+  // Rate limit por IP (6.5): sin esto, un bot puede spamear el proxy de TTS.
+  const lim = await checkLimit(rlTts, clientIp(req), false);
+  if (!lim.ok) return tooMany(lim.retryAfter);
+
   const { searchParams } = new URL(req.url);
   const q  = (searchParams.get("q") ?? "").slice(0, 200);
   const tl = searchParams.get("tl") ?? "es";

@@ -1,10 +1,45 @@
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
+import { z } from "zod";
 import type { AppData, SemestreArchivado } from "../../lib/types";
 import { DATA_DEFAULT } from "../../lib/types";
+import { rlDb, checkLimit, clientIp, tooMany } from "../../lib/ratelimit";
 
 const KEY = "uca_data";
 type PatchBody = Partial<AppData> & { _delta?: boolean; _archivar?: { nombre: string } };
+
+// Validación server-side del body (6.4): un dato corrupto o malicioso nunca
+// llega a la base. Mismos límites que la UI ya impone por diseño.
+const MateriaSchema = z.object({
+  id: z.string().min(1).max(60),
+  nombre: z.string().min(1).max(100),
+  examen: z.string().max(30),
+  metaHoras: z.number().min(0).max(10000),
+});
+const PatchSchema = z
+  .object({
+    materias: z.array(MateriaSchema).max(50),
+    sesiones: z.record(z.string().max(60), z.number().min(0).max(100000000)),
+    preparacion: z.record(z.string().max(60), z.number().min(0).max(100)),
+    semestres: z
+      .array(
+        z.object({
+          id: z.string().max(60),
+          numero: z.number().min(0).max(1000),
+          nombre: z.string().max(100),
+          materias: z.array(MateriaSchema).max(50),
+          sesiones: z.record(z.string().max(60), z.number().min(0).max(100000000)),
+          archivedAt: z.string().max(40),
+        })
+      )
+      .max(100),
+    planEstudio: z.record(z.string().max(12), z.array(z.string().max(60)).max(32)),
+    notas: z.array(z.string().max(144)).max(100),
+    _delta: z.boolean(),
+    _archivar: z.object({ nombre: z.string().min(1).max(100) }),
+  })
+  .partial()
+  .strict();
 
 async function getData(): Promise<AppData> {
   try {
@@ -21,11 +56,21 @@ async function getData(): Promise<AppData> {
   } catch { return DATA_DEFAULT; }
 }
 
-export async function GET() { return NextResponse.json(await getData()); }
+export async function GET(req: Request) {
+  const lim = await checkLimit(rlDb, `get:${clientIp(req)}`, false);
+  if (!lim.ok) return tooMany(lim.retryAfter);
+  return NextResponse.json(await getData());
+}
 
 export async function POST(req: Request) {
+  const lim = await checkLimit(rlDb, `post:${clientIp(req)}`, false);
+  if (!lim.ok) return tooMany(lim.retryAfter);
   try {
-    const body = (await req.json()) as PatchBody;
+    const parsed = PatchSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return NextResponse.json({ ok: false, error: "Datos inválidos." }, { status: 400 });
+    }
+    const body = parsed.data as PatchBody;
     const current = await getData();
 
     if (body._archivar) {
