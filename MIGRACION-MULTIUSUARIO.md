@@ -242,7 +242,13 @@ puntual — igual queda documentado para no perderlo de vista).
 
 - 🔴 Login real con email + contraseña — nunca hardcodeado, nunca en `localStorage`.
 - 🔴 Usar Supabase Auth (ver decisión de arquitectura arriba) — nunca armar un
-  sistema de auth propio desde cero.
+  sistema de auth propio desde cero. Esto es sobre el MOTOR de autenticación, no
+  sobre la interfaz: **la app sí necesita una pantalla propia de login/registro**
+  (formularios de "Iniciar sesión" y "Crear cuenta", con link entre ambas) como
+  puerta de entrada — es la primera pantalla que ve cualquiera que no tenga
+  sesión activa, y ninguna otra ruta de la app debe quedar accesible antes de
+  pasar por ahí. Construís la interfaz vos; Supabase Auth resuelve la lógica de
+  autenticación por detrás.
 - 🟡 OAuth con Google y Apple Sign-In (genera confianza, facilita el onboarding).
 - 🔴 Logout real: si volvés atrás en el navegador después de cerrar sesión, no te
   tiene que dejar entrar de nuevo — la sesión del lado del servidor tiene que estar
