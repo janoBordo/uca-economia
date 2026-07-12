@@ -6,7 +6,39 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
-## Versión actual: v10 — Fase 1 de 3 de la migración multi-usuario (branch `migracion-v10`, NO mergeado a main todavía)
+## Versión actual: v10 — Fase 2 de 3: login, registro, recuperación por OTP y protección total de rutas (branch `migracion-v10`, NO mergeado a main todavía)
+
+Puerta de entrada completa sobre el backend de Fase 1 (secciones 6.1 y 6.16 de [`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md)). **⚠ NO mergeable a main todavía**: `/api/db` ya exige sesión pero sigue sirviendo el blob único de Vercel KV (compartido entre cualquier usuario logueado) — la migración de datos por-usuario a Supabase sigue pendiente.
+
+**Arquitectura de sesión (decisión de Fase 2):** NO hay supabase-js en el navegador. Todo el auth pasa por endpoints propios (`/api/auth/*`) y la sesión vive en **cookies HttpOnly + Secure + SameSite=Lax** (helper `hardenCookie()` en `app/lib/supabase/server.ts` + mismo endurecimiento en `middleware.ts`) — ni un XSS puede leer el token (6.7), y nada de sesión toca `localStorage`. El refresh de sesión (jwt 900s) lo hace el middleware en cada navegación y los route handlers en cada API call.
+
+**Rutas/páginas nuevas:**
+- `/login` — email+contraseña+Turnstile; links a `/registro` y `/recuperar`; muestra error si llega de un link de confirmación vencido (`?error=confirmacion`).
+- `/registro` — email dos veces (guardia anti-typo, re-verificado server-side), contraseña ≥8, Turnstile; al crear muestra "Revisá tu casilla" (cuenta inutilizable hasta confirmar email).
+- `/recuperar` — 2 pasos: email+Turnstile → código OTP 6 dígitos + contraseña nueva; al confirmar cierra sesión en TODOS los dispositivos y manda a `/login`.
+- `/auth/confirm` (route handler GET) — callback del link de confirmación de email por `token_hash` (verificado server-side, sesión directa a cookies HttpOnly; **nunca viajan tokens de sesión en la URL** — se cambió el template de confirmación de Supabase de `{{ .ConfirmationURL }}` a `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup` vía Management API).
+
+**Endpoints nuevos (`app/api/auth/*`, todos con validación Zod + rate limit Upstash fail-closed):**
+- `POST /api/auth/signup` — `{ email, emailConfirm, password, captchaToken }`; 8/h por IP. CAPTCHA lo verifica Supabase. Email duplicado NO da error distinto (Supabase responde éxito ofuscado con confirmación activa).
+- `POST /api/auth/login` — `{ email, password, captchaToken }`; 10/15min por IP **y** por email. Mensaje único "Email o contraseña incorrectos" para credenciales malas/cuenta eliminada (sin señal a atacantes); caso aparte solo para email sin confirmar.
+- `POST /api/auth/logout` — signOut scope `local`: revoca el refresh token de ESA sesión en el server (logout real) + borra cookies.
+- `GET /api/auth/me` — `{ id, email }` de la sesión (las cookies son HttpOnly, la UI no puede leer el JWT — este endpoint es el "quién soy").
+- `POST /api/auth/recover` — pide el código OTP; 5/h por IP y por email; **respuesta idéntica exista o no el email** (anti-enumeración).
+- `POST /api/auth/recover/verify` — `{ email, code, newPassword }`; **5 intentos/15min por email, fail-closed** (anti fuerza bruta del código de 6 dígitos; el código además vence a los 10 min y es de un solo uso); al éxito revoca TODAS las sesiones del usuario.
+
+**Protección de rutas:** `middleware.ts` (raíz del repo) — toda página redirige a `/login` sin sesión (`getUser()` validado contra el servidor de Auth, nunca `getSession()`); logueado en `/login|/registro|/recuperar` redirige a `/`. Los `/api/*` NO dependen del middleware: cada handler verifica sesión por su cuenta (`/api/db` GET/POST y `/api/tts` ahora devuelven 401 sin sesión; los `/api/account/*` ya lo hacían desde Fase 1). El cliente (`app/lib/api.ts`) redirige a `/login` ante cualquier 401 (cubre "volver atrás" tras logout).
+
+**UI de sesión:** hook `useUser()` (`app/lib/useUser.ts`, pega a `/api/auth/me`) para saber el usuario actual desde el cliente; botón "Salir" en el Nav (POST logout + navegación completa que vacía el cache en memoria); en las pantallas de auth el Nav muestra solo el logo. Componentes nuevos: `app/components/Turnstile.tsx` (widget CAPTCHA sin dependencias nuevas, script oficial ya permitido por la CSP) y `app/components/AuthCard.tsx` (marco compartido de las 3 pantallas, misma identidad visual).
+
+**Tests:** `scripts/test-auth-fase2-e2e.mjs` — 32 checks (protección de rutas, 401 en APIs, validación, fuerza bruta OTP → 429, flujo real de recuperación con código generado por admin, cookies HttpOnly/Secure/SameSite, logout real con cookies viejas → 401, confirm con token trucho) — **32/32 PASS**. La suite de Fase 1 sigue vigente para `/api/account/*`.
+
+**npm audit (6.14):** quedan 2 advisories (high en `next` 14.2.35 + moderate en su `postcss` interno) cuyo fix es **Next 16 (breaking major)** — no se decide solo en esta fase; ninguno de los CVEs aplica directo al setup actual (el bypass de middleware de Pages Router+i18n no aplica a App Router, y la protección no depende solo del middleware igual). Queda reportado para decidir con Jano.
+
+**Pendiente para Fase 3 (y para poder mergear):** migración de datos KV→Supabase + `/api/db` por-usuario sobre Supabase (bloqueante del merge), pantalla de Cuenta (6.17: menú con avatar/nombre, Perfil, Apariencia con temas por universidad, cambiar contraseña y eliminar cuenta sobre los endpoints ya existentes, "Cerrar sesión" también dentro del menú), OAuth Google/Apple (🟡), Sentry/PostHog (🟡), paginación (🟡), rename del proyecto Vercel a `stuniv`, agregar `localhost` al widget de Turnstile si se quiere probar login en local (hoy el widget solo pasa en `*.vercel.app`), actualizar `site_url` de Supabase si cambia el dominio, revocar tokens de gestión amplia al cierre.
+
+---
+
+## v10 — Fase 1 de 3 de la migración multi-usuario (branch `migracion-v10`, NO mergeado a main todavía)
 
 Infraestructura y backend de seguridad para multi-usuario, según [`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md). **Sin ningún cambio visual ni de UI** — la app sigue funcionando igual (todavía sobre Vercel KV); lo nuevo es la base sobre la que las Fases 2-3 migran datos y construyen login/pantallas.
 
@@ -131,9 +163,9 @@ Ver detalle completo de v2 a v6.2 en la sección "Historia completa" al final de
 - **Rate limiting**: Upstash Redis `stuniv-ratelimit` (`sa-east-1`), activo en todos los endpoints
 - **Backups**: repo privado `janoBordo/stuniv-backups`, diario 03:00 AR con prueba de restore
 - **Dominio**: el que da Vercel por defecto (sin dominio propio comprado)
-- **Auth/login**: motor configurado (Supabase Auth) — sin pantallas todavía, la app sigue sin login hasta la Fase 3
+- **Auth/login**: motor Supabase Auth + pantallas de entrada construidas en el branch `migracion-v10` (`/login`, `/registro`, `/recuperar`, middleware, logout, sesión en cookies HttpOnly) — en `main` la app sigue sin login hasta mergear la migración
 - **Servicios externos pagos**: ninguno. (Para el MP3 se usa el TTS gratuito de Google Translate vía proxy `/api/tts`, no oficial y sin costo; si Google lo bloqueara, la descarga MP3 fallaría con aviso, pero escuchar en vivo con Web Speech seguiría andando.)
-- **⚠ Migración multi-usuario EN CURSO (branch `migracion-v10`)**: ver [`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md). Fase 1 (infra + seguridad) completada; Fases 2-3 (migración de datos, login y pantallas) pendientes.
+- **⚠ Migración multi-usuario EN CURSO (branch `migracion-v10`)**: ver [`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md). Fase 1 (infra + seguridad) y Fase 2 (login/registro/recuperación + protección de rutas) completadas; Fase 3 (migración de datos KV→Supabase y pantalla de Cuenta) pendiente — el merge a main está bloqueado hasta migrar los datos.
 
 ## Stack técnico
 - Next.js 14 (App Router), TypeScript, Tailwind CSS
@@ -173,6 +205,7 @@ Todo pasa por `/api/db` (GET trae todo, POST hace merge parcial). **Cache client
 - `/semestre` — config de materias + cierre/archivo de semestres + historial
 - `/tts` — Lectura: texto/PDF/Word/TXT; escuchar por capítulos con seek + descargar .mp3 real
 - `/configuracion` — redirect a `/semestre` (legacy)
+- Solo en branch `migracion-v10`: `/login`, `/registro`, `/recuperar` (públicas) y `/auth/confirm` (callback de email) — todo lo demás exige sesión vía `middleware.ts`
 
 ## Reglas de diseño fijas
 - Paleta: navy `#0B1F4D`, ocre `#C9A227`, canvas `#F5F4F0`
