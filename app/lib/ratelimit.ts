@@ -32,6 +32,38 @@ export const rlDeleteAccount = new Ratelimit({
   prefix: "rl:del",
 });
 
+// ── Fase 2: endpoints de autenticación (siempre fail-closed) ──
+
+// Login y confirmación de email: 10 por 15 min (por IP y por email).
+export const rlAuth = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(10, "15 m"),
+  prefix: "rl:auth",
+});
+
+// Crear cuenta: 8 por hora por IP.
+export const rlSignup = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(8, "1 h"),
+  prefix: "rl:signup",
+});
+
+// Pedir código de recuperación: 5 por hora (por IP y por email).
+export const rlRecover = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, "1 h"),
+  prefix: "rl:recover",
+});
+
+// Verificar el código OTP: 5 intentos por 15 min POR EMAIL (6.1: un código de
+// 6 dígitos es adivinable por fuerza bruta sin este límite; además el código
+// vence a los 10 min y es de un solo uso).
+export const rlOtp = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, "15 m"),
+  prefix: "rl:otp",
+});
+
 /** IP real del cliente detrás del proxy de Vercel. */
 export function clientIp(req: Request): string {
   return (

@@ -10,6 +10,16 @@ const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 /**
+ * Atributos endurecidos para las cookies de sesión (6.7): HttpOnly (ni un XSS
+ * puede leerlas — posible porque NO usamos supabase-js en el navegador: todo
+ * el auth pasa por /api/auth/*), Secure y SameSite=Lax (mitiga CSRF).
+ * Compartido con middleware.ts — cualquier cookie de sesión sale con esto.
+ */
+export function hardenCookie<T extends object | undefined>(options: T) {
+  return { ...options, httpOnly: true, secure: true, sameSite: "lax" as const, path: "/" };
+}
+
+/**
  * Cliente ligado a la sesión del usuario que hace el request.
  * Lee la sesión de las cookies (@supabase/ssr) o, si no hay, del header
  * Authorization: Bearer <access_token>. Todas las queries pasan por RLS.
@@ -28,7 +38,7 @@ export function supabaseForRequest(req: Request): SupabaseClient {
       getAll: () => store.getAll(),
       setAll: (list) => {
         try {
-          list.forEach(({ name, value, options }) => store.set(name, value, options));
+          list.forEach(({ name, value, options }) => store.set(name, value, hardenCookie(options)));
         } catch {
           // Route handlers de solo-lectura pueden no permitir set — no es fatal.
         }
