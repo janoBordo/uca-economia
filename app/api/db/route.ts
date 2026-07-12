@@ -4,6 +4,18 @@ import { z } from "zod";
 import type { AppData, SemestreArchivado } from "../../lib/types";
 import { DATA_DEFAULT } from "../../lib/types";
 import { rlDb, checkLimit, clientIp, tooMany } from "../../lib/ratelimit";
+import { supabaseForRequest } from "../../lib/supabase/server";
+
+// Fase 2: sesión obligatoria (verificada server-side contra Supabase Auth,
+// además del middleware). OJO: los datos siguen siendo el blob único de
+// Vercel KV (compartido) — la migración de datos por-usuario a Supabase es
+// el paso pendiente; hasta entonces este branch no se mergea a main.
+async function requireUser(req: Request) {
+  const { data, error } = await supabaseForRequest(req).auth.getUser();
+  return error || !data.user ? null : data.user;
+}
+const noAuth = () =>
+  NextResponse.json({ ok: false, error: "No autenticado." }, { status: 401 });
 
 const KEY = "uca_data";
 type PatchBody = Partial<AppData> & { _delta?: boolean; _archivar?: { nombre: string } };
@@ -59,12 +71,14 @@ async function getData(): Promise<AppData> {
 export async function GET(req: Request) {
   const lim = await checkLimit(rlDb, `get:${clientIp(req)}`, false);
   if (!lim.ok) return tooMany(lim.retryAfter);
+  if (!(await requireUser(req))) return noAuth();
   return NextResponse.json(await getData());
 }
 
 export async function POST(req: Request) {
   const lim = await checkLimit(rlDb, `post:${clientIp(req)}`, false);
   if (!lim.ok) return tooMany(lim.retryAfter);
+  if (!(await requireUser(req))) return noAuth();
   try {
     const parsed = PatchSchema.safeParse(await req.json());
     if (!parsed.success) {

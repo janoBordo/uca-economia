@@ -10,6 +10,14 @@ let inFlight: Promise<AppData> | null = null;
 const TTL = 15000; // ms: dentro de esta ventana, navegar entre páginas sirve del cache (sin pegarle a /api/db)
 const listeners = new Set<() => void>();
 
+// Sesión vencida/cerrada (ej. botón "atrás" después del logout): a /login.
+// La navegación completa además vacía este cache en memoria.
+function sinSesion() {
+  cache = null; lastFetched = 0;
+  if (typeof window !== "undefined" && window.location.pathname !== "/login")
+    window.location.assign("/login");
+}
+
 export function subscribe(fn: () => void) { listeners.add(fn); return () => listeners.delete(fn); }
 function notify() { listeners.forEach(fn => fn()); }
 export function getCached(): AppData { return cache ?? DATA_DEFAULT; }
@@ -19,6 +27,7 @@ export async function fetchData(force = false): Promise<AppData> {
   if (!force && inFlight) return inFlight;          // dedupe: un solo request concurrente
   inFlight = (async () => {
     const r = await fetch("/api/db", { cache: "no-store" });
+    if (r.status === 401) { sinSesion(); throw new Error("Sin sesión"); }
     if (!r.ok) throw new Error("Error cargando datos");
     const d: AppData = await r.json();
     cache = d; lastFetched = Date.now(); notify(); return d;
@@ -32,6 +41,7 @@ async function patch(body: PatchBody): Promise<AppData> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (r.status === 401) { sinSesion(); throw new Error("Sin sesión"); }
   if (!r.ok) throw new Error("Error guardando datos");
   const { data } = await r.json();
   if (data) { cache = data; lastFetched = Date.now(); notify(); }
