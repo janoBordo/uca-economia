@@ -34,7 +34,41 @@ Puerta de entrada completa sobre el backend de Fase 1 (secciones 6.1 y 6.16 de [
 
 **npm audit (6.14):** quedan 2 advisories (high en `next` 14.2.35 + moderate en su `postcss` interno) cuyo fix es **Next 16 (breaking major)** — no se decide solo en esta fase; ninguno de los CVEs aplica directo al setup actual (el bypass de middleware de Pages Router+i18n no aplica a App Router, y la protección no depende solo del middleware igual). Queda reportado para decidir con Jano.
 
-**Pendiente para Fase 3 (y para poder mergear):** migración de datos KV→Supabase + `/api/db` por-usuario sobre Supabase (bloqueante del merge), pantalla de Cuenta (6.17: menú con avatar/nombre, Perfil, Apariencia con temas por universidad, cambiar contraseña y eliminar cuenta sobre los endpoints ya existentes, "Cerrar sesión" también dentro del menú), OAuth Google/Apple (🟡), Sentry/PostHog (🟡), paginación (🟡), rename del proyecto Vercel a `stuniv`, agregar `localhost` al widget de Turnstile si se quiere probar login en local (hoy el widget solo pasa en `*.vercel.app`), actualizar `site_url` de Supabase si cambia el dominio, revocar tokens de gestión amplia al cierre.
+### Resumen estructurado de Fase 2 (handoff para Fase 3 — no adivinar nada)
+
+**Rutas/páginas creadas:**
+| Path | Qué es |
+|---|---|
+| `/login` | Email + contraseña + Turnstile. Links a `/registro` y `/recuperar`. Lee `?error=confirmacion`. |
+| `/registro` | Email **dos veces** + contraseña ≥8 + Turnstile → pantalla "Revisá tu casilla". |
+| `/recuperar` | 2 pasos: email+Turnstile → código OTP 6 dígitos + contraseña nueva → vuelta a `/login`. |
+| `/auth/confirm` | Route handler GET del link de confirmación de email (`token_hash`) → sesión en cookies → `/`. |
+| `POST /api/auth/{signup,login,logout,recover,recover/verify}` + `GET /api/auth/me` | Backend de todo lo anterior (Zod + rate limit Upstash fail-closed en todos). |
+
+**Acceso al usuario/sesión actual:**
+- **Cliente**: hook `useUser()` en `app/lib/useUser.ts` (devuelve `{ user: {id, email}, loading }`, pega a `GET /api/auth/me`). No hay supabase-js en el navegador — las cookies son HttpOnly y el JS no puede leerlas, a propósito.
+- **Server**: `supabaseForRequest(req).auth.getUser()` de `app/lib/supabase/server.ts` (acepta cookies o Bearer).
+
+**Cómo funciona la protección de rutas:** `middleware.ts` en la raíz: toda página sin sesión → redirect `/login` (con `getUser()` validado contra el servidor de Auth + refresh de token); logueado en páginas de auth → redirect `/`. Los `/api/*` **no** dependen del middleware: cada handler verifica sesión por su cuenta (`/api/db`, `/api/tts` ahora devuelven 401; `/api/account/*` ya lo hacía). `app/lib/api.ts` redirige a `/login` ante cualquier 401 (cubre "volver atrás" tras logout).
+
+**Checklist de seguridad verificado (uno por uno, con test o config real):**
+- ✅ Login con Supabase Auth, pantalla propia, nada hardcodeado ni en localStorage (6.1)
+- ✅ **Logout real**: cookies viejas post-logout → 401 (refresh token revocado server-side, verificado en e2e) (6.1)
+- ✅ Ruta protegida = verificación **server-side** (middleware + por-endpoint, no solo frontend) (6.1)
+- ✅ Confirmación de email obligatoria; template cambiado a `token_hash` — **nunca viajan tokens de sesión en URL/fragment** (6.1)
+- ✅ CAPTCHA Turnstile en signup/login/recover, verificado por Supabase (probado: token falso → 400) (6.1)
+- ✅ Doble campo de email en signup, re-verificado server-side (6.1)
+- ✅ OTP: 6 dígitos, 10 min, un solo uso (config real confirmada vía Management API), **5 intentos/15min por email fail-closed** (e2e: 5×400 → 429), respuesta uniforme exista o no el email, signOut global al confirmar (6.1/6.16)
+- ✅ Rate limiting propio en login (por IP **y** por email), signup, recover, verify — todos fail-closed (6.5)
+- ✅ Cookies de sesión **HttpOnly + Secure + SameSite=Lax + Path=/** — confirmado en el Set-Cookie real del e2e, no asumido (6.7)
+- ✅ Mensajes de error genéricos sin señal (credencial mala = cuenta eliminada = mismo texto); detalle solo en logs de server (6.9)
+- ✅ Sin keys nuevas en el frontend (solo `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, pública por diseño); CSP ya cubría Turnstile; cero dependencias npm nuevas (6.2/6.14)
+- ⚠️ `npm audit`: 2 advisories en `next@14.2.35` cuyo fix es **Next 16 (breaking)** — ninguna aplica directo al setup (el bypass de middleware es Pages Router+i18n, y la protección no depende solo del middleware). Decisión de Jano, no se toma sola.
+
+**Qué falta explícitamente para Fase 3:**
+1. **Bloqueante del merge a main**: migrar datos KV→Supabase y hacer `/api/db` por-usuario — hoy exige sesión pero sirve el blob compartido de KV (cualquier usuario logueado vería los datos de Jano si se mergeara así).
+2. Pantalla de Cuenta (6.17): menú avatar/nombre arriba a la derecha, Perfil, Apariencia (mover ThemeToggle + temas por universidad), cambiar contraseña y eliminar cuenta — los endpoints `POST /api/account/change-password` y `/api/account/delete` ya existen de Fase 1 (change-password acepta `captchaToken` opcional).
+3. Menores: OAuth Google/Apple (🟡), Sentry/PostHog (🟡), paginación (🟡), rename del proyecto Vercel a `stuniv` + actualizar `site_url` de Supabase (hoy `uca-economia.vercel.app`), agregar `localhost` al widget de Turnstile en Cloudflare si se quiere probar login en local (hoy solo pasa en `*.vercel.app`), revocar tokens de gestión amplia al cierre de la migración.
 
 ---
 
