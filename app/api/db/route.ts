@@ -111,6 +111,8 @@ export async function POST(req: Request) {
     await kv.set(KEY, merged);
     return NextResponse.json({ ok: true, data: merged });
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Error" }, { status: 500 });
+    // Detalle completo al log del server; al cliente solo un mensaje genérico (6.9)
+    console.error("api/db POST:", e instanceof Error ? e.message : e);
+    return NextResponse.json({ ok: false, error: "Algo salió mal." }, { status: 500 });
   }
 }
