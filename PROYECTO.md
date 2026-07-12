@@ -42,7 +42,32 @@ Infraestructura y backend de seguridad para multi-usuario, según [`MIGRACION-MU
 | Server (secret key) | Bypass de RLS solo en `app/lib/supabase/server.ts` → usos puntuales: marcar soft-delete, cambiar contraseña ya verificada. Nunca para servir lecturas de datos. |
 | Admin humano | No existe rol admin en la app. Gestión = dashboard de Supabase con la cuenta de servicio. |
 
-**Pendiente para Fase 2/3** (ver resumen estructurado del cierre de Fase 1): migración de datos KV→Supabase, `/api/db` sobre Supabase con sesión, pantallas de login/registro/cuenta, middleware de sesión, OAuth, Sentry/PostHog, rename del proyecto Vercel a `stuniv`.
+### Handoff exacto para Fase 2 (no adivinar nada — todo lo de abajo ya existe y se llama así)
+
+**Tablas y columnas** (migraciones versionadas en `supabase/migrations/0001_schema_v10.sql` y `0002_soft_delete_enforcement.sql` — leerlas es la fuente de verdad):
+- `profiles`: `id` (uuid PK = auth.users.id), `nombre`, `apellido`, `apodo`, `universidad`, `carrera`, `foto_url`, `tema_color` ('azul'|'bordo'|'negro'|'verde'|'dorado', default 'azul'), `deleted_at` (soft delete), `created_at`, `updated_at`. Se crea sola al registrarse (trigger `on_auth_user_created` → función `public.handle_new_user`).
+- `materias`: `id` (uuid PK), `user_id`, `nombre`, `examen` (**timestamp SIN zona horaria** — mismo semántico que el string `"2026-06-08T09:00"` del modelo viejo), `meta_horas` numeric(6,1), `preparacion` smallint 0-100 (ya NO es un Record aparte como en KV), `posicion` (orden de la lista en UI), `created_at`, `updated_at`.
+- `sesiones_estudio`: `materia_id` (uuid **PK**, 1 fila por materia), `user_id`, `minutos` (total agregado), `updated_at`. Los incrementos van SIEMPRE por el RPC `add_minutos`, nunca UPDATE leer-modificar-escribir.
+- `semestres`: `id` (uuid PK), `user_id`, `numero` (unique por user), `nombre`, `materias` jsonb, `sesiones` jsonb, `archived_at`.
+- `plan_estudio`: PK compuesta (`user_id`, `fecha` date), `materia_ids` uuid[], `updated_at`.
+- `notas`: `id` (uuid PK), `user_id`, `texto` (1-144 chars), `posicion`, `created_at`.
+
+**Políticas RLS** (23; todas `TO authenticated`, todas exigen `auth.uid()` = dueño **y** perfil no soft-deleted): `profiles_select_own`, `profiles_insert_own`, `profiles_update_own` (sin delete: se soft-deletea, nunca DELETE directo); `materias_{select,insert,update,delete}_own`; `sesiones_{select,insert,update,delete}_own` (sobre `sesiones_estudio`); `semestres_{select,insert,update,delete}_own`; `plan_{select,insert,update,delete}_own` (sobre `plan_estudio`); `notas_{select,insert,update,delete}_own`. RLS `ENABLE` + `FORCE` en las 6 tablas; `anon` con REVOKE total sobre `public`.
+
+**RPCs** (llamar con `supabase.rpc(...)`): `add_minutos(p_materia_id uuid, p_delta integer)` (upsert atómico, valida dueño), `archivar_semestre(p_nombre text)` (snapshot + reset transaccional, devuelve el semestre archivado), `purge_deleted_accounts(p_dias integer)` (solo service role, la corre el workflow de backups).
+
+**Variables de entorno** — cargadas en **Vercel (production+preview) y en `.env.local`**:
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SECRET_KEY` (service role — solo server), `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `TURNSTILE_SECRET_KEY`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. Solo en `.env.local` (no van a Vercel): `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `VERCEL_TOKEN`, `UPSTASH_API_KEY`, `SENDGRID_*`, `SENTRY_AUTH_TOKEN`, `POSTHOG_*`, `TURNSTILE_SITE_KEY`. En GitHub Actions secrets de `stuniv-backups`/este repo: la connection string de la DB para `pg_dump`.
+
+**Endpoints creados en esta fase**:
+- `POST /api/account/change-password` — body `{ currentPassword, newPassword }` (Zod; nueva ≥8). Exige sesión, re-verifica la contraseña actual contra Auth, rate limit 5/15min por user+IP (fail-closed), al éxito cierra sesión en los demás dispositivos (`scope: 'others'`).
+- `POST /api/account/delete` — body `{ confirmacion: "ELIMINAR MI CUENTA" }` literal. Exige sesión; marca `profiles.deleted_at`, banea al usuario y hace signOut global. Hard delete automático a los 30 días vía `purge_deleted_accounts`.
+- `/api/db` y `/api/tts` siguen sobre KV pero ya con rate limit por IP + validación Zod. **Fase 2 los migra a Supabase con sesión.**
+
+**Convenciones elegidas en Fase 1** (mantener): nombres de tablas/columnas en español y snake_case; políticas `<tabla>_<operacion>_own`; RPCs con prefijo de argumentos `p_`; clientes Supabase solo desde `app/lib/supabase/server.ts` (`createRlsClient()` por-request con el token del usuario, `createAdminClient()` service-role solo para soft-delete/cambio de contraseña — nunca para servir lecturas); rate limiting solo vía `app/lib/ratelimit.ts`; Turnstile server-side vía `app/lib/turnstile.ts`; signup/login del cliente deben mandar `captchaToken` (Turnstile) o Auth los rechaza.
+
+**Checklist sección 6 — verificado en Fase 1**: 6.2 (secrets solo server, sourcemaps off), 6.3 completo (RLS/IDOR/aislación, Security Advisor 0 hallazgos, suite e2e 24/24), 6.4 (Zod server-side, sin SQL injection posible — client Supabase parametrizado, headers/CSP), 6.5 (rate limiting login/signup/db/tts/account), 6.6 (CORS same-origin, headers), 6.7 (jwt_exp 900s, rotación refresh tokens, sin sesión en localStorage), 6.10 (backup diario + restore probado en cada corrida), 6.13 (RPCs atómicos), 6.16 backend (cambiar contraseña + soft/hard delete).
+**Pendiente Fase 2/3**: migración de datos KV→Supabase, `/api/db` sobre Supabase con sesión, pantallas login/registro/cuenta (6.1 UI, 6.17), doble campo de email en signup, middleware de sesión + logout real en UI, OAuth Google/Apple (🟡), Sentry y PostHog (6.9 🟡), paginación (6.12 🟡), rename del proyecto Vercel a `stuniv`, revocar tokens de gestión amplia al cierre de la migración.
 
 ---
 
