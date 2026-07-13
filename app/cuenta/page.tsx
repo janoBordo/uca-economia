@@ -278,7 +278,9 @@ function SeccionPassword() {
   const [enviando, setEnviando] = useState(false);
   const [msg, setMsg] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
 
-  const valido = actual.length > 0 && nueva.length >= 8 && nueva === repetir && nueva !== actual;
+  // captcha obligatorio: la verificación de la contraseña actual pasa por el
+  // login de Supabase, que exige Turnstile — sin token el server devuelve 403.
+  const valido = actual.length > 0 && nueva.length >= 8 && nueva === repetir && nueva !== actual && !!captcha;
 
   function pedirConfirmacion() {
     setMsg(null);
@@ -294,7 +296,7 @@ function SeccionPassword() {
       const r = await fetch("/api/account/change-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentPassword: actual, newPassword: nueva, ...(captcha ? { captchaToken: captcha } : {}) }),
+        body: JSON.stringify({ currentPassword: actual, newPassword: nueva, captchaToken: captcha }),
       });
       const d = await r.json().catch(() => null);
       if (r.ok) {

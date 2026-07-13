@@ -1,4 +1,8 @@
 // E2E de /api/account/change-password y /api/account/delete contra dev server
+// NOTA: desde Fase 2 el CAPTCHA (Turnstile) es obligatorio en todo login por
+// contraseña — esta suite lo APAGA vía Management API mientras corre y lo
+// vuelve a prender SIEMPRE al final (verificado). Si el script muriera a la
+// mitad, correrlo de nuevo lo deja bien.
 import { createClient } from "@supabase/supabase-js";
 import fs from "node:fs";
 
@@ -9,12 +13,46 @@ const env = Object.fromEntries(
 );
 const URL_ = env.NEXT_PUBLIC_SUPABASE_URL, ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY, SECRET = env.SUPABASE_SECRET_KEEY || env.SUPABASE_SECRET_KEY;
 
+// ── CAPTCHA on/off vía Management API (solo mientras corre la suite) ──
+const REF = new URL(URL_).hostname.split(".")[0];
+async function setCaptcha(enabled) {
+  const r = await fetch(`https://api.supabase.com/v1/projects/${REF}/config/auth`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${env.SUPABASE_ACCESS_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ security_captcha_enabled: enabled }),
+  });
+  if (!r.ok) throw new Error(`Management API captcha=${enabled}: ${r.status} ${await r.text()}`);
+}
+
 const admin = createClient(URL_, SECRET, { auth: { persistSession: false } });
 const pub = () => createClient(URL_, ANON, { auth: { persistSession: false } });
 
 const EMAIL = "test-fase1@example.com", PWD1 = "PasswordVieja123", PWD2 = "PasswordNueva456";
 let fails = 0;
 const check = (name, cond, extra = "") => { console.log((cond ? "PASS" : "FAIL"), name, extra); if (!cond) fails++; };
+
+// pase lo que pase, el CAPTCHA vuelve a quedar activo
+async function restaurarCaptcha() {
+  try { await setCaptcha(true); console.log("CAPTCHA re-activado."); }
+  catch (e) { console.error("¡NO SE PUDO RE-ACTIVAR EL CAPTCHA!", e.message); }
+}
+process.on("unhandledRejection", async (e) => { console.error(e); await restaurarCaptcha(); process.exit(1); });
+process.on("uncaughtException", async (e) => { console.error(e); await restaurarCaptcha(); process.exit(1); });
+
+await setCaptcha(false);
+console.log("CAPTCHA desactivado temporalmente para la suite…");
+
+// El cambio de config tarda en propagar al servicio de Auth: reintentar
+// mientras siga respondiendo captcha_failed (hasta ~2 min).
+async function loginConReintentos(email, password) {
+  for (let i = 0; i < 24; i++) {
+    const { data, error } = await pub().auth.signInWithPassword({ email, password });
+    if (!error) return { data, error: null };
+    if (error.code !== "captcha_failed") return { data: null, error };
+    await new Promise(res => setTimeout(res, 5000));
+  }
+  return { data: null, error: new Error("captcha sigue activo tras 2 min") };
+}
 
 // limpieza previa si quedó de otra corrida
 const { data: list } = await admin.auth.admin.listUsers();
@@ -29,8 +67,8 @@ const uid = created.user.id;
 const { data: prof } = await admin.from("profiles").select("id,deleted_at").eq("id", uid).single();
 check("trigger crea profile al registrarse", !!prof && prof.deleted_at === null);
 
-// 2. login
-const { data: s1, error: sErr } = await pub().auth.signInWithPassword({ email: EMAIL, password: PWD1 });
+// 2. login (espera a que la desactivación del captcha propague)
+const { data: s1, error: sErr } = await loginConReintentos(EMAIL, PWD1);
 check("login inicial", !sErr, sErr?.message ?? "");
 const token = s1.session.access_token;
 
@@ -128,6 +166,13 @@ await admin.auth.admin.deleteUser(B.id);
 await admin.auth.admin.deleteUser(uid);
 const { data: gone } = await admin.from("profiles").select("id").eq("id", uid);
 check("hard delete cascade limpia el profile", (gone ?? []).length === 0);
+
+await restaurarCaptcha();
+// verificación real (no asumir): el config tiene que decir enabled=true
+const cfg = await fetch(`https://api.supabase.com/v1/projects/${REF}/config/auth`, {
+  headers: { Authorization: `Bearer ${env.SUPABASE_ACCESS_TOKEN}` },
+}).then(r => r.json());
+check("CAPTCHA quedó activo tras la suite", cfg.security_captcha_enabled === true);
 
 console.log(fails === 0 ? "TODO OK" : `FALLARON ${fails}`);
 process.exit(fails === 0 ? 0 : 1);
