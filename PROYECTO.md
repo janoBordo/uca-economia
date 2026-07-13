@@ -6,7 +6,45 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
-## Versión actual: v10 — Fase 2 de 3: login, registro, recuperación por OTP y protección total de rutas (branch `migracion-v10`, NO mergeado a main todavía)
+## Versión actual: v10 — Fase 3 de 3: datos por-usuario en Supabase + pantalla de Cuenta (branch `migracion-v10`, migración COMPLETA — falta solo el paso manual de Jano para mergear)
+
+Cierre de la migración multi-usuario ([`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md)). Con esta fase **se destrabó el bloqueante del merge**: `/api/db` ya no toca Vercel KV — sirve y escribe los datos POR USUARIO sobre las tablas de Supabase con RLS forzado.
+
+**Datos por-usuario (`app/api/db/route.ts` reescrito):**
+- GET arma el `AppData` del usuario desde las 6 tablas (contrato con el cliente intacto — cero cambios en las vistas). El historial de semestres archivados (lo único que crece sin techo) solo viaja con `?full=1`, que pide únicamente `/semestre` (`useData({ full: true })`); las escrituras devuelven el estado sin historial y el cliente conserva el suyo en cache.
+- POST mapea el merge parcial a la base: materias = upsert + delete de las que no están (cascade limpia sesiones); minutos SIEMPRE por el RPC atómico `add_minutos` (`_delta`, 1..1440); cerrar semestre por el RPC transaccional `archivar_semestre`; preparación como columna de `materias`; plan/notas reemplazo completo acotado. Sin `_delta`, `sesiones` solo acepta el reset `{}` (hallazgo de la auditoría — ver abajo).
+- Ids de materias ahora son **uuid** (PK real; `crypto.randomUUID()` en la UI). Cuentas nuevas arrancan **sin materias precargadas** (las de UCA·Economía eran el semestre personal de Jano); la home tiene estado vacío con CTA a `/semestre`, y cerrar semestre arranca el siguiente vacío.
+- Migración de datos reales: `scripts/migrar-kv-a-supabase.mjs .env.local <email> [backup] [--force]` — remapea slugs→uuid (incluidas referencias en sesiones/preparación/plan) y carga el export del KV a esa cuenta. **Pendiente de correr** cuando exista la cuenta de Jano (ver pasos manuales). `@vercel/kv` eliminado del proyecto.
+
+**Pantalla de Cuenta (6.17, completa):**
+- **Menú desplegable** desde el nombre/avatar en la esquina del Nav (`app/components/UserMenu.tsx`): Configuración → `/cuenta`, Ayuda (mailto soporte), Cerrar sesión. Reemplaza al botón "Salir"; no es una pestaña más del nav.
+- **`/cuenta` — Perfil**: foto (ver abajo), nombre, apellido, apodo (visible en la app), universidad (dropdown fijo: UCA/UADE/ITBA/Austral/Udesa/UAI/UCEMA/Kennedy/UB/UBA/UTN/UP/USAL/UNLP + "Otra" con texto libre), carrera (texto libre). Guardado explícito ("Guardar cambios"), nunca autoguardado.
+- **Foto de perfil** (reglas de uploads seguros 6.4, sin servicios nuevos — Supabase Storage ya estaba en el stack): la UI recorta/reduce a 256px client-side (de paso descarta EXIF); `POST /api/account/avatar` valida **tipo real por magic bytes** (jpeg/png/webp), tope 400KB (header + bytes reales), y guarda en el bucket **privado** `avatars` (creado con `scripts/setup-avatars-bucket.mjs`, verificado `public:false` + límites a nivel bucket). El path es SIEMPRE `<user_id>.<ext>` derivado de la sesión (sin path traversal/IDOR); nunca se sirve directo: la UI recibe una **signed URL de 1h**.
+- **Apariencia**: el toggle Clásico 2D ↔ Vidrio 3D reubicado acá (antes al final de la home) + **tema de color por universidad** (nuevo, ver "Reglas de diseño fijas"). Elegir paleta previsualiza al instante y "Guardar apariencia" la persiste en `profiles.tema_color` (viaja entre dispositivos; espejo en `localStorage.uca_palette` para el anti-flash).
+- **Cambiar contraseña**: contra el endpoint de Fase 1 (re-verifica la actual, rate limit fail-closed, cierra otras sesiones). Con widget Turnstile obligatorio (la verificación pasa por el login de Supabase, que exige CAPTCHA) y **confirmación inline** antes de aplicar.
+- **Eliminar cuenta**: contra el endpoint de Fase 1 (soft delete + ban + signOut global; hard delete a los 30 días). Confirmación inline explícita (regla fija de acciones destructivas). Cerrar sesión también dentro de la pantalla.
+- Endpoints nuevos: `GET/POST /api/account/profile` (Zod estricto, RLS fila propia, rate limit 30/15min fail-closed en escritura; devuelve email + campos + signed URL de la foto) y `POST/DELETE /api/account/avatar` (10/h fail-closed). Cliente: `app/lib/perfil.ts` (cache + `usePerfil()` + sincronización de paleta).
+
+**Temas de color por universidad (6.17):** navy/ocre dejaron de ser hex hardcodeados — ahora son variables CSS (`--navy-rgb`, `--ocre-rgb` + variantes) definidas en `globals.css` y consumidas por Tailwind (`rgb(var(...) / <alpha-value>)`), por todo el sistema Liquid Glass y por los charts (helper `rgbVar()` en `app/lib/paleta.ts`, porque Recharts/SVG no aceptan `var()` en atributos). 5 paletas con el mapeo exacto del documento: **Azul y Blanco** (UCA, UADE, ITBA, Austral, Udesa — la identidad navy/ocre de siempre, default), **Bordó** (UAI, UCEMA, Kennedy, UB), **Negro** (UBA, UTN, UP), **Verde** (USAL, UNLP), **Dorado** (solo manual). La asignación por universidad es solo el valor sugerido — siempre se puede elegir otra a mano.
+
+**Auditoría de seguridad (sección 7, sobre las 3 fases juntas):** 1 hallazgo, arreglado — el reemplazo de `sesiones` sin `_delta` permitía plantar una fila con `materia_id` ajeno (el FK valida existencia, no dueño) y romperle `add_minutos` al dueño real conociendo su uuid; ahora ese camino solo acepta `{}` (+ check e2e). Verificado sin hallazgos: env vars (solo `NEXT_PUBLIC_*` públicas llegan al cliente), rate limit en todos los endpoints, admin client solo en operaciones puntuales (password ya verificada, soft-delete, storage del avatar), nada de sesión en `localStorage`, **Security Advisor de Supabase re-consultado post-cambios: 0 hallazgos**. `npm audit`: mismos 2 advisories de Fase 2 (fix = Next 16, breaking — decisión de Jano).
+
+**Tests:** `scripts/test-fase3-e2e.mjs` — **33 checks PASS** (401 sin sesión en todo lo nuevo, cuenta nueva vacía, roundtrips, atomicidad de `add_minutos`, IDOR en `_delta`/upsert/replace, aislación A/B en datos y perfil, `?full=1`, Zod estricto, avatar: magic bytes/bucket privado probado por URL pública/signed URL/delete). Suites de Fase 1 (25 checks) y Fase 2 (32 checks) **re-corridas en verde**; la de Fase 1 se actualizó porque el CAPTCHA (obligatorio desde Fase 2) bloquea el login por contraseña de los scripts: ahora lo apaga vía Management API solo mientras corre y **verifica que quedó re-activado** al final.
+
+**Capacidad (3.2.1, medida — no estimada):** un GET normal de `/api/db` con un semestre cargado (9 materias, plan de 30 días, 10 notas, 4 semestres archivados) pesa **5.4KB crudo / 0.75KB en el cable** (gzip, verificado que PostgREST comprime hacia el server); con `?full=1` 12.3KB/1.1KB; el perfil 157B. Contra los ~166MB/día del tier gratis de Supabase: **~1.500 usuarios activos/día sostenibles con uso mixto realista** (~60 llamadas/día los intensos con timer, ~20 los moderados; ~50-300KB/día por usuario contando el egress de Auth), con techo cercano a ~3.000/día si el uso promedio es moderado. Con el patrón viejo (blob completo siempre) eran ~400-500/día. Palancas ya activas: historial fuera del GET normal, cache cliente 15s + dedupe, escrituras que devuelven estado sin historial, respuestas comprimidas.
+
+**Pasos manuales de Jano antes de mergear a main (en orden):**
+1. Abrir el preview deploy de Vercel del branch `migracion-v10` (Turnstile solo pasa en `*.vercel.app`), registrarse en `/registro` con `janobordo@gmail.com` y confirmar el email.
+2. Avisar si usó la app en producción (main) después del 12/07 — el backup migrable es de esa fecha; si hubo cambios, se re-exporta el KV antes de migrar.
+3. Correr (o pedir que se corra) `node scripts/migrar-kv-a-supabase.mjs .env.local janobordo@gmail.com` y verificar sus datos entrando a la app del preview.
+4. Probar en el preview lo que localmente no se puede (Turnstile real): login, cambiar contraseña en `/cuenta`, subir foto.
+5. Mergear `migracion-v10` → `main` (deploy automático). A partir de ahí main deja de usar KV.
+6. Post-merge: renombrar el proyecto Vercel a `stuniv` + actualizar `site_url` de Supabase (hoy `uca-economia.vercel.app`); decidir el upgrade a Next 16 (2 advisories de npm audit); **revocar los tokens de gestión amplia** (`SUPABASE_ACCESS_TOKEN`, `VERCEL_TOKEN`, `UPSTASH_API_KEY`, token de SendGrid si no rota mails, `SENTRY_AUTH_TOKEN`/`POSTHOG_*` si no se usan) — quedan solo las keys angostas de runtime (anon key, secret key del server, Upstash REST, Turnstile). Ojo: la suite `test-seguridad-e2e.mjs` usa `SUPABASE_ACCESS_TOKEN` para el toggle del CAPTCHA — revocarlo implica regenerarlo para volver a correrla.
+7. Pendientes menores que quedaron afuera a propósito (🟡 del documento): OAuth Google/Apple, Sentry + PostHog, load testing formal, `localhost` en el widget de Turnstile para probar login local.
+
+---
+
+## v10 — Fase 2 de 3: login, registro, recuperación por OTP y protección total de rutas (branch `migracion-v10`)
 
 Puerta de entrada completa sobre el backend de Fase 1 (secciones 6.1 y 6.16 de [`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md)). **⚠ NO mergeable a main todavía**: `/api/db` ya exige sesión pero sigue sirviendo el blob único de Vercel KV (compartido entre cualquier usuario logueado) — la migración de datos por-usuario a Supabase sigue pendiente.
 
@@ -187,19 +225,18 @@ Ver detalle completo de v2 a v6.2 en la sección "Historia completa" al final de
 # ESTADO ACTUAL (se reescribe cada vez que algo de esto cambia)
 
 ## Qué es
-**stuniv** (marca de la app web; el repo sigue llamándose `uca-economia`). App personal de Jano (estudiante de Economía, UCA Buenos Aires, primer año) para gestionar el semestre: fechas de examen, horas de estudio, plan diario, lectura de apuntes en voz. El claim "Tu futuro. Tu camino." del manual de marca NO se usa en la app.
+**stuniv** (marca de la app web; el repo sigue llamándose `uca-economia`). App multi-usuario para estudiantes universitarios (nacida como app personal de Jano, estudiante de Economía, UCA Buenos Aires) para gestionar el semestre: fechas de examen, horas de estudio, plan diario, lectura de apuntes en voz. Cada usuario tiene su cuenta, sus datos aislados por RLS y su personalización (perfil + tema de color por universidad). El claim "Tu futuro. Tu camino." del manual de marca NO se usa en la app.
 
 ## Infraestructura (ESTO PUEDE CAMBIAR — mantener actualizado)
 - **Hosting**: Vercel
 - **Repo**: GitHub `janoBordo/uca-economia`, branch `main`
-- **Base de datos (en uso por la app)**: Vercel KV (Upstash Redis), una sola key `uca_data` — la migración de datos a Supabase es la Fase 2
-- **Base de datos nueva (lista, aún sin datos)**: Supabase Postgres 17, proyecto `stuniv` (`sfwntnljelgxrtyrizht`, `sa-east-1`), schema v10 con RLS forzado + Supabase Auth configurado (email SendGrid, CAPTCHA Turnstile) — ver entrada v10 arriba
+- **Base de datos (branch `migracion-v10`)**: Supabase Postgres 17, proyecto `stuniv` (`sfwntnljelgxrtyrizht`, `sa-east-1`) — 6 tablas por-usuario con RLS forzado + bucket privado `avatars` en Supabase Storage. `/api/db` sirve el `AppData` del usuario logueado desde ahí. **En `main` la app todavía usa Vercel KV** (key `uca_data`) hasta mergear; los datos de Jano se migran con `scripts/migrar-kv-a-supabase.mjs` cuando exista su cuenta.
 - **Rate limiting**: Upstash Redis `stuniv-ratelimit` (`sa-east-1`), activo en todos los endpoints
 - **Backups**: repo privado `janoBordo/stuniv-backups`, diario 03:00 AR con prueba de restore
 - **Dominio**: el que da Vercel por defecto (sin dominio propio comprado)
-- **Auth/login**: motor Supabase Auth + pantallas de entrada construidas en el branch `migracion-v10` (`/login`, `/registro`, `/recuperar`, middleware, logout, sesión en cookies HttpOnly) — en `main` la app sigue sin login hasta mergear la migración
+- **Auth/login**: Supabase Auth completo en el branch (`/login`, `/registro`, `/recuperar` por OTP, middleware, logout real, sesión en cookies HttpOnly, CAPTCHA Turnstile obligatorio) — en `main` la app sigue sin login hasta mergear
 - **Servicios externos pagos**: ninguno. (Para el MP3 se usa el TTS gratuito de Google Translate vía proxy `/api/tts`, no oficial y sin costo; si Google lo bloqueara, la descarga MP3 fallaría con aviso, pero escuchar en vivo con Web Speech seguiría andando.)
-- **⚠ Migración multi-usuario EN CURSO (branch `migracion-v10`)**: ver [`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md). Fase 1 (infra + seguridad) y Fase 2 (login/registro/recuperación + protección de rutas) completadas; Fase 3 (migración de datos KV→Supabase y pantalla de Cuenta) pendiente — el merge a main está bloqueado hasta migrar los datos.
+- **⚠ Migración multi-usuario COMPLETA en el branch `migracion-v10`** (las 3 fases de [`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md)): falta solo que Jano se registre, se corra la migración de sus datos y se mergee — ver "pasos manuales" en la entrada v10 Fase 3.
 
 ## Stack técnico
 - Next.js 14 (App Router), TypeScript, Tailwind CSS
@@ -221,29 +258,30 @@ Ver detalle completo de v2 a v6.2 en la sección "Historia completa" al final de
 ## Modelo de datos (`app/lib/types.ts` → `AppData`)
 ```ts
 type AppData = {
-  materias: Materia[];                    // nombre, examen (ISO), metaHoras
+  materias: Materia[];                    // id uuid, nombre, examen (local "YYYY-MM-DDTHH:MM"), metaHoras
   sesiones: Record<string, number>;       // materiaId -> minutos estudiados
   preparacion: Record<string, number>;    // materiaId -> 0..100
-  semestres: SemestreArchivado[];         // historial archivado
+  semestres: SemestreArchivado[];         // historial archivado (solo viaja con ?full=1)
   planEstudio: Record<string, string[]>;  // "YYYY-MM-DD" -> materiaId[]
   notas: string[];                        // notas rápidas del calendario
 }
 ```
-Todo pasa por `/api/db` (GET trae todo, POST hace merge parcial). **Cache cliente** (`app/lib/api.ts`): cache en memoria con TTL de 15s + dedupe de requests concurrentes, así navegar entre páginas no re-pega a `/api/db` cada vez (las escrituras refrescan el cache al instante). El nav NO tiene "Inicio" — al inicio se llega tocando el logo.
+En el branch v10 esto es una **vista armada por `/api/db` desde las tablas por-usuario de Supabase** (materias, sesiones_estudio, semestres, plan_estudio, notas — RLS forzado; preparación es columna de materias). GET trae todo menos el historial de semestres (`?full=1` para incluirlo — solo lo pide `/semestre`); POST hace merge parcial (minutos vía RPC atómico `add_minutos`; cerrar semestre vía RPC `archivar_semestre`). **Cache cliente** (`app/lib/api.ts`): cache en memoria con TTL de 15s + dedupe, las escrituras refrescan el cache al instante. Cuentas nuevas arrancan sin materias. El nav NO tiene "Inicio" — al inicio se llega tocando el logo.
 
 ## Rutas actuales
-- `/` — countdown próximo examen + lista de materias
+- `/` — countdown próximo examen + lista de materias (estado vacío con CTA a `/semestre` si no hay materias)
 - `/timer` — Pomodoro + Cronómetro (persiste en localStorage al navegar) + carga manual de horas; materia default = examen más próximo
 - `/metricas` — horas vs meta + sliders de preparación
 - `/calendario` — grilla mensual, exámenes, plan de estudio, notas rápidas
 - `/semestre` — config de materias + cierre/archivo de semestres + historial
 - `/tts` — Lectura: texto/PDF/Word/TXT; escuchar por capítulos con seek + descargar .mp3 real
+- `/cuenta` — Configuración (6.17): perfil (foto/nombre/apellido/apodo/universidad/carrera), apariencia (Clásico/Vidrio + tema de color), cambiar contraseña, eliminar cuenta, cerrar sesión. Se llega por el menú desplegable del nombre en el Nav.
 - `/configuracion` — redirect a `/semestre` (legacy)
-- Solo en branch `migracion-v10`: `/login`, `/registro`, `/recuperar` (públicas) y `/auth/confirm` (callback de email) — todo lo demás exige sesión vía `middleware.ts`
+- `/login`, `/registro`, `/recuperar` (públicas) y `/auth/confirm` (callback de email) — todo lo demás exige sesión vía `middleware.ts`
 
 ## Reglas de diseño fijas
-- Paleta: navy `#0B1F4D`, ocre `#C9A227`, canvas `#F5F4F0`
-- 8 colores fijos para materias: `#6B9FD4 #7BC47F #E07B6B #B088C9 #E8A838 #5BB8B0 #D4956A #8FA86E`
+- **Paleta parametrizada por tema de color** (v10, sección 6.17): navy/ocre son variables CSS (`--navy-rgb`/`--ocre-rgb` + variantes en `globals.css`, consumidas por Tailwind). El default "Azul y Blanco" es la identidad de siempre: navy `#0B1F4D`, ocre `#C9A227`. Canvas `#F5F4F0` fijo en todos los temas. 5 paletas (mapeo universidad→paleta fijo, decidido por Jano): Azul (UCA/UADE/ITBA/Austral/Udesa), Bordó (UAI/UCEMA/Kennedy/UB), Negro (UBA/UTN/UP), Verde (USAL/UNLP), Dorado (solo manual). Preferencia en `profiles.tema_color` + espejo `localStorage.uca_palette` (anti-flash). **Colores nuevos SIEMPRE via variables/Tailwind, nunca hex navy/ocre hardcodeado**; para SVG/charts usar `rgbVar()` de `app/lib/paleta.ts`.
+- 8 colores fijos para materias (no cambian con el tema): `#6B9FD4 #7BC47F #E07B6B #B088C9 #E8A838 #5BB8B0 #D4956A #8FA86E`
 - Tipografía Inter, títulos `font-black`, un foco visual por vista, sin dashboards saturados
 - Mobile: fechas SIEMPRE como `type="date"` + `type="time"` separados (nunca `datetime-local`)
 - Acciones destructivas: SIEMPRE confirmación inline (Sí/No)
