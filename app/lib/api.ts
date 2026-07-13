@@ -5,15 +5,17 @@ import { DATA_DEFAULT } from "./types";
 type PatchBody = Partial<AppData> & { _delta?: boolean; _archivar?: { nombre: string } };
 
 let cache: AppData | null = null;
+let cacheFull = false;     // ¿el cache incluye el historial de semestres? (solo lo pide /semestre)
 let lastFetched = 0;
 let inFlight: Promise<AppData> | null = null;
+let inFlightFull = false;
 const TTL = 15000; // ms: dentro de esta ventana, navegar entre páginas sirve del cache (sin pegarle a /api/db)
 const listeners = new Set<() => void>();
 
 // Sesión vencida/cerrada (ej. botón "atrás" después del logout): a /login.
 // La navegación completa además vacía este cache en memoria.
 function sinSesion() {
-  cache = null; lastFetched = 0;
+  cache = null; cacheFull = false; lastFetched = 0;
   if (typeof window !== "undefined" && window.location.pathname !== "/login")
     window.location.assign("/login");
 }
@@ -22,15 +24,23 @@ export function subscribe(fn: () => void) { listeners.add(fn); return () => list
 function notify() { listeners.forEach(fn => fn()); }
 export function getCached(): AppData { return cache ?? DATA_DEFAULT; }
 
-export async function fetchData(force = false): Promise<AppData> {
-  if (!force && cache && Date.now() - lastFetched < TTL) return cache;
-  if (!force && inFlight) return inFlight;          // dedupe: un solo request concurrente
+/* El historial de semestres archivados (lo único que crece sin techo) solo
+   viaja cuando alguien lo necesita (`full` — lo pide /semestre): menos egress
+   por navegación = más usuarios/día dentro del tier gratis (3.2.1). Una vez
+   que el cache es "full" se mantiene full para no perder el historial. */
+export async function fetchData(force = false, opts?: { full?: boolean }): Promise<AppData> {
+  const needFull = opts?.full === true;
+  const fresco = cache && Date.now() - lastFetched < TTL;
+  if (!force && fresco && (!needFull || cacheFull)) return cache!;
+  if (!force && inFlight && (!needFull || inFlightFull)) return inFlight; // dedupe
+  const pedirFull = needFull || cacheFull;
+  inFlightFull = pedirFull;
   inFlight = (async () => {
-    const r = await fetch("/api/db", { cache: "no-store" });
+    const r = await fetch(`/api/db${pedirFull ? "?full=1" : ""}`, { cache: "no-store" });
     if (r.status === 401) { sinSesion(); throw new Error("Sin sesión"); }
     if (!r.ok) throw new Error("Error cargando datos");
     const d: AppData = await r.json();
-    cache = d; lastFetched = Date.now(); notify(); return d;
+    cache = d; cacheFull = pedirFull; lastFetched = Date.now(); notify(); return d;
   })();
   try { return await inFlight; } finally { inFlight = null; }
 }
@@ -44,8 +54,15 @@ async function patch(body: PatchBody): Promise<AppData> {
   if (r.status === 401) { sinSesion(); throw new Error("Sin sesión"); }
   if (!r.ok) throw new Error("Error guardando datos");
   const { data } = await r.json();
-  if (data) { cache = data; lastFetched = Date.now(); notify(); }
-  return data as AppData;
+  if (data) {
+    // Las escrituras normales vuelven sin `semestres` (no cambió — se conserva
+    // el del cache); cerrar semestre sí lo trae completo.
+    const semestres = data.semestres ?? cache?.semestres ?? [];
+    if (data.semestres) cacheFull = true;
+    cache = { ...data, semestres };
+    lastFetched = Date.now(); notify();
+  }
+  return cache as AppData;
 }
 
 export async function saveMaterias(m: Materia[])                    { return patch({ materias: m }); }
@@ -55,7 +72,6 @@ export async function resetHoras()                                   { return pa
 export async function clearPlanEstudio()                             { return patch({ planEstudio: {} }); }
 export async function savePlanEstudio(p: Record<string, string[]>)  { return patch({ planEstudio: p }); }
 export async function saveNotas(notas: string[])                    { return patch({ notas }); }
-export async function resetData()                                    { return patch({ sesiones: {}, preparacion: {}, materias: DATA_DEFAULT.materias, planEstudio: {} }); }
 export async function archivarSemestre(nombre: string, mats: Materia[]) {
   return patch({ _archivar: { nombre }, materias: mats });
 }

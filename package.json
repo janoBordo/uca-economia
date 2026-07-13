@@ -12,7 +12,6 @@
     "@supabase/supabase-js": "^2.110.2",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
-    "@vercel/kv": "^2.0.0",
     "framer-motion": "^11.3.0",
     "mammoth": "^1.8.0",
     "next": "^14.2.35",

@@ -228,7 +228,8 @@ export default function Timer() {
 
   // Sumar horas estudiadas sin haber usado el timer (te olvidaste del pomodoro)
   async function guardarManual() {
-    const mins = Math.max(0, Math.round(manualH * 60 + manualM));
+    // Tope 24h (1440 min): mismo límite que valida el server por carga
+    const mins = Math.min(1440, Math.max(0, Math.round(manualH * 60 + manualM)));
     if (mins <= 0 || !matId) return;
     setGuardando(true);
     await addMinutos(matId, mins);

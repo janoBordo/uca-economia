@@ -3,10 +3,11 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useData } from "../lib/useData";
 import { archivarSemestre, saveMaterias, resetHoras, clearPlanEstudio } from "../lib/api";
-import { MATERIAS_DEFAULT, type Materia, type SemestreArchivado } from "../lib/types";
+import { type Materia, type SemestreArchivado } from "../lib/types";
 import { GlassCard, GlassButton, GlassInput } from "../components/glass";
 
-function uid() { return Math.random().toString(36).slice(2, 10); }
+// Los ids de materias son uuid (PK real en la base)
+function uid() { return crypto.randomUUID(); }
 
 // Convierte "2026-06-08T09:00" → { date:"2026-06-08", time:"09:00" }
 function splitISO(iso: string) {
@@ -88,7 +89,7 @@ function BtnEliminar({ onConfirm }: { onConfirm: () => void }) {
 }
 
 export default function Semestre() {
-  const { data } = useData();
+  const { data } = useData({ full: true });   // única vista que necesita el historial archivado
   const [confirmCerrar, setConfirmCerrar] = useState(false);
   const [guardandoCierre, setGuardandoCierre] = useState(false);
   const [expandido,     setExpandido]     = useState<string | null>(null);
@@ -133,8 +134,10 @@ export default function Semestre() {
   async function doClearPlan()  { setEjPlan(true);  await clearPlanEstudio(); setEjPlan(false);  setConfirmPlan(false); }
   async function cerrarSemestre() {
     setGuardandoCierre(true);
-    await archivarSemestre(`Semestre ${nextNumero}`, MATERIAS_DEFAULT);
+    // El semestre nuevo arranca vacío: cada uno carga sus materias nuevas
+    await archivarSemestre(`Semestre ${nextNumero}`, []);
     setGuardandoCierre(false); setConfirmCerrar(false);
+    setLocal([]);
   }
 
   return (

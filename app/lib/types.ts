@@ -23,20 +23,11 @@ export type AppData = {
   notas:       string[];
 };
 
-export const MATERIAS_DEFAULT: Materia[] = [
-  { id:"administracion", nombre:"Administración",                    examen:"2026-06-08T09:00", metaHoras:20 },
-  { id:"contabilidad",   nombre:"Contabilidad",                      examen:"2026-06-10T09:00", metaHoras:25 },
-  { id:"matematica",     nombre:"Matemática Aplicada I",             examen:"2026-06-05T09:00", metaHoras:30 },
-  { id:"microeconomia",  nombre:"Microeconomía",                     examen:"2026-06-12T09:00", metaHoras:28 },
-  { id:"seminario",      nombre:"Seminario: Argentina en el Mundo",  examen:"2026-06-15T09:00", metaHoras:12 },
-  { id:"filosofia",      nombre:"Filosofía",                         examen:"2026-06-17T09:00", metaHoras:15 },
-  { id:"antropologia",   nombre:"Antropología",                      examen:"2026-06-19T09:00", metaHoras:15 },
-  { id:"logica",         nombre:"Taller de Lógica y Oratoria",       examen:"2026-06-22T09:00", metaHoras:10 },
-  { id:"redaccion",      nombre:"Taller Comunicación y Redacción",   examen:"2026-06-24T09:00", metaHoras:10 },
-];
-
+// Multi-usuario (v10): las cuentas nuevas arrancan sin materias — cada
+// estudiante carga las suyas en /semestre (ya no existen las de UCA·Economía
+// pre-cargadas, que eran el semestre personal de Jano).
 export const DATA_DEFAULT: AppData = {
-  materias:    MATERIAS_DEFAULT,
+  materias:    [],
   sesiones:    {},
   preparacion: {},
   semestres:   [],

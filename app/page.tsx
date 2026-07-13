@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useData } from "./lib/useData";
 import { materiasPorProximidad } from "./lib/api";
 import type { Materia } from "./lib/types";
-import ThemeToggle from "./components/ThemeToggle";
 
 function useDiff(target: string, intervalMs = 1000) {
   const calc = useCallback(() => {
@@ -57,7 +56,21 @@ function RowItem({ m, index }: { m: Materia; index: number }) {
 export default function Inicio() {
   const { data } = useData();
   const orden = materiasPorProximidad(data);
-  if (!orden.length) return null;
+
+  // Cuenta nueva sin materias todavía: invitación a cargarlas (antes: null)
+  if (!orden.length) return (
+    <section className="flex-1 w-full max-w-4xl mx-auto px-6 sm:px-8 py-16 sm:py-24 flex flex-col">
+      <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}>
+        <h1 className="font-black text-navy leading-[0.9] mb-6" style={{ fontSize:"clamp(2.5rem,8vw,5.5rem)", letterSpacing:"-0.04em" }}>
+          Tu semestre,<br/>organizado
+        </h1>
+        <p className="text-navy/40 text-base mb-10">Cargá tus materias y fechas de examen para arrancar.</p>
+        <Link href="/semestre" className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-navy text-canvas text-sm font-semibold hover:bg-navy-soft transition-colors">
+          Cargar materias →
+        </Link>
+      </motion.div>
+    </section>
+  );
 
   const ahora = Date.now();
   const proximo = orden.find(m => new Date(m.examen).getTime() > ahora);
@@ -113,8 +126,6 @@ export default function Inicio() {
       </motion.div>
 
       <ul>{resto.map((m,i) => <RowItem key={m.id} m={m} index={i} />)}</ul>
-
-      <ThemeToggle />
     </section>
   );
 }
