@@ -6,7 +6,20 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
-## Versión actual: v10 — Fase 3 de 3: datos por-usuario en Supabase + pantalla de Cuenta (branch `migracion-v10`, migración COMPLETA — falta solo el paso manual de Jano para mergear)
+## v10.1 — Ajustes post-prueba real de Jano (branch `migracion-v10`)
+
+Primera prueba de la migración con usuario real (Jano se registró, confirmó email y usó la app en el preview). Ajustes que salieron de esa prueba:
+
+- **Preview accesible desde cualquier dispositivo**: el celular mostraba "Log in to Vercel" — era la Deployment Protection de Vercel (SSO exigido en previews). Desactivada vía API (`ssoProtection: null`); verificado con curl sin sesión: `/login` responde 200. Ahora cualquiera puede registrarse desde cualquier dispositivo.
+- **Mail de confirmación**: llega (SendGrid: processed/delivered/opened verificados por API) pero puede caer en SPAM — inherente a mandar desde `@gmail.com` vía SendGrid sin dominio propio (Gmail no autoriza a SendGrid para su dominio). Fix real = dominio propio, pendiente a futuro. Mientras tanto: subido el rate limit de emails de Supabase de 10/h → 30/h (con 10/h, si >10 personas se registraban en una hora, al resto no le llegaba el mail y no podían entrar; tope diario real: 100/día de SendGrid free).
+- **`site_url` de Supabase apuntando temporalmente al preview** (`uca-economia-git-migracion-v10-...vercel.app`) para que el link del mail de confirmación no caiga en el 404 de producción sin migrar. **REVERTIR al dominio final antes/después del merge** (paso manual anotado abajo).
+- **Cuenta — contraseña colapsada**: "Cambiar contraseña" dejó de ser una card principal; ahora es una fila compacta en "Seguridad" que se expande sólo si el usuario quiere (el widget Turnstile recién se monta ahí — no carga de más).
+- **Tema automático al elegir universidad**: al seleccionar la universidad en Perfil, la paleta global cambia AL INSTANTE (y se persiste con "Guardar cambios", sólo si la universidad cambió — el override manual de Apariencia se respeta). Apariencia queda como personalización posterior, sincronizada si la paleta cambia desde afuera.
+- **Re-verificación de seguridad sobre el deploy vivo** (no local): `/` sin sesión → 307 a `/login`; `/api/db`, `/api/tts`, `/api/account/*` sin sesión → 401; login sin captcha → rechazado por Zod; headers completos en producción real (CSP, HSTS, X-Frame-Options DENY, nosniff). Todo en verde.
+
+---
+
+## v10 — Fase 3 de 3: datos por-usuario en Supabase + pantalla de Cuenta (branch `migracion-v10`, migración COMPLETA — falta solo el paso manual de Jano para mergear)
 
 Cierre de la migración multi-usuario ([`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md)). Con esta fase **se destrabó el bloqueante del merge**: `/api/db` ya no toca Vercel KV — sirve y escribe los datos POR USUARIO sobre las tablas de Supabase con RLS forzado.
 
