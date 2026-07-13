@@ -16,8 +16,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es">
       <head>
-        {/* Aplica el tema guardado antes del primer paint (evita parpadeo) */}
-        <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem('uca_theme')==='glass')document.documentElement.setAttribute('data-theme','glass')}catch(e){}` }} />
+        {/* Aplica tema (Clásico/Vidrio) y paleta de color guardados antes del primer paint (evita parpadeo) */}
+        <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem('uca_theme')==='glass')document.documentElement.setAttribute('data-theme','glass');var p=localStorage.getItem('uca_palette');if(p&&['bordo','negro','verde','dorado'].indexOf(p)>-1)document.documentElement.setAttribute('data-palette',p)}catch(e){}` }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />

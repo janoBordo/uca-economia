@@ -119,7 +119,7 @@ export default function Metricas() {
         <div className="flex flex-col gap-8">
           {materias.map((m,i) => {
             const v     = prepReal[m.id] ?? 0;
-            const color = v<35 ? "#C9A227" : v<70 ? "#0B1F4D" : "#1B335F";
+            const color = v<35 ? "rgb(var(--ocre-rgb))" : v<70 ? "rgb(var(--navy-rgb))" : "rgb(var(--navy-soft-rgb))";
             return (
               <motion.div key={m.id} initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ delay:i*0.04 }}>
                 <div className="flex items-baseline justify-between mb-3">

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useData } from "../lib/useData";
 import { addMinutos, materiasPorProximidad } from "../lib/api";
 import { GlassTabs, GlassButton, GlassInput, GlassSelect } from "../components/glass";
+import { rgbVar } from "../lib/paleta";
 
 type Modo = "pomodoro" | "cronometro";
 
@@ -87,15 +88,15 @@ const TimerDial = memo(function TimerDial(
   return (
     <div className="relative" style={{ width:300, height:300 }}>
       <svg width="300" height="300" style={{ transform:"rotate(-90deg)" }}>
-        <circle cx="150" cy="150" r={R} fill="none" stroke="rgba(11,31,77,0.07)" strokeWidth="10" />
+        <circle cx="150" cy="150" r={R} fill="none" stroke={rgbVar("--navy-rgb",0.07)} strokeWidth="10" />
         {modo==="pomodoro" && (
           <motion.circle cx="150" cy="150" r={R} fill="none"
-            stroke={corriendo?"#C9A227":"#0B1F4D"} strokeWidth="10" strokeLinecap="round"
+            stroke={corriendo?rgbVar("--ocre-rgb"):rgbVar("--navy-rgb")} strokeWidth="10" strokeLinecap="round"
             strokeDasharray={circum} animate={{ strokeDashoffset: circum*(1-progreso) }}
             transition={{ ease:"linear", duration:0.4 }} />
         )}
         {modo==="cronometro" && corriendo && (
-          <circle cx="150" cy="150" r={R} fill="none" stroke="#C9A227" strokeWidth="10" />
+          <circle cx="150" cy="150" r={R} fill="none" stroke={rgbVar("--ocre-rgb")} strokeWidth="10" />
         )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">

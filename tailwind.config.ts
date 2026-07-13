@@ -4,8 +4,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        navy:  { DEFAULT:"#0B1F4D", deep:"#060F2A", soft:"#1B335F", muted:"#2D4A7A" },
-        ocre:  { DEFAULT:"#C9A227", light:"#E0BF4A", dark:"#A07C10" },
+        // navy/ocre salen de las variables de paleta (globals.css :root +
+        // html[data-palette=…]) — temas de color por universidad (6.17).
+        navy:  {
+          DEFAULT:"rgb(var(--navy-rgb) / <alpha-value>)",
+          deep:   "rgb(var(--navy-deep-rgb) / <alpha-value>)",
+          soft:   "rgb(var(--navy-soft-rgb) / <alpha-value>)",
+          muted:  "rgb(var(--navy-muted-rgb) / <alpha-value>)",
+        },
+        ocre:  {
+          DEFAULT:"rgb(var(--ocre-rgb) / <alpha-value>)",
+          light:  "rgb(var(--ocre-light-rgb) / <alpha-value>)",
+          dark:   "rgb(var(--ocre-dark-rgb) / <alpha-value>)",
+        },
         canvas:"#F5F4F0",
       },
       fontFamily: { sans: ["Inter","system-ui","sans-serif"] },

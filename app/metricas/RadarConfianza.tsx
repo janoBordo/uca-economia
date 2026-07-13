@@ -1,6 +1,7 @@
 "use client";
 import { memo } from "react";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { rgbVar } from "../lib/paleta";
 
 export type RadarDatum = {
   materia: string; full: string; valor: number; ref: number; color: string;
@@ -20,7 +21,7 @@ function RadarConfianza({ data, umbral }: { data: RadarDatum[]; umbral: number }
         <circle cx={center ? x : tx + (right ? -8 : 8)} cy={dotY} r={4} fill={item?.color} />
         <text x={tx} y={y} dy={center ? (y < cy ? -2 : 4) : 0}
           textAnchor={anchor} dominantBaseline="central"
-          fill="rgba(11,31,77,0.7)" fontSize={12} fontWeight={600}>{payload.value}</text>
+          fill={rgbVar("--navy-rgb",0.7)} fontSize={12} fontWeight={600}>{payload.value}</text>
       </g>
     );
   };
@@ -42,13 +43,13 @@ function RadarConfianza({ data, umbral }: { data: RadarDatum[]; umbral: number }
   return (
     <ResponsiveContainer width="100%" height="100%">
       <RadarChart data={data} outerRadius="70%" margin={{ top:20, right:60, bottom:20, left:60 }}>
-        <PolarGrid stroke="rgba(11,31,77,0.10)" />
+        <PolarGrid stroke={rgbVar("--navy-rgb",0.10)} />
         <PolarAngleAxis dataKey="materia" tick={<RadarTick />} />
         <PolarRadiusAxis domain={[0,100]} tick={false} axisLine={false} />
-        <Radar name="Umbral" dataKey="ref" stroke="rgba(11,31,77,0.35)" strokeWidth={1.5}
+        <Radar name="Umbral" dataKey="ref" stroke={rgbVar("--navy-rgb",0.35)} strokeWidth={1.5}
           strokeDasharray="4 4" fill="none" isAnimationActive={false} />
-        <Radar name="Confianza" dataKey="valor" stroke="#0B1F4D" strokeWidth={2}
-          fill="#0B1F4D" fillOpacity={0.10} />
+        <Radar name="Confianza" dataKey="valor" stroke={rgbVar("--navy-rgb")} strokeWidth={2}
+          fill={rgbVar("--navy-rgb")} fillOpacity={0.10} />
         <Tooltip content={<RadarTooltip />} />
       </RadarChart>
     </ResponsiveContainer>

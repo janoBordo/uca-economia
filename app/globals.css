@@ -2,17 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════ TEMAS DE COLOR POR UNIVERSIDAD (6.17) ═══════════════════
+   La paleta activa vive en estas variables (tripletas RGB espacio-separadas,
+   para poder componer alpha: rgb(var(--navy-rgb) / 0.45)). Tailwind (navy/ocre)
+   y todo este archivo las consumen. El default (:root) es "Azul y Blanco" — la
+   identidad navy/ocre de siempre. Se cambia con data-palette en <html>
+   (anti-flash en layout.tsx; preferencia en profiles.tema_color + espejo
+   localStorage 'uca_palette'). Los swatches del selector en /cuenta son espejo
+   de esto en app/lib/paleta.ts — mantener sincronizados. */
+:root {
+  --navy-rgb: 11 31 77;         /* #0B1F4D */
+  --navy-deep-rgb: 6 15 42;     /* #060F2A */
+  --navy-soft-rgb: 27 51 95;    /* #1B335F */
+  --navy-muted-rgb: 45 74 122;  /* #2D4A7A */
+  --ocre-rgb: 201 162 39;       /* #C9A227 */
+  --ocre-light-rgb: 224 191 74; /* #E0BF4A */
+  --ocre-dark-rgb: 160 124 16;  /* #A07C10 */
+}
+/* Bordó y Blanco — UAI, UCEMA, Kennedy, UB */
+html[data-palette="bordo"] {
+  --navy-rgb: 100 27 46;        /* #641B2E */
+  --navy-deep-rgb: 63 15 29;    /* #3F0F1D */
+  --navy-soft-rgb: 124 42 64;   /* #7C2A40 */
+  --navy-muted-rgb: 152 72 94;  /* #98485E */
+  --ocre-rgb: 192 90 110;       /* #C05A6E */
+  --ocre-light-rgb: 214 132 148;/* #D68494 */
+  --ocre-dark-rgb: 158 61 80;   /* #9E3D50 */
+}
+/* Negro y Blanco — UBA, UTN, UP */
+html[data-palette="negro"] {
+  --navy-rgb: 26 26 26;         /* #1A1A1A */
+  --navy-deep-rgb: 0 0 0;       /* #000000 */
+  --navy-soft-rgb: 51 51 51;    /* #333333 */
+  --navy-muted-rgb: 85 85 85;   /* #555555 */
+  --ocre-rgb: 140 140 140;      /* #8C8C8C */
+  --ocre-light-rgb: 176 176 176;/* #B0B0B0 */
+  --ocre-dark-rgb: 107 107 107; /* #6B6B6B */
+}
+/* Verde y Blanco — USAL, UNLP */
+html[data-palette="verde"] {
+  --navy-rgb: 20 83 45;         /* #14532D */
+  --navy-deep-rgb: 10 56 32;    /* #0A3820 */
+  --navy-soft-rgb: 32 107 62;   /* #206B3E */
+  --navy-muted-rgb: 60 135 96;  /* #3C8760 */
+  --ocre-rgb: 85 168 104;       /* #55A868 */
+  --ocre-light-rgb: 124 194 141;/* #7CC28D */
+  --ocre-dark-rgb: 61 139 78;   /* #3D8B4E */
+}
+/* Amarillo/Dorado y Blanco — solo elección manual */
+html[data-palette="dorado"] {
+  --navy-rgb: 122 92 16;        /* #7A5C10 */
+  --navy-deep-rgb: 78 58 8;     /* #4E3A08 */
+  --navy-soft-rgb: 150 115 26;  /* #96731A */
+  --navy-muted-rgb: 176 141 51; /* #B08D33 */
+  --ocre-rgb: 227 185 59;       /* #E3B93B */
+  --ocre-light-rgb: 239 208 106;/* #EFD06A */
+  --ocre-dark-rgb: 194 154 31;  /* #C29A1F */
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-html, body { margin:0; padding:0; background:#F5F4F0; color:#0B1F4D; font-family:"Inter",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
-::selection { background:#C9A227; color:#060F2A; }
+html, body { margin:0; padding:0; background:#F5F4F0; color:rgb(var(--navy-rgb)); font-family:"Inter",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+::selection { background:rgb(var(--ocre-rgb)); color:rgb(var(--navy-deep-rgb)); }
 
-input[type="range"] { -webkit-appearance:none; appearance:none; width:100%; height:4px; background:rgba(11,31,77,0.12); border-radius:99px; outline:none; }
-input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:24px; height:24px; border-radius:50%; background:#C9A227; cursor:pointer; border:3px solid #F5F4F0; box-shadow:0 2px 12px rgba(201,162,39,0.5); }
-input[type="range"]::-moz-range-thumb { width:24px; height:24px; border-radius:50%; background:#C9A227; cursor:pointer; border:3px solid #F5F4F0; }
+input[type="range"] { -webkit-appearance:none; appearance:none; width:100%; height:4px; background:rgb(var(--navy-rgb) / 0.12); border-radius:99px; outline:none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:24px; height:24px; border-radius:50%; background:rgb(var(--ocre-rgb)); cursor:pointer; border:3px solid #F5F4F0; box-shadow:0 2px 12px rgb(var(--ocre-rgb) / 0.5); }
+input[type="range"]::-moz-range-thumb { width:24px; height:24px; border-radius:50%; background:rgb(var(--ocre-rgb)); cursor:pointer; border:3px solid #F5F4F0; }
 ::-webkit-scrollbar { width:4px; }
 ::-webkit-scrollbar-track { background:transparent; }
-::-webkit-scrollbar-thumb { background:rgba(11,31,77,0.15); border-radius:99px; }
+::-webkit-scrollbar-thumb { background:rgb(var(--navy-rgb) / 0.15); border-radius:99px; }
 
 /* ═══════════════════ SISTEMA LIQUID GLASS ═══════════════════
    Material único para toda la app. Se activa con data-theme="glass"
@@ -29,12 +87,12 @@ html[data-theme="glass"] {
   --gl-bg:      rgba(255,255,255,0.18);    /* lámina neutra translúcida */
   --gl-bg-soft: rgba(255,255,255,0.14);    /* inputs */
   --gl-bg-panel:rgba(255,255,255,0.22);    /* paneles/modales */
-  --gl-navy:    rgba(11,31,77,0.74);       /* tinte navy translúcido: con color (no slate gris) pero glass */
-  --gl-ocre:    rgba(201,162,39,0.70);     /* tinte ocre dorado translúcido */
+  --gl-navy:    rgb(var(--navy-rgb) / 0.74);       /* tinte navy translúcido: con color (no slate gris) pero glass */
+  --gl-ocre:    rgb(var(--ocre-rgb) / 0.70);     /* tinte ocre dorado translúcido */
   --gl-red:     rgba(214,40,40,0.82);      /* tinte peligro: legible con texto blanco (botones "Sí") */
   --gl-edge:    rgba(255,255,255,0.58);    /* borde de cristal brillante */
   --gl-gloss:   linear-gradient(130deg, rgba(255,255,255,0.50) 0%, rgba(255,255,255,0.12) 26%, rgba(255,255,255,0) 50%);
-  --gl-float:   0 14px 32px -16px rgba(11,31,77,0.32), 0 4px 12px -8px rgba(11,31,77,0.20);
+  --gl-float:   0 14px 32px -16px rgb(var(--navy-rgb) / 0.32), 0 4px 12px -8px rgb(var(--navy-rgb) / 0.20);
   --gl-inset:   inset 0 1px 1px rgba(255,255,255,0.85), inset 0 -8px 18px -14px rgba(255,255,255,0.28);
 }
 
@@ -43,8 +101,8 @@ html[data-theme="glass"] {
 html[data-theme="glass"] body {
   background:
     linear-gradient(135deg, rgba(255,255,255,0.45) 0%, transparent 32%),
-    radial-gradient(1100px 760px at 8% -12%, rgba(201,162,39,0.16), transparent 56%),
-    radial-gradient(1100px 760px at 100% -2%, rgba(11,31,77,0.14), transparent 54%),
+    radial-gradient(1100px 760px at 8% -12%, rgb(var(--ocre-rgb) / 0.16), transparent 56%),
+    radial-gradient(1100px 760px at 100% -2%, rgb(var(--navy-rgb) / 0.14), transparent 54%),
     radial-gradient(900px 900px at 50% 122%, rgba(91,184,176,0.10), transparent 60%),
     #ECEBE5;
 }
@@ -111,7 +169,7 @@ html[data-theme="glass"] body {
     backdrop-filter: none !important;
     box-shadow:
       inset 0 1px 0 rgba(255,255,255,0.65),
-      0 4px 10px -6px rgba(11,31,77,0.20) !important;
+      0 4px 10px -6px rgb(var(--navy-rgb) / 0.20) !important;
   }
 
   /* ── Inputs / selects / textarea: vidrio cóncavo, redondeado, con foco ocre ── */
@@ -127,7 +185,7 @@ html[data-theme="glass"] body {
     background-color: var(--gl-bg-soft) !important;
     border: 1px solid var(--gl-edge) !important;
     box-shadow:
-      inset 0 2px 5px -2px rgba(11,31,77,0.14),
+      inset 0 2px 5px -2px rgb(var(--navy-rgb) / 0.14),
       inset 0 1px 0 rgba(255,255,255,0.45) !important;
   }
   html[data-theme="glass"] textarea { border-radius: 18px !important; }
@@ -151,7 +209,7 @@ html[data-theme="glass"] body {
   ):focus {
     outline: none;
     box-shadow:
-      0 0 0 2px rgba(201,162,39,0.50),
+      0 0 0 2px rgb(var(--ocre-rgb) / 0.50),
       inset 0 1px 0 rgba(255,255,255,0.45) !important;
   }
 
@@ -179,25 +237,25 @@ html[data-theme="glass"] body {
   }
 
   /* El logo (U) se mantiene navy sólido y crujiente, no translúcido */
-  html[data-theme="glass"] .glass-solid { background-color: #0B1F4D !important; }
+  html[data-theme="glass"] .glass-solid { background-color: rgb(var(--navy-rgb)) !important; }
 
   /* Barras de "materias a estudiar" del calendario: varilla de vidrio de color */
   html[data-theme="glass"] .glass-plan-bar {
     border-radius: 3px;
     box-shadow:
       inset 1.5px 0 0 rgba(255,255,255,0.65),
-      inset -1px 0 3px rgba(11,31,77,0.20),
+      inset -1px 0 3px rgb(var(--navy-rgb) / 0.20),
       inset 0 1px 0 rgba(255,255,255,0.45) !important;
   }
 
   /* Glow de color bajo los acentos (gana el box-shadow por mayor especificidad) */
   html[data-theme="glass"] :is(.glass-button, button.rounded-full, a.rounded-full).glass-tint-navy,
   html[data-theme="glass"] :is(.glass-button, button.rounded-full, a.rounded-full).bg-navy {
-    box-shadow: var(--gl-inset), 0 16px 34px -16px rgba(11,31,77,0.55), 0 5px 14px -8px rgba(11,31,77,0.40) !important;
+    box-shadow: var(--gl-inset), 0 16px 34px -16px rgb(var(--navy-rgb) / 0.55), 0 5px 14px -8px rgb(var(--navy-rgb) / 0.40) !important;
   }
   html[data-theme="glass"] :is(.glass-button, button.rounded-full, a.rounded-full).glass-tint-ocre,
   html[data-theme="glass"] :is(.glass-button, button.rounded-full, a.rounded-full).bg-ocre {
-    box-shadow: var(--gl-inset), 0 16px 34px -16px rgba(201,162,39,0.50), 0 5px 14px -8px rgba(201,162,39,0.38) !important;
+    box-shadow: var(--gl-inset), 0 16px 34px -16px rgb(var(--ocre-rgb) / 0.50), 0 5px 14px -8px rgb(var(--ocre-rgb) / 0.38) !important;
   }
 
   /* Nav / header como panel de vidrio flotante */
@@ -210,7 +268,7 @@ html[data-theme="glass"] body {
 
   /* Range (sliders) en vidrio */
   html[data-theme="glass"] input[type="range"] {
-    background: rgba(11,31,77,0.10);
+    background: rgb(var(--navy-rgb) / 0.10);
   }
 }
 
@@ -243,8 +301,8 @@ html[data-theme="glass"] body {
 
   /* ── 2D Clásico: las cards se elevan y ganan sombra al pasar el mouse ── */
   html:not([data-theme="glass"]) :is(.glass-card, .glass-panel, .rounded-2xl, .rounded-3xl):hover {
-    box-shadow: 0 18px 36px -18px rgba(11,31,77,0.34), 0 5px 12px -6px rgba(11,31,77,0.14) !important;
-    border-color: rgba(11,31,77,0.16) !important;
+    box-shadow: 0 18px 36px -18px rgb(var(--navy-rgb) / 0.34), 0 5px 12px -6px rgb(var(--navy-rgb) / 0.14) !important;
+    border-color: rgb(var(--navy-rgb) / 0.16) !important;
   }
 
   /* ── Vidrio 3D: el cristal se "enciende" (borde brillante + profundidad + más saturación) ── */
@@ -252,13 +310,13 @@ html[data-theme="glass"] body {
     border-color: rgba(255,255,255,0.92) !important;
     -webkit-backdrop-filter: blur(var(--gl-blur)) saturate(185%);
     backdrop-filter: blur(var(--gl-blur)) saturate(185%);
-    box-shadow: var(--gl-inset), 0 26px 50px -18px rgba(11,31,77,0.48), 0 9px 22px -10px rgba(11,31,77,0.32) !important;
+    box-shadow: var(--gl-inset), 0 26px 50px -18px rgb(var(--navy-rgb) / 0.48), 0 9px 22px -10px rgb(var(--navy-rgb) / 0.32) !important;
   }
   /* Glow de color intensificado en los acentos navy/ocre */
   html[data-theme="glass"] :is(.glass-button, button.rounded-full, a.rounded-full):is(.glass-tint-navy, .bg-navy):hover {
-    box-shadow: var(--gl-inset), 0 24px 46px -16px rgba(11,31,77,0.72), 0 6px 16px -8px rgba(11,31,77,0.50) !important;
+    box-shadow: var(--gl-inset), 0 24px 46px -16px rgb(var(--navy-rgb) / 0.72), 0 6px 16px -8px rgb(var(--navy-rgb) / 0.50) !important;
   }
   html[data-theme="glass"] :is(.glass-button, button.rounded-full, a.rounded-full):is(.glass-tint-ocre, .bg-ocre):hover {
-    box-shadow: var(--gl-inset), 0 24px 46px -16px rgba(201,162,39,0.62), 0 6px 16px -8px rgba(201,162,39,0.50) !important;
+    box-shadow: var(--gl-inset), 0 24px 46px -16px rgb(var(--ocre-rgb) / 0.62), 0 6px 16px -8px rgb(var(--ocre-rgb) / 0.50) !important;
   }
 }
