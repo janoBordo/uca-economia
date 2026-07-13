@@ -20,15 +20,15 @@ export default function ThemeToggle() {
     else document.documentElement.removeAttribute("data-theme");
   }
 
+  // Reubicado en /cuenta → Apariencia (6.17); antes vivía al final de la home.
   return (
-    <div className="mt-20 flex flex-col items-center gap-3">
-      <span className="text-navy/30 text-xs uppercase tracking-widest font-medium">Apariencia</span>
+    <div className="flex flex-col gap-3">
       <GlassTabs
         options={[{ value: "normal", label: "Clásico 2D" }, { value: "glass", label: "Vidrio 3D" }]}
         value={theme}
         onChange={aplicar}
       />
-      <p className="text-navy/30 text-xs text-center">Cambia el estilo visual de toda la app.</p>
+      <p className="text-navy/30 text-xs">Cambia el estilo visual de toda la app en este dispositivo.</p>
     </div>
   );
 }

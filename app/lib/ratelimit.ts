@@ -64,6 +64,23 @@ export const rlOtp = new Ratelimit({
   prefix: "rl:otp",
 });
 
+// ── Fase 3: pantalla de Cuenta ──
+
+// Guardar perfil/apariencia: 30 por 15 min (por usuario y por IP), fail-closed.
+export const rlProfile = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(30, "15 m"),
+  prefix: "rl:profile",
+});
+
+// Subir/borrar foto de perfil: 10 por hora, fail-closed (uploads = superficie
+// sensible, 6.4).
+export const rlAvatar = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(10, "1 h"),
+  prefix: "rl:avatar",
+});
+
 /** IP real del cliente detrás del proxy de Vercel. */
 export function clientIp(req: Request): string {
   return (
