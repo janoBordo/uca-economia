@@ -176,9 +176,11 @@ export async function POST(req: Request) {
         const { error } = await sb.from("sesiones_estudio").delete().gte("minutos", 0);
         if (error) throw new Error(error.message);
       } else {
-        const filas = entries.map(([materia_id, minutos]) => ({ materia_id, user_id: userId, minutos }));
-        const { error } = await sb.from("sesiones_estudio").upsert(filas, { onConflict: "materia_id" });
-        if (error) throw new Error(error.message);
+        // Sin _delta solo se acepta el reset ({}): un reemplazo arbitrario
+        // permitiría insertar una fila con materia_id AJENO (el FK valida
+        // existencia, no dueño) y romperle el add_minutos a ese usuario.
+        // La UI jamás manda esto; si llega, es malicioso o un bug.
+        return NextResponse.json({ ok: false, error: "Datos inválidos." }, { status: 400 });
       }
     }
 

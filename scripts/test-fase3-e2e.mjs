@@ -86,6 +86,12 @@ r = await post("/api/db", tokB, { materias: [{ id: m1, nombre: "HACKEADA", exame
 const dA = await (await req("/api/db", tokA)).json();
 check("upsert con id ajeno no pisa la materia de A", dA.materias[0].nombre === "Micro" && dA.sesiones[m1] === 45, `(post=${r.status})`);
 
+// ── 5b. Reemplazo de sesiones sin _delta (no lo usa la UI): solo se acepta
+// el reset {} — un replace arbitrario permitiría plantar una fila con
+// materia_id ajeno (el FK valida existencia, no dueño) ──
+r = await post("/api/db", tokB, { sesiones: { [m1]: 999 } });
+check("sesiones sin _delta no-vacío → 400", r.status === 400, `(${r.status})`);
+
 // ── 6. Aislación de lectura ──
 const dB = await (await req("/api/db", tokB)).json();
 check("B no ve datos de A", dB.materias.every(m => m.id !== m1 && m.id !== m2));
