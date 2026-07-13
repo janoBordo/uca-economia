@@ -73,15 +73,30 @@ function SeccionPerfil({ perfil }: { perfil: Perfil }) {
     setForm(f => ({ ...f, [k]: e.target.value })); setEstado("");
   };
 
+  /* Cambio AUTOMÁTICO de paleta al asignar la institución (6.17): al elegir
+     una universidad del mapeo, la paleta global cambia al instante (vista
+     previa) y se persiste junto con el perfil al Guardar. La personalización
+     manual queda en Apariencia, como override posterior. */
+  function setUniversidad(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    const uni = e.target.value;
+    setForm(f => ({ ...f, uniSel: uni })); setEstado("");
+    const pal = paletaSugerida(uni);
+    if (pal) aplicarPaleta(pal);
+  }
+
   async function guardar() {
     setGuardando(true); setEstado("");
     const universidad = (form.uniSel === UNIVERSIDAD_OTRA ? form.uniOtra : form.uniSel).trim().slice(0, 80);
+    // La paleta automática viaja en el mismo guardado, solo si la universidad
+    // CAMBIÓ (si quedó igual, se respeta el override manual de Apariencia).
+    const pal = universidad !== perfil.universidad ? paletaSugerida(universidad) : null;
     const p = await guardarPerfil({
       nombre: form.nombre.trim().slice(0, 60),
       apellido: form.apellido.trim().slice(0, 60),
       apodo: form.apodo.trim().slice(0, 40),
       universidad,
       carrera: form.carrera.trim().slice(0, 80),
+      ...(pal ? { temaColor: pal } : {}),
     });
     setGuardando(false);
     setEstado(p ? "ok" : "error");
@@ -161,14 +176,14 @@ function SeccionPerfil({ perfil }: { perfil: Perfil }) {
         </div>
         <div className="min-w-0">
           <label className={labelCls}>Universidad</label>
-          <GlassSelect value={form.uniSel} onChange={set("uniSel")} className={inputCls}>
+          <GlassSelect value={form.uniSel} onChange={setUniversidad} className={inputCls}>
             <option value="">— Elegir —</option>
             {UNIVERSIDADES.map(u => <option key={u.nombre} value={u.nombre}>{u.nombre}</option>)}
             <option value={UNIVERSIDAD_OTRA}>{UNIVERSIDAD_OTRA}</option>
           </GlassSelect>
           {sugerida && (
             <p className="text-navy/30 text-xs mt-1.5">
-              Sugiere la paleta {PALETAS.find(p => p.id === sugerida)?.label} (se elige abajo, en Apariencia).
+              Colores {PALETAS.find(p => p.id === sugerida)?.label} aplicados — si no te gustan, los cambiás abajo en Apariencia.
             </p>
           )}
         </div>
@@ -211,6 +226,10 @@ function SeccionApariencia({ perfil }: { perfil: Perfil }) {
   const [estado, setEstado] = useState<"" | "ok" | "error">("");
   const sucia = elegida !== perfil.temaColor;
 
+  // Si la paleta cambió desde afuera (ej. asignación automática al elegir
+  // universidad en Perfil), el selector se sincroniza con la nueva.
+  useEffect(() => { setElegida(perfil.temaColor); }, [perfil.temaColor]);
+
   function previsualizar(p: Paleta) {
     setElegida(p); setEstado("");
     aplicarPaleta(p);   // vista previa inmediata; persiste recién con Guardar
@@ -232,7 +251,7 @@ function SeccionApariencia({ perfil }: { perfil: Perfil }) {
       <div className="h-px bg-navy/8 mb-8" />
       <p className="text-navy/50 text-sm font-semibold mb-1">Tema de color</p>
       <p className="text-navy/35 text-xs mb-4">
-        Se sugiere según tu universidad, pero podés elegir el que quieras. Se guarda en tu cuenta y viaja entre dispositivos.
+        Se asigna automáticamente según tu universidad — si no te gusta, elegí acá el que quieras. Se guarda en tu cuenta y viaja entre dispositivos.
       </p>
       <div className="flex flex-wrap gap-3 mb-6">
         {PALETAS.map(p => (
@@ -267,8 +286,9 @@ function SeccionApariencia({ perfil }: { perfil: Perfil }) {
   );
 }
 
-/* ── Cambiar contraseña ── */
+/* ── Seguridad: cambiar contraseña (colapsado — es secundario, se expande a pedido) ── */
 function SeccionPassword() {
+  const [abierto, setAbierto] = useState(false);
   const [actual, setActual] = useState("");
   const [nueva, setNueva] = useState("");
   const [repetir, setRepetir] = useState("");
@@ -277,6 +297,12 @@ function SeccionPassword() {
   const [confirmando, setConfirmando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [msg, setMsg] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
+
+  function cerrar() {
+    setAbierto(false); setConfirmando(false); setMsg(null);
+    setActual(""); setNueva(""); setRepetir("");
+    setCaptcha(null); setResetKey(k => k + 1);
+  }
 
   // captcha obligatorio: la verificación de la contraseña actual pasa por el
   // login de Supabase, que exige Turnstile — sin token el server devuelve 403.
@@ -313,55 +339,82 @@ function SeccionPassword() {
   }
 
   return (
-    <Seccion titulo="Cambiar contraseña">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+    <Seccion titulo="Seguridad">
+      {/* Fila compacta; el formulario solo aparece si el usuario lo pide */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="min-w-0">
-          <label className={labelCls}>Contraseña actual</label>
-          <GlassInput type="password" autoComplete="current-password" value={actual}
-            onChange={e => { setActual(e.target.value); setMsg(null); setConfirmando(false); }} className={inputCls} />
+          <p className="text-navy font-medium text-sm">Contraseña</p>
+          <p className="text-navy/40 text-xs mt-0.5">••••••••</p>
         </div>
-        <div className="min-w-0">
-          <label className={labelCls}>Contraseña nueva</label>
-          <GlassInput type="password" autoComplete="new-password" value={nueva}
-            onChange={e => { setNueva(e.target.value); setMsg(null); setConfirmando(false); }} className={inputCls} />
-        </div>
-        <div className="min-w-0">
-          <label className={labelCls}>Repetir la nueva</label>
-          <GlassInput type="password" autoComplete="new-password" value={repetir}
-            onChange={e => { setRepetir(e.target.value); setMsg(null); setConfirmando(false); }} className={inputCls} />
-        </div>
-      </div>
-      <p className="text-navy/30 text-xs mb-4">Mínimo 8 caracteres. Al confirmar se cierra la sesión en todos tus otros dispositivos.</p>
-      <Turnstile onToken={setCaptcha} resetKey={resetKey} />
-      <div className="flex items-center gap-4 flex-wrap mt-2">
-        <AnimatePresence mode="wait">
-          {!confirmando ? (
-            <GlassButton key="btn" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-              onClick={pedirConfirmacion} disabled={!valido || enviando}
-              className="px-8 py-3 rounded-full bg-navy text-canvas font-semibold text-sm hover:bg-navy-soft transition-colors disabled:opacity-50">
-              Cambiar contraseña
-            </GlassButton>
-          ) : (
-            <motion.div key="confirm" initial={{ opacity:0, y:4 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-navy/20 bg-navy/5 flex-wrap">
-              <span className="text-navy text-xs font-medium">¿Confirmás el cambio de contraseña?</span>
-              <button onClick={cambiar} disabled={enviando}
-                className="px-4 py-1.5 rounded-full bg-navy text-canvas text-xs font-semibold hover:bg-navy-soft transition-colors disabled:opacity-50">
-                {enviando ? "…" : "Sí, cambiar"}
-              </button>
-              <button onClick={() => setConfirmando(false)} disabled={enviando}
-                className="px-4 py-1.5 rounded-full border border-navy/20 text-navy/50 text-xs hover:border-navy/40 transition-colors">
-                Cancelar
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        {msg && (
-          <span className={`text-sm ${msg.tipo === "ok" ? "text-navy/60" : "text-red-500"}`}>
-            {msg.tipo === "ok" && <span className="text-ocre">✓ </span>}{msg.texto}
-          </span>
+        {!abierto ? (
+          <GlassButton onClick={() => setAbierto(true)}
+            className="shrink-0 px-4 py-2 rounded-full border border-navy/15 text-navy/55 text-xs font-semibold hover:border-navy/35 hover:text-navy transition-colors">
+            Cambiar
+          </GlassButton>
+        ) : (
+          <button onClick={cerrar}
+            className="shrink-0 text-navy/40 text-xs hover:text-navy transition-colors">Cancelar</button>
         )}
       </div>
+
+      <AnimatePresence>
+        {abierto && (
+          <motion.div key="form" initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:"auto" }} exit={{ opacity:0, height:0 }}
+            className="overflow-hidden">
+            <div className="pt-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                <div className="min-w-0">
+                  <label className={labelCls}>Contraseña actual</label>
+                  <GlassInput type="password" autoComplete="current-password" value={actual}
+                    onChange={e => { setActual(e.target.value); setMsg(null); setConfirmando(false); }} className={inputCls} />
+                </div>
+                <div className="min-w-0">
+                  <label className={labelCls}>Contraseña nueva</label>
+                  <GlassInput type="password" autoComplete="new-password" value={nueva}
+                    onChange={e => { setNueva(e.target.value); setMsg(null); setConfirmando(false); }} className={inputCls} />
+                </div>
+                <div className="min-w-0">
+                  <label className={labelCls}>Repetir la nueva</label>
+                  <GlassInput type="password" autoComplete="new-password" value={repetir}
+                    onChange={e => { setRepetir(e.target.value); setMsg(null); setConfirmando(false); }} className={inputCls} />
+                </div>
+              </div>
+              <p className="text-navy/30 text-xs mb-4">Mínimo 8 caracteres. Al confirmar se cierra la sesión en todos tus otros dispositivos.</p>
+              {/* El captcha recién se monta acá — no se carga si nadie abre esto */}
+              <Turnstile onToken={setCaptcha} resetKey={resetKey} />
+              <div className="flex items-center gap-4 flex-wrap mt-2">
+                <AnimatePresence mode="wait">
+                  {!confirmando ? (
+                    <GlassButton key="btn" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+                      onClick={pedirConfirmacion} disabled={!valido || enviando}
+                      className="px-8 py-3 rounded-full bg-navy text-canvas font-semibold text-sm hover:bg-navy-soft transition-colors disabled:opacity-50">
+                      Cambiar contraseña
+                    </GlassButton>
+                  ) : (
+                    <motion.div key="confirm" initial={{ opacity:0, y:4 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-navy/20 bg-navy/5 flex-wrap">
+                      <span className="text-navy text-xs font-medium">¿Confirmás el cambio de contraseña?</span>
+                      <button onClick={cambiar} disabled={enviando}
+                        className="px-4 py-1.5 rounded-full bg-navy text-canvas text-xs font-semibold hover:bg-navy-soft transition-colors disabled:opacity-50">
+                        {enviando ? "…" : "Sí, cambiar"}
+                      </button>
+                      <button onClick={() => setConfirmando(false)} disabled={enviando}
+                        className="px-4 py-1.5 rounded-full border border-navy/20 text-navy/50 text-xs hover:border-navy/40 transition-colors">
+                        Cancelar
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                {msg && (
+                  <span className={`text-sm ${msg.tipo === "ok" ? "text-navy/60" : "text-red-500"}`}>
+                    {msg.tipo === "ok" && <span className="text-ocre">✓ </span>}{msg.texto}
+                  </span>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Seccion>
   );
 }
