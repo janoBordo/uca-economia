@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import UserMenu from "./UserMenu";
+import { usePerfil } from "../lib/perfil";
 
 const LINKS = [
   { href:"/timer",      label:"Pomodoro",   short:"Timer"  },
@@ -15,6 +16,27 @@ const LINKS = [
 // Pantallas de entrada: solo el logo, sin tabs ni menú de cuenta (no hay sesión).
 const AUTH_PATHS = new Set(["/login", "/registro", "/recuperar"]);
 
+// Identidad académica al lado del logo — te "acompaña" en todo el sitio.
+// El color de la paleta SÍ se aplica acá (es texto de acento, no el logo).
+function Identidad() {
+  const { perfil } = usePerfil();
+  if (!perfil || (!perfil.carrera && !perfil.universidad)) return null;
+  return (
+    <div className="hidden lg:flex flex-col justify-center min-w-0 border-l border-navy/10 pl-3 ml-1 leading-tight">
+      {perfil.carrera && (
+        <span className="text-[13px] font-semibold truncate max-w-[15rem]" style={{ color:"rgb(var(--navy-rgb) / 0.75)" }}>
+          {perfil.carrera}
+        </span>
+      )}
+      {perfil.universidad && (
+        <span className="text-[11px] truncate max-w-[15rem]" style={{ color:"rgb(var(--navy-rgb) / 0.4)" }}>
+          {perfil.universidad}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function Nav() {
   const path = usePathname();
   const esAuth = AUTH_PATHS.has(path);
@@ -22,12 +44,16 @@ export default function Nav() {
     <header className="sticky top-0 z-50 border-b border-navy/10"
       style={{ background:"rgba(245,244,240,0.85)", backdropFilter:"blur(16px)" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-4">
-        <Link href="/" className="flex items-center shrink-0" aria-label="stuniv — inicio">
-          {/* Mobile: isotipo s. */}
-          <span className="sm:hidden font-extrabold text-navy text-2xl leading-none tracking-tight">s<span style={{ color:"#009CDE" }}>.</span></span>
-          {/* Desktop: logotipo completo */}
-          <span className="hidden sm:block font-extrabold text-navy text-2xl leading-none tracking-tight">stuniv<span style={{ color:"#009CDE" }}>.</span></span>
-        </Link>
+        <div className="flex items-center min-w-0 shrink">
+          <Link href="/" className="flex items-center shrink-0" aria-label="stuniv — inicio">
+            {/* Logo SIEMPRE azul + punto celeste, sin importar la paleta elegida */}
+            {/* Mobile: isotipo s. */}
+            <span className="sm:hidden font-extrabold text-2xl leading-none tracking-tight" style={{ color:"#0B1F4D" }}>s<span style={{ color:"#009CDE" }}>.</span></span>
+            {/* Desktop: logotipo completo */}
+            <span className="hidden sm:block font-extrabold text-2xl leading-none tracking-tight" style={{ color:"#0B1F4D" }}>stuniv<span style={{ color:"#009CDE" }}>.</span></span>
+          </Link>
+          {!esAuth && <Identidad />}
+        </div>
         {!esAuth && <div className="flex items-center gap-1 sm:gap-2 min-w-0">
           <nav className="flex items-center gap-0.5">
             {LINKS.map(l => {

@@ -160,19 +160,19 @@ function SeccionPerfil({ perfil }: { perfil: Perfil }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div className="min-w-0">
           <label className={labelCls}>Nombre</label>
-          <GlassInput value={form.nombre} onChange={set("nombre")} maxLength={60} className={inputCls} />
+          <GlassInput value={form.nombre} onChange={set("nombre")} maxLength={60} autoComplete="given-name" className={inputCls} />
         </div>
         <div className="min-w-0">
           <label className={labelCls}>Apellido</label>
-          <GlassInput value={form.apellido} onChange={set("apellido")} maxLength={60} className={inputCls} />
+          <GlassInput value={form.apellido} onChange={set("apellido")} maxLength={60} autoComplete="family-name" className={inputCls} />
         </div>
         <div className="min-w-0">
           <label className={labelCls}>Apodo <span className="normal-case">(visible en la app)</span></label>
-          <GlassInput value={form.apodo} onChange={set("apodo")} maxLength={40} className={inputCls} />
+          <GlassInput value={form.apodo} onChange={set("apodo")} maxLength={40} autoComplete="off" className={inputCls} />
         </div>
         <div className="min-w-0">
           <label className={labelCls}>Email</label>
-          <GlassInput value={perfil.email ?? ""} disabled className={`${inputCls} opacity-60`} />
+          <GlassInput value={perfil.email ?? ""} disabled autoComplete="off" className={`${inputCls} opacity-60`} />
         </div>
         <div className="min-w-0">
           <label className={labelCls}>Universidad</label>
@@ -190,13 +190,14 @@ function SeccionPerfil({ perfil }: { perfil: Perfil }) {
         {form.uniSel === UNIVERSIDAD_OTRA && (
           <div className="min-w-0">
             <label className={labelCls}>Nombre de tu universidad</label>
-            <GlassInput value={form.uniOtra} onChange={set("uniOtra")} maxLength={80}
+            <GlassInput value={form.uniOtra} onChange={set("uniOtra")} maxLength={80} autoComplete="off"
               placeholder="Ej. Universidad Nacional de Cuyo" className={inputCls} />
           </div>
         )}
         <div className="min-w-0">
           <label className={labelCls}>Carrera</label>
-          <GlassInput value={form.carrera} onChange={set("carrera")} maxLength={80}
+          {/* autoComplete off: el navegador metía el email acá por heurística */}
+          <GlassInput value={form.carrera} onChange={set("carrera")} maxLength={80} autoComplete="off"
             placeholder="Ej. Economía" className={inputCls} />
         </div>
       </div>
@@ -495,7 +496,7 @@ export default function Cuenta() {
   }
 
   return (
-    <section className="flex-1 w-full max-w-3xl mx-auto px-6 sm:px-8 py-16 flex flex-col gap-8">
+    <section className="flex-1 w-full max-w-6xl mx-auto px-6 sm:px-8 py-12 sm:py-16 flex flex-col gap-8">
       <div>
         <motion.h2 initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
           className="font-black text-navy mb-2" style={{ fontSize:"clamp(2rem,6vw,3.5rem)", letterSpacing:"-0.04em" }}>
@@ -507,18 +508,24 @@ export default function Cuenta() {
       {loading || !perfil ? (
         <div className="py-16 text-center text-navy/30 text-sm">Cargando…</div>
       ) : (
-        <>
-          <SeccionPerfil perfil={perfil} />
-          <SeccionApariencia perfil={perfil} />
-          <SeccionPassword />
-          <SeccionEliminar />
-          <div className="flex justify-center pt-2 pb-6">
-            <button onClick={salir} disabled={saliendo}
-              className="px-6 py-2.5 rounded-full border border-navy/15 text-navy/50 text-sm font-medium hover:border-navy/40 hover:text-navy transition-colors disabled:opacity-50">
-              {saliendo ? "Saliendo…" : "Cerrar sesión"}
-            </button>
+        // Dos columnas en desktop: Perfil (más grande) a la izquierda; apariencia
+        // y seguridad a la derecha. Aprovecha el ancho y baja el scroll a la mitad.
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
+          <div className="flex flex-col gap-6 lg:gap-8">
+            <SeccionPerfil perfil={perfil} />
           </div>
-        </>
+          <div className="flex flex-col gap-6 lg:gap-8">
+            <SeccionApariencia perfil={perfil} />
+            <SeccionPassword />
+            <SeccionEliminar />
+            <div className="flex justify-center pt-1 pb-6">
+              <button onClick={salir} disabled={saliendo}
+                className="px-6 py-2.5 rounded-full border border-navy/15 text-navy/50 text-sm font-medium hover:border-navy/40 hover:text-navy transition-colors disabled:opacity-50">
+                {saliendo ? "Saliendo…" : "Cerrar sesión"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );

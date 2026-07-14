@@ -58,7 +58,7 @@ export default function Metricas() {
   }, [prepReal]);
 
   return (
-    <section className="flex-1 w-full max-w-4xl mx-auto px-6 sm:px-8 py-16 flex flex-col gap-20">
+    <section className="flex-1 w-full max-w-5xl mx-auto px-6 sm:px-8 py-16 flex flex-col gap-20">
 
       {/* KPIs */}
       <div>
