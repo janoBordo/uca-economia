@@ -17,6 +17,15 @@ Primera prueba de la migración con usuario real (Jano se registró, confirmó e
 - **Tema automático al elegir universidad**: al seleccionar la universidad en Perfil, la paleta global cambia AL INSTANTE (y se persiste con "Guardar cambios", sólo si la universidad cambió — el override manual de Apariencia se respeta). Apariencia queda como personalización posterior, sincronizada si la paleta cambia desde afuera.
 - **Re-verificación de seguridad sobre el deploy vivo** (no local): `/` sin sesión → 307 a `/login`; `/api/db`, `/api/tts`, `/api/account/*` sin sesión → 401; login sin captcha → rechazado por Zod; headers completos en producción real (CSP, HSTS, X-Frame-Options DENY, nosniff). Todo en verde.
 
+**Segunda tanda de ajustes (UI, tras seguir probando):**
+- **Logo fijo**: `stuniv.` vuelve a ser SIEMPRE `#0B1F4D` + punto `#009CDE`, sin importar la paleta de universidad elegida (antes usaba `text-navy` = variable de paleta y se teñía). El resto de la UI sí sigue la paleta.
+- **Identidad académica en el nav** (`app/components/Nav.tsx` → `Identidad`): al lado del logo, en desktop (lg+), se muestra carrera (arriba) + universidad (abajo, más chica) del perfil — "te acompaña" en todo el sitio. Sutil, truncado, con color de paleta.
+- **Configuración a 2 columnas** (`app/cuenta/page.tsx`): dejó de ser una sola columna angosta de cards centradas (`max-w-3xl`). Ahora `max-w-6xl` con grid `lg:grid-cols-2` (Perfil a la izquierda; Apariencia + Seguridad + Eliminar + Cerrar sesión a la derecha) — aprovecha el ancho y baja el scroll a la mitad en desktop.
+- **Fix autofill Carrera**: el navegador metía el email en el input de Carrera por heurística. Se agregaron `autocomplete` correctos (nombre=given-name, apellido=family-name; apodo/universidad/carrera/email en `off`).
+- **Métricas a `max-w-5xl`** para que los gráficos usen mejor el ancho. Inicio/Lectura/Timer quedan centrados a propósito (hero / lectura legible / dial).
+
+**Esta versión pasa a ser `main`** — la migración se dio por buena tras las pruebas reales. De acá en adelante los cambios van sobre `main` (la rama `migracion-v10` cumplió su función). `site_url` de Supabase revertido al dominio de producción al mergear.
+
 ---
 
 ## v10 — Fase 3 de 3: datos por-usuario en Supabase + pantalla de Cuenta (branch `migracion-v10`, migración COMPLETA — falta solo el paso manual de Jano para mergear)
