@@ -6,6 +6,12 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.3.1 — Fix: varios exámenes por materia (branch `main`)
+
+Corrección del flujo de v10.3: como cada `Materia` tiene una sola fecha (`examen`), asignarle una fecha nueva desde el calendario **pisaba** la anterior. Ahora, si la materia **ya tiene un examen en otra fecha**, `agregarExamen` (`app/calendario/page.tsx`) crea una **entrada nueva** (misma materia, otra fecha) en vez de sobreescribir — así una materia puede rendir en varias fechas y conviven todas. Cada examen extra es su propia fila (aparece también en Semestres con su fecha y sus horas). Sin cambios en la base. (Si en el futuro se quiere una sola materia con varias fechas en una fila, eso sí requiere cambio de modelo.)
+
+---
+
 ## v10.3 — Más UI + alta de exámenes desde el calendario (branch `main`)
 
 Segunda tanda de UI sobre `main`. Seis cambios:

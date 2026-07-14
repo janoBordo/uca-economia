@@ -106,8 +106,17 @@ export default function Calendario() {
   // (metaHoras) de la materia elegida. Se puede repetir para varias materias.
   async function agregarExamen() {
     if (!modal || !exSel) return;
-    const examen  = `${modal.key}T${exHora || "09:00"}`;
-    const updated = materias.map(m => m.id === exSel ? { ...m, examen, metaHoras: exHoras || m.metaHoras } : m);
+    const examen = `${modal.key}T${exHora || "09:00"}`;
+    const m = materias.find(x => x.id === exSel);
+    let updated: Materia[];
+    if (m && m.examen) {
+      // La materia YA tiene examen en otra fecha: agrego una entrada nueva (misma
+      // materia, otra fecha) en vez de pisar la anterior — puede rendir varias veces.
+      updated = [...materias, { id: crypto.randomUUID(), nombre: m.nombre, examen, metaHoras: exHoras || m.metaHoras }];
+    } else {
+      // Primera fecha de la materia: se la asigno directamente.
+      updated = materias.map(x => x.id === exSel ? { ...x, examen, metaHoras: exHoras || x.metaHoras } : x);
+    }
     await saveMaterias(updated);
     cancelAddExam();
   }
