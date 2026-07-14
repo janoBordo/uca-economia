@@ -141,7 +141,7 @@ export default function Semestre() {
   }
 
   return (
-    <section className="flex-1 w-full max-w-6xl mx-auto px-6 sm:px-8 py-16 flex flex-col gap-16">
+    <section className="flex-1 w-full max-w-6xl xl:max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-16 flex flex-col gap-16">
 
       {/* ── MATERIAS Y FECHAS ── */}
       <div>
@@ -149,9 +149,9 @@ export default function Semestre() {
           className="font-black text-navy mb-2" style={{ fontSize:"clamp(2rem,6vw,3.5rem)", letterSpacing:"-0.04em" }}>
           Materias y fechas
         </motion.h2>
-        <p className="text-navy/45 text-base mb-8">Editá nombre, fecha de examen y meta de horas. Se sincroniza en todos tus dispositivos.</p>
+        <p className="text-navy/45 text-base mb-8">Editá nombre, fecha de examen y meta de horas.</p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           <AnimatePresence>
             {local.map((m, i) => {
               const { date, time } = splitISO(m.examen);

@@ -4,12 +4,21 @@ import Link from "next/link";
 import { AuthCard, AuthError, inputCls, labelCls, btnCls } from "../components/AuthCard";
 import { GlassButton } from "../components/glass";
 import Turnstile from "../components/Turnstile";
+import { UNIVERSIDADES, UNIVERSIDAD_OTRA, paletaSugerida, aplicarPaleta } from "../lib/paleta";
 
-/* Crear cuenta (6.1): email dos veces (guardia anti-typo), contraseña ≥8,
-   CAPTCHA. La cuenta no queda operativa hasta confirmar el email (el mail
-   sale de soporte.stuniv@gmail.com vía SendGrid). */
+/* Crear cuenta (6.1): datos de perfil (nombre, apellido, universidad, carrera)
+   + email dos veces (guardia anti-typo), contraseña ≥8, CAPTCHA. Al elegir la
+   universidad se previsualiza su paleta al instante y se guarda en el perfil,
+   así al confirmar el mail y entrar la app ya arranca con esos colores. La
+   cuenta no queda operativa hasta confirmar el email (sale de
+   soporte.stuniv@gmail.com vía SendGrid). */
 
 export default function RegistroPage() {
+  const [nombre, setNombre] = useState("");
+  const [apellido, setApellido] = useState("");
+  const [uniSel, setUniSel] = useState("");
+  const [uniOtra, setUniOtra] = useState("");
+  const [carrera, setCarrera] = useState("");
   const [email, setEmail] = useState("");
   const [email2, setEmail2] = useState("");
   const [password, setPassword] = useState("");
@@ -22,9 +31,18 @@ export default function RegistroPage() {
   const emailsDistintos =
     email2.length > 0 && email.trim().toLowerCase() !== email2.trim().toLowerCase();
 
+  // Vista previa de la paleta al elegir universidad (como en /cuenta).
+  function elegirUniversidad(e: React.ChangeEvent<HTMLSelectElement>) {
+    const u = e.target.value;
+    setUniSel(u);
+    const pal = paletaSugerida(u);
+    if (pal) aplicarPaleta(pal);
+  }
+
   async function crear(e: React.FormEvent) {
     e.preventDefault();
     if (enviando) return;
+    const universidad = (uniSel === UNIVERSIDAD_OTRA ? uniOtra : uniSel).trim();
     if (emailsDistintos) { setError("Los dos emails no coinciden."); return; }
     if (password.length < 8) { setError("La contraseña necesita al menos 8 caracteres."); return; }
     if (!captcha) { setError("Esperá a que cargue la verificación anti-bot."); return; }
@@ -33,7 +51,10 @@ export default function RegistroPage() {
       const r = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, emailConfirm: email2, password, captchaToken: captcha }),
+        body: JSON.stringify({
+          email, emailConfirm: email2, password, captchaToken: captcha,
+          nombre: nombre.trim(), apellido: apellido.trim(), universidad, carrera: carrera.trim(),
+        }),
       });
       if (r.ok) { setListo(true); return; }
       const d = await r.json().catch(() => null);
@@ -64,6 +85,40 @@ export default function RegistroPage() {
   return (
     <AuthCard title="Crear cuenta" subtitle="Gratis. Solo necesitás un email.">
       <form onSubmit={crear} className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="nombre" className={labelCls}>Nombre</label>
+            <input id="nombre" type="text" autoComplete="given-name" required maxLength={60}
+              className={inputCls} value={nombre} onChange={e => setNombre(e.target.value)} />
+          </div>
+          <div>
+            <label htmlFor="apellido" className={labelCls}>Apellido</label>
+            <input id="apellido" type="text" autoComplete="family-name" required maxLength={60}
+              className={inputCls} value={apellido} onChange={e => setApellido(e.target.value)} />
+          </div>
+        </div>
+        <div>
+          <label htmlFor="universidad" className={labelCls}>Universidad</label>
+          <select id="universidad" required className={inputCls} value={uniSel} onChange={elegirUniversidad}>
+            <option value="">— Elegir —</option>
+            {UNIVERSIDADES.map(u => <option key={u.nombre} value={u.nombre}>{u.nombre}</option>)}
+            <option value={UNIVERSIDAD_OTRA}>{UNIVERSIDAD_OTRA}</option>
+          </select>
+        </div>
+        {uniSel === UNIVERSIDAD_OTRA && (
+          <div>
+            <label htmlFor="uniOtra" className={labelCls}>Nombre de tu universidad</label>
+            <input id="uniOtra" type="text" required maxLength={80} autoComplete="off"
+              placeholder="Ej. Universidad Nacional de Cuyo"
+              className={inputCls} value={uniOtra} onChange={e => setUniOtra(e.target.value)} />
+          </div>
+        )}
+        <div>
+          <label htmlFor="carrera" className={labelCls}>Carrera</label>
+          <input id="carrera" type="text" required maxLength={80} autoComplete="off"
+            placeholder="Ej. Economía"
+            className={inputCls} value={carrera} onChange={e => setCarrera(e.target.value)} />
+        </div>
         <div>
           <label htmlFor="email" className={labelCls}>Email</label>
           <input id="email" type="email" autoComplete="email" required maxLength={255}

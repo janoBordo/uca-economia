@@ -67,7 +67,10 @@ export default function UserMenu() {
           <motion.div role="menu"
             initial={{ opacity: 0, y: -6, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }} transition={{ duration: 0.14 }}
-            className="absolute right-0 mt-2 w-52 rounded-2xl border border-navy/10 bg-white shadow-xl overflow-hidden py-1.5 z-50">
+            // rounded-[16px] (= rounded-2xl visual) a propósito: NO matchea los
+            // selectores del material Vidrio, así el menú queda sólido y bien
+            // encuadrado igual que en 2D (en Vidrio se volvía translúcido/cortado).
+            className="absolute right-0 mt-2 w-52 rounded-[16px] border border-navy/10 bg-white shadow-xl overflow-hidden py-1.5 z-50">
             {perfil?.email && (
               <div className="px-4 pt-2 pb-2.5 border-b border-navy/8">
                 <p className="text-navy text-sm font-semibold truncate">{nombre || "Tu cuenta"}</p>

@@ -81,7 +81,7 @@ export default function Inicio() {
     : "";
 
   return (
-    <section className="flex-1 w-full max-w-4xl mx-auto px-6 sm:px-8 py-16 sm:py-24 flex flex-col">
+    <section className="flex-1 w-full max-w-4xl xl:max-w-6xl mx-auto px-6 sm:px-8 lg:px-12 py-16 sm:py-24 flex flex-col">
 
       {todoRendido ? (
         <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} className="mb-16">
@@ -125,7 +125,7 @@ export default function Inicio() {
         <div className="flex-1 h-px bg-navy/8" />
       </motion.div>
 
-      <ul>{resto.map((m,i) => <RowItem key={m.id} m={m} index={i} />)}</ul>
+      <ul className="grid xl:grid-cols-2 xl:gap-x-14">{resto.map((m,i) => <RowItem key={m.id} m={m} index={i} />)}</ul>
     </section>
   );
 }

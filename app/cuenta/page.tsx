@@ -151,7 +151,6 @@ function SeccionPerfil({ perfil }: { perfil: Perfil }) {
               </span>
             )}
           </div>
-          <p className="text-navy/30 text-xs">JPG, PNG o WebP. Se recorta al centro y se reduce a 256px.</p>
           {errorFoto && <p className="text-red-500 text-xs">{errorFoto}</p>}
         </div>
       </div>
@@ -252,7 +251,7 @@ function SeccionApariencia({ perfil }: { perfil: Perfil }) {
       <div className="h-px bg-navy/8 mb-8" />
       <p className="text-navy/50 text-sm font-semibold mb-1">Tema de color</p>
       <p className="text-navy/35 text-xs mb-4">
-        Se asigna automáticamente según tu universidad — si no te gusta, elegí acá el que quieras. Se guarda en tu cuenta y viaja entre dispositivos.
+        Se asigna automáticamente según tu universidad — si no te gusta, elegí acá el que quieras.
       </p>
       <div className="flex flex-wrap gap-3 mb-6">
         {PALETAS.map(p => (
@@ -340,7 +339,8 @@ function SeccionPassword() {
   }
 
   return (
-    <Seccion titulo="Seguridad">
+    <div>
+      <h4 className={labelCls}>Seguridad</h4>
       {/* Fila compacta; el formulario solo aparece si el usuario lo pide */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="min-w-0">
@@ -416,7 +416,7 @@ function SeccionPassword() {
           </motion.div>
         )}
       </AnimatePresence>
-    </Seccion>
+    </div>
   );
 }
 
@@ -446,13 +446,10 @@ function SeccionEliminar() {
   }
 
   return (
-    <GlassCard initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
-      className="p-6 sm:p-8 rounded-3xl border border-red-200"
-      style={{ background:"#fff", boxShadow:"0 2px 12px rgb(var(--navy-rgb) / 0.06)" }}>
-      <h3 className="font-bold text-navy text-xl sm:text-2xl mb-2" style={{ letterSpacing:"-0.03em" }}>Eliminar cuenta</h3>
-      <p className="text-navy/45 text-sm mb-6">
-        Tu cuenta se desactiva al instante y se borra definitivamente, con todos tus datos, a los 30 días.
-        Se cierra la sesión en todos tus dispositivos.
+    <div>
+      <h4 className={labelCls}>Eliminar cuenta</h4>
+      <p className="text-navy/40 text-xs mb-4 max-w-md">
+        Se desactiva al instante y se borra definitivamente, con todos tus datos, a los 30 días.
       </p>
       <div className="flex items-center gap-3 flex-wrap">
         <AnimatePresence mode="wait">
@@ -479,7 +476,7 @@ function SeccionEliminar() {
         </AnimatePresence>
         {error && <span className="text-sm text-red-500">{error}</span>}
       </div>
-    </GlassCard>
+    </div>
   );
 }
 
@@ -508,24 +505,27 @@ export default function Cuenta() {
       {loading || !perfil ? (
         <div className="py-16 text-center text-navy/30 text-sm">Cargando…</div>
       ) : (
-        // Dos columnas en desktop: Perfil (más grande) a la izquierda; apariencia
-        // y seguridad a la derecha. Aprovecha el ancho y baja el scroll a la mitad.
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
-          <div className="flex flex-col gap-6 lg:gap-8">
+        <>
+          {/* Lo principal: Perfil y Apariencia como cards, en 2 columnas en desktop. */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
             <SeccionPerfil perfil={perfil} />
-          </div>
-          <div className="flex flex-col gap-6 lg:gap-8">
             <SeccionApariencia perfil={perfil} />
-            <SeccionPassword />
-            <SeccionEliminar />
-            <div className="flex justify-center pt-1 pb-6">
+          </div>
+
+          {/* Opciones secundarias: planas, integradas al fondo, sin peso de card. */}
+          <div className="mt-6 pt-8 border-t border-navy/8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-8">
+              <SeccionPassword />
+              <SeccionEliminar />
+            </div>
+            <div className="flex justify-center mt-10">
               <button onClick={salir} disabled={saliendo}
-                className="px-6 py-2.5 rounded-full border border-navy/15 text-navy/50 text-sm font-medium hover:border-navy/40 hover:text-navy transition-colors disabled:opacity-50">
+                className="text-navy/40 text-sm font-medium hover:text-navy transition-colors disabled:opacity-50">
                 {saliendo ? "Saliendo…" : "Cerrar sesión"}
               </button>
             </div>
           </div>
-        </div>
+        </>
       )}
     </section>
   );

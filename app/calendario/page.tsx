@@ -106,7 +106,7 @@ export default function Calendario() {
   });
 
   return (
-    <section className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-8 py-12 flex flex-col gap-10">
+    <section className="flex-1 w-full max-w-5xl xl:max-w-6xl mx-auto px-4 sm:px-8 lg:px-12 py-12 flex flex-col gap-10">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

@@ -6,6 +6,21 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.2 — UI dinámica + ajustes post-prueba (branch `main`)
+
+Tanda de UI sobre `main` tras seguir usando la app. Seis cambios:
+
+- **Layout responsive de verdad (no "escala como imagen")**: el problema era que cada vista era una **sola columna centrada con `max-w-*` fija** y casi todos los breakpoints eran `sm:` — de 640px para arriba el layout quedaba congelado y al hacer zoom-out todo se encogía sin reacomodarse. Ahora los contenedores crecen escalonado (`max-w-4xl xl:max-w-6xl 2xl:max-w-7xl`, padding `lg:px-12`) y las grillas **suman columnas al haber ancho**: home lista las materias en 2 columnas en `xl`; métricas pone los dos gráficos (Horas por materia + Matriz de Confianza) lado a lado en `xl` y los sliders en 2 columnas desde `lg`; semestre suma `xl:grid-cols-4`; calendario ensancha el mes (celdas más grandes) manteniendo su panel lateral. **Timer y Lectura NO se tocaron** (centrado intencional: dial / lectura legible). Alcance elegido con Jano: mejora acotada y segura, no rearmado total.
+- **Cuenta — Seguridad y Eliminar cuenta secundarias**: dejaron de ser cards blancas apiladas con títulos grandes. Ahora son **planas, sin chrome de tarjeta, una al lado de la otra** en una fila al pie (`border-t`, `sm:grid-cols-2`), con título tipo label y texto `text-navy/40` — integradas al fondo, claramente secundarias. Perfil y Apariencia quedan como las dos cards principales arriba. Toda la funcionalidad intacta (form de contraseña colapsable con Turnstile + confirmación inline; eliminar con confirmación inline). "Cerrar sesión" quedó como link discreto centrado.
+- **Registro pide perfil + paleta automática al entrar**: el alta ahora pide **Nombre, Apellido, Universidad (mismo dropdown de `/cuenta` + "Otra") y Carrera**. Al elegir la universidad se previsualiza su paleta al instante (mismo `paletaSugerida`+`aplicarPaleta` de `/cuenta`). El backend (`/api/auth/signup`) tras el `signUp` escribe esos campos + `tema_color` en la fila `profiles` (que crea el trigger) vía **admin client** (todavía no hay sesión: falta confirmar el email) — best-effort, un fallo no invalida el alta. Así, al confirmar el mail y loguearse, la app arranca con los colores de su universidad. Mapa universidad→tema espejado server-safe en el route (el módulo `paleta.ts` es `"use client"`).
+- **Menos texto de relleno**: se sacaron copys que no aportaban ("JPG, PNG o WebP. Se recorta al centro y se reduce a 256px.", "Se guarda en tu cuenta y viaja entre dispositivos.", "Se sincroniza en todos tus dispositivos.").
+- **Fix menú de perfil en Vidrio 3D (PC)**: el dropdown se veía translúcido/cortado en Vidrio (en 2D estaba bien) porque su clase `rounded-2xl` lo hacía adoptar el material glass (fondo `var(--gl-bg)`, blur, `--gl-float`). Se cambió a `rounded-[16px]` (mismo radio, 1rem) que **no matchea los selectores del sistema Vidrio** → queda sólido y bien encuadrado igual que en 2D, sin tocar `globals.css`.
+- **Logo de universidad en el nav**: en `Identidad` (nav, desktop), entre la línea divisoria y el texto carrera/universidad, aparece el **logo de la universidad elegida** (`opacity 0.9`). Archivos en `public/logos/` y mapa en `app/lib/paleta.ts` (`logoUniversidad`). Hay logo para UCA, UADE, Udesa, UB, UBA, UTN, UP, UNLP (las que pasó Jano); el resto (ITBA, Austral, UAI, UCEMA, Kennedy, USAL) no muestra logo, como antes.
+
+**Verificación**: `npm run build` en verde (27/27). `/registro` probado en local: renderiza los 4 campos nuevos + dropdown de universidades. El resto (reflujo responsive, logos en el nav, menú en Vidrio 3D, layout de `/cuenta`) vive detrás del login y Turnstile solo pasa en `*.vercel.app`, así que **queda para eyeball en el preview de Vercel** (constraint conocido). El fix del menú es determinista por CSS (misma render que 2D) y la paleta de registro reusa el flujo ya probado de `/cuenta`.
+
+---
+
 ## v10.1 — Ajustes post-prueba real de Jano (branch `migracion-v10`)
 
 Primera prueba de la migración con usuario real (Jano se registró, confirmó email y usó la app en el preview). Ajustes que salieron de esa prueba:

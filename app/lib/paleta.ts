@@ -46,6 +46,23 @@ export function paletaSugerida(universidad: string): Paleta | null {
   return UNIVERSIDADES.find(u => u.nombre === universidad)?.paleta ?? null;
 }
 
+/* Logos de universidad (nav). Solo las que Jano pasó; el resto no muestra logo.
+   Archivos en public/logos/. La clave es el `nombre` exacto de UNIVERSIDADES. */
+const LOGOS: Record<string, string> = {
+  UCA:   "/logos/uca.svg",
+  UADE:  "/logos/uade.svg",
+  Udesa: "/logos/udesa.svg",
+  UB:    "/logos/ub.svg",
+  UBA:   "/logos/uba.svg",
+  UTN:   "/logos/utn.svg",
+  UP:    "/logos/up.svg",
+  UNLP:  "/logos/unlp.svg",
+};
+
+export function logoUniversidad(universidad: string): string | null {
+  return LOGOS[universidad] ?? null;
+}
+
 /** Aplica la paleta al documento y la espeja en localStorage (anti-flash). */
 export function aplicarPaleta(p: Paleta) {
   if (typeof document === "undefined") return;

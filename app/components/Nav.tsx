@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import UserMenu from "./UserMenu";
 import { usePerfil } from "../lib/perfil";
+import { logoUniversidad } from "../lib/paleta";
 
 const LINKS = [
   { href:"/timer",      label:"Pomodoro",   short:"Timer"  },
@@ -21,18 +22,25 @@ const AUTH_PATHS = new Set(["/login", "/registro", "/recuperar"]);
 function Identidad() {
   const { perfil } = usePerfil();
   if (!perfil || (!perfil.carrera && !perfil.universidad)) return null;
+  const logo = perfil.universidad ? logoUniversidad(perfil.universidad) : null;
   return (
-    <div className="hidden lg:flex flex-col justify-center min-w-0 border-l border-navy/10 pl-3 ml-1 leading-tight">
-      {perfil.carrera && (
-        <span className="text-[13px] font-semibold truncate max-w-[15rem]" style={{ color:"rgb(var(--navy-rgb) / 0.75)" }}>
-          {perfil.carrera}
-        </span>
+    <div className="hidden lg:flex items-center gap-2.5 min-w-0 border-l border-navy/10 pl-3 ml-1">
+      {logo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logo} alt="" aria-hidden className="h-6 w-auto max-w-[2.25rem] object-contain shrink-0" style={{ opacity:0.9 }} />
       )}
-      {perfil.universidad && (
-        <span className="text-[11px] truncate max-w-[15rem]" style={{ color:"rgb(var(--navy-rgb) / 0.4)" }}>
-          {perfil.universidad}
-        </span>
-      )}
+      <div className="flex flex-col justify-center min-w-0 leading-tight">
+        {perfil.carrera && (
+          <span className="text-[13px] font-semibold truncate max-w-[15rem]" style={{ color:"rgb(var(--navy-rgb) / 0.75)" }}>
+            {perfil.carrera}
+          </span>
+        )}
+        {perfil.universidad && (
+          <span className="text-[11px] truncate max-w-[15rem]" style={{ color:"rgb(var(--navy-rgb) / 0.4)" }}>
+            {perfil.universidad}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

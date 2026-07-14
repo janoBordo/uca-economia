@@ -58,7 +58,7 @@ export default function Metricas() {
   }, [prepReal]);
 
   return (
-    <section className="flex-1 w-full max-w-5xl mx-auto px-6 sm:px-8 py-16 flex flex-col gap-20">
+    <section className="flex-1 w-full max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-16 flex flex-col gap-20">
 
       {/* KPIs */}
       <div>
@@ -85,6 +85,8 @@ export default function Metricas() {
         </div>
       </div>
 
+      {/* Gráfico + Matriz: lado a lado cuando hay ancho (xl+), apilados si no */}
+      <div className="grid xl:grid-cols-2 gap-14 xl:gap-10 items-start">
       {/* Gráfico */}
       <div>
         <div className="flex items-baseline justify-between mb-6 flex-wrap gap-2">
@@ -111,12 +113,13 @@ export default function Metricas() {
           <RadarConfianza data={radarData} umbral={UMBRAL_SOLIDO} />
         </GlassPanel>
       </div>
+      </div>
 
       {/* Sliders preparación */}
       <div>
         <h3 className="font-bold text-navy text-xl sm:text-2xl mb-2" style={{ letterSpacing:"-0.03em" }}>Preparación subjetiva</h3>
         <p className="text-navy/45 text-sm mb-10">¿Qué tan listo te sentís? Sin mentirte.</p>
-        <div className="flex flex-col gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-8">
           {materias.map((m,i) => {
             const v     = prepReal[m.id] ?? 0;
             const color = v<35 ? "rgb(var(--ocre-rgb))" : v<70 ? "rgb(var(--navy-rgb))" : "rgb(var(--navy-soft-rgb))";
