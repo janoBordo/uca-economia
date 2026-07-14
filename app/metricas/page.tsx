@@ -96,20 +96,22 @@ export default function Metricas() {
             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded inline-block" style={{ background:"rgba(11,31,77,0.15)" }}/>Restante</span>
           </div>
         </div>
-        <GlassPanel className="h-72 w-full">
+        <GlassPanel className="h-80 w-full p-4">
           <BarHoras data={chartData} />
         </GlassPanel>
       </div>
 
       {/* Matriz de Confianza (radar) */}
       <div>
-        <h3 className="font-bold text-navy text-xl sm:text-2xl mb-2" style={{ letterSpacing:"-0.03em" }}>Matriz de Confianza</h3>
-        <p className="text-navy/45 text-sm mb-2">Tu preparación subjetiva por materia, de un vistazo. Cuanto más grande la figura, más sólido te sentís.</p>
-        <div className="flex items-center gap-4 text-xs text-navy/40 mb-4">
-          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-navy inline-block"/>Tu confianza</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-0 border-t border-dashed border-navy/40 inline-block"/>Umbral sólido ({UMBRAL_SOLIDO})</span>
+        <div className="flex items-baseline justify-between mb-2 flex-wrap gap-x-4 gap-y-2">
+          <h3 className="font-bold text-navy text-xl sm:text-2xl" style={{ letterSpacing:"-0.03em" }}>Matriz de Confianza</h3>
+          <div className="flex items-center gap-4 text-xs text-navy/40">
+            <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-navy inline-block"/>Tu confianza</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-0 border-t border-dashed border-navy/40 inline-block"/>Umbral sólido ({UMBRAL_SOLIDO})</span>
+          </div>
         </div>
-        <GlassPanel className="h-[360px] w-full">
+        <p className="text-navy/45 text-sm mb-4">Tu preparación subjetiva por materia.</p>
+        <GlassPanel className="h-80 w-full p-2">
           <RadarConfianza data={radarData} umbral={UMBRAL_SOLIDO} />
         </GlassPanel>
       </div>

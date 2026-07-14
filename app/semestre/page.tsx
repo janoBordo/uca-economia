@@ -4,20 +4,19 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useData } from "../lib/useData";
 import { archivarSemestre, saveMaterias, resetHoras, clearPlanEstudio } from "../lib/api";
 import { type Materia, type SemestreArchivado } from "../lib/types";
-import { GlassCard, GlassButton, GlassInput } from "../components/glass";
+import { GlassCard, GlassButton } from "../components/glass";
 
 // Los ids de materias son uuid (PK real en la base)
 function uid() { return crypto.randomUUID(); }
 
-// Convierte "2026-06-08T09:00" → { date:"2026-06-08", time:"09:00" }
-function splitISO(iso: string) {
-  const [date = "", time = ""] = iso.split("T");
-  return { date, time: time.slice(0, 5) };
-}
-// Une date + time → ISO
-function joinISO(date: string, time: string) {
-  if (!date) return "";
-  return `${date}T${time || "09:00"}`;
+// Fecha de examen como texto (las fechas se cargan desde el calendario).
+function fechaExamenTexto(examen: string): string {
+  if (!examen) return "Sin fecha";
+  const d = new Date(examen);
+  if (isNaN(d.getTime())) return "Sin fecha";
+  const dia  = d.toLocaleDateString("es-AR", { day:"2-digit", month:"short" });
+  const hora = d.toLocaleTimeString("es-AR", { hour:"2-digit", minute:"2-digit" });
+  return d.getTime() < Date.now() ? `Rendido · ${dia}` : `${dia} · ${hora}`;
 }
 
 function SemestreCard({ sem, open, onToggle }: { sem: SemestreArchivado; open: boolean; onToggle: () => void }) {
@@ -97,7 +96,7 @@ export default function Semestre() {
   const [guardado,      setGuardado]      = useState(false);
   const [guardando,     setGuardando]     = useState(false);
   const [agregando,     setAgregando]     = useState(false);
-  const [nueva,         setNueva]         = useState({ nombre:"", date:"", time:"09:00", metaHoras:15 });
+  const [nueva,         setNueva]         = useState({ nombre:"" });
   const [confirmHoras,  setConfirmHoras]  = useState(false);
   const [confirmPlan,   setConfirmPlan]   = useState(false);
   const [ejHoras,       setEjHoras]       = useState(false);
@@ -117,14 +116,13 @@ export default function Semestre() {
   function updateField(id: string, field: keyof Materia, val: string | number) {
     setLocal(ms => ms.map(m => m.id === id ? { ...m, [field]: val } : m));
   }
-  function updateDate(id: string, date: string, time: string) {
-    setLocal(ms => ms.map(m => m.id === id ? { ...m, examen: joinISO(date, time) } : m));
-  }
   function quitar(id: string) { setLocal(ms => ms.filter(m => m.id !== id)); }
   function agregar() {
-    if (!nueva.nombre.trim() || !nueva.date) return;
-    setLocal(ms => [...ms, { id: uid(), nombre: nueva.nombre.trim(), examen: joinISO(nueva.date, nueva.time), metaHoras: nueva.metaHoras || 15 }]);
-    setNueva({ nombre:"", date:"", time:"09:00", metaHoras:15 }); setAgregando(false);
+    const nombre = nueva.nombre.trim();
+    if (!nombre) return;
+    // Sin fecha ni horas: se cargan después desde el calendario (examen vacío).
+    setLocal(ms => [...ms, { id: uid(), nombre, examen: "", metaHoras: 15 }]);
+    setNueva({ nombre:"" }); setAgregando(false);
   }
   async function guardar() {
     setGuardando(true); await saveMaterias(local); setGuardando(false);
@@ -147,14 +145,15 @@ export default function Semestre() {
       <div>
         <motion.h2 initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
           className="font-black text-navy mb-2" style={{ fontSize:"clamp(2rem,6vw,3.5rem)", letterSpacing:"-0.04em" }}>
-          Materias y fechas
+          Materias
         </motion.h2>
-        <p className="text-navy/45 text-base mb-8">Editá nombre, fecha de examen y meta de horas.</p>
+        <p className="text-navy/45 text-base mb-8">Agregá y renombrá las materias del semestre. Las fechas de examen y las horas se cargan desde el calendario.</p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           <AnimatePresence>
             {local.map((m, i) => {
-              const { date, time } = splitISO(m.examen);
+              const horasEstudiadas = ((data.sesiones[m.id] || 0) / 60).toFixed(1);
+              const sinFecha = !m.examen;
               return (
                 <GlassCard key={m.id}
                   initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, scale:0.96 }}
@@ -167,25 +166,15 @@ export default function Semestre() {
                     <BtnEliminar onConfirm={() => quitar(m.id)} />
                   </div>
                   <div className="h-px bg-navy/6" />
-                  <div>
-                    <label className="block text-xs text-navy/35 uppercase tracking-wider mb-2">Fecha examen</label>
-                    {/* Dos inputs separados para compatibilidad iOS */}
-                    <div className="flex gap-2">
-                      <GlassInput type="date" value={date}
-                        onChange={e => updateDate(m.id, e.target.value, time)}
-                        className="flex-1 min-w-0 bg-navy/3 rounded-xl px-3 py-2.5 text-navy text-xs font-medium border border-navy/8 focus:outline-none focus:ring-2 focus:ring-ocre/40" />
-                      <GlassInput type="time" value={time}
-                        onChange={e => updateDate(m.id, date, e.target.value)}
-                        className="w-24 bg-navy/3 rounded-xl px-3 py-2.5 text-navy text-xs font-medium border border-navy/8 focus:outline-none focus:ring-2 focus:ring-ocre/40 shrink-0" />
+                  {/* Fecha y horas como texto (se cargan desde el calendario) */}
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-navy/35 text-xs uppercase tracking-wider">Examen</span>
+                      <span className={`text-xs font-medium ${sinFecha ? "text-navy/30" : "text-navy/70"}`}>{fechaExamenTexto(m.examen)}</span>
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-navy/35 uppercase tracking-wider mb-2">Meta de horas</label>
-                    <div className="flex items-center gap-2">
-                      <GlassInput type="number" min={1} max={200} value={m.metaHoras}
-                        onChange={e => updateField(m.id, "metaHoras", +e.target.value)}
-                        className="w-20 bg-navy/3 rounded-xl px-3 py-2.5 text-navy text-sm font-medium border border-navy/8 focus:outline-none focus:ring-2 focus:ring-ocre/40 text-center" />
-                      <span className="text-navy/40 text-xs">horas</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-navy/35 text-xs uppercase tracking-wider">Estudiado</span>
+                      <span className="text-navy/70 text-xs font-medium tabular-nums">{horasEstudiadas}h</span>
                     </div>
                   </div>
                 </GlassCard>
@@ -201,29 +190,14 @@ export default function Semestre() {
               <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
                 className="p-5 rounded-2xl border-2 border-ocre/30 bg-ocre/5">
                 <p className="font-semibold text-navy mb-4 text-sm uppercase tracking-wider">Nueva materia</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                  <div className="min-w-0">
-                    <label className="block text-xs text-navy/40 uppercase tracking-wider mb-1.5">Nombre</label>
-                    <input value={nueva.nombre} onChange={e => setNueva(n => ({ ...n, nombre: e.target.value }))}
-                      placeholder="Ej. Macroeconomía"
-                      className="w-full min-w-0 appearance-none bg-canvas rounded-xl px-4 py-2.5 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40" />
-                  </div>
-                  <div className="min-w-0">
-                    <label className="block text-xs text-navy/40 uppercase tracking-wider mb-1.5">Meta de horas</label>
-                    <input type="number" min={1} value={nueva.metaHoras}
-                      onChange={e => setNueva(n => ({ ...n, metaHoras: +e.target.value }))}
-                      className="w-full min-w-0 appearance-none bg-canvas rounded-xl px-4 py-2.5 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40 text-center" />
-                  </div>
-                  <div className="min-w-0">
-                    <label className="block text-xs text-navy/40 uppercase tracking-wider mb-1.5">Fecha examen</label>
-                    <input type="date" value={nueva.date} onChange={e => setNueva(n => ({ ...n, date: e.target.value }))}
-                      className="w-full min-w-0 appearance-none bg-canvas rounded-xl px-4 py-2.5 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40" />
-                  </div>
-                  <div className="min-w-0">
-                    <label className="block text-xs text-navy/40 uppercase tracking-wider mb-1.5">Hora examen</label>
-                    <input type="time" value={nueva.time} onChange={e => setNueva(n => ({ ...n, time: e.target.value }))}
-                      className="w-full min-w-0 appearance-none bg-canvas rounded-xl px-4 py-2.5 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40" />
-                  </div>
+                <div className="mb-4">
+                  <label className="block text-xs text-navy/40 uppercase tracking-wider mb-1.5">Nombre</label>
+                  <input value={nueva.nombre} autoFocus
+                    onChange={e => setNueva({ nombre: e.target.value })}
+                    onKeyDown={e => { if (e.key === "Enter") agregar(); }}
+                    placeholder="Ej. Macroeconomía"
+                    className="w-full min-w-0 appearance-none bg-canvas rounded-xl px-4 py-2.5 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40" />
+                  <p className="text-navy/35 text-xs mt-2">La fecha de examen y las horas a estudiar se cargan después desde el calendario.</p>
                 </div>
                 <div className="flex gap-3">
                   <button onClick={agregar} className="px-6 py-2.5 rounded-full bg-navy text-canvas text-sm font-semibold hover:bg-navy-soft transition-colors">Agregar</button>

@@ -34,8 +34,9 @@ function CountdownHero({ materia }: { materia: Materia }) {
 }
 
 function RowItem({ m, index }: { m: Materia; index: number }) {
+  const sinFecha = !m.examen;
   const d = useDiff(m.examen, 60000); // la fila sólo muestra minutos → basta tickear cada 60s
-  const fecha = new Date(m.examen).toLocaleDateString("es-AR", { day:"2-digit", month:"short" });
+  const fecha = sinFecha ? "" : new Date(m.examen).toLocaleDateString("es-AR", { day:"2-digit", month:"short" });
   return (
     <motion.li initial={{ opacity:0, x:-12 }} animate={{ opacity:1, x:0 }} transition={{ delay:0.4+index*0.05 }}
       className="flex items-center justify-between py-4 border-b border-navy/8 group">
@@ -46,7 +47,9 @@ function RowItem({ m, index }: { m: Materia; index: number }) {
       <div className="flex items-center gap-3 sm:gap-5 shrink-0">
         <span className="text-navy/35 text-sm hidden sm:block">{fecha}</span>
         <span className="tabular-nums text-navy/60 text-sm font-medium">
-          {d.neg ? <span className="text-navy/25">rendido</span> : `${d.dias}d ${d.horas}h ${d.mins}m`}
+          {sinFecha ? <span className="text-navy/25">sin fecha</span>
+            : d.neg ? <span className="text-navy/25">rendido</span>
+            : `${d.dias}d ${d.horas}h ${d.mins}m`}
         </span>
       </div>
     </motion.li>

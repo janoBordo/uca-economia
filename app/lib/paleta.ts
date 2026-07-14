@@ -39,6 +39,9 @@ export const UNIVERSIDADES: { nombre: string; paleta: Paleta }[] = [
   { nombre: "UP",      paleta: "negro" },
   { nombre: "USAL",    paleta: "verde" },
   { nombre: "UNLP",    paleta: "verde" },
+  { nombre: "UNC",     paleta: "azul"  },
+  { nombre: "UNR",     paleta: "bordo" },
+  { nombre: "Siglo 21", paleta: "verde" },
 ];
 export const UNIVERSIDAD_OTRA = "Otra";
 
@@ -49,14 +52,23 @@ export function paletaSugerida(universidad: string): Paleta | null {
 /* Logos de universidad (nav). Solo las que Jano pasó; el resto no muestra logo.
    Archivos en public/logos/. La clave es el `nombre` exacto de UNIVERSIDADES. */
 const LOGOS: Record<string, string> = {
-  UCA:   "/logos/uca.svg",
-  UADE:  "/logos/uade.svg",
-  Udesa: "/logos/udesa.svg",
-  UB:    "/logos/ub.svg",
-  UBA:   "/logos/uba.svg",
-  UTN:   "/logos/utn.svg",
-  UP:    "/logos/up.svg",
-  UNLP:  "/logos/unlp.svg",
+  UCA:      "/logos/uca.svg",
+  UADE:     "/logos/uade.svg",
+  Udesa:    "/logos/udesa.svg",
+  UB:       "/logos/ub.svg",
+  UBA:      "/logos/uba.svg",
+  UTN:      "/logos/utn.svg",
+  UP:       "/logos/up.svg",
+  UNLP:     "/logos/unlp.svg",
+  ITBA:     "/logos/itba.svg",
+  Austral:  "/logos/austral.svg",
+  UAI:      "/logos/uai.svg",
+  UCEMA:    "/logos/ucema.svg",
+  Kennedy:  "/logos/kennedy.svg",
+  USAL:     "/logos/usal.svg",
+  UNC:      "/logos/unc.svg",
+  UNR:      "/logos/unr.svg",
+  "Siglo 21": "/logos/siglo21.svg",
 };
 
 export function logoUniversidad(universidad: string): string | null {

@@ -63,5 +63,5 @@ function conCookies(destino: NextResponse, origen: NextResponse) {
 
 export const config = {
   // Todo menos /api (cada handler se protege solo), assets y archivos estáticos.
-  matcher: ["/((?!api|_next/static|_next/image|icon\\.svg|favicon\\.ico).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|logos|icon\\.svg|favicon\\.ico).*)"],
 };

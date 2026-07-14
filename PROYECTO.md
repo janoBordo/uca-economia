@@ -6,6 +6,24 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.3 — Más UI + alta de exámenes desde el calendario (branch `main`)
+
+Segunda tanda de UI sobre `main`. Seis cambios:
+
+- **Métricas más prolijas**: en la Matriz de Confianza se quitó el texto de más ("de un vistazo. Cuanto más grande…") y la leyenda (Tu confianza / Umbral sólido) pasó a estar **al lado del título** (no debajo). El gráfico de "Horas por materia" ya no toca los bordes: se le dio padding al panel (`p-4`) y se corrigieron los márgenes del chart (`BarHoras`: `left:-24 → -6`, `top/right/bottom` con aire) para que el "24" del eje Y y las etiquetas inclinadas no queden cortados. Los dos paneles (Horas y Matriz) quedaron **del mismo alto** (`h-80`) para que se vean parejos lado a lado.
+- **Apariencia como acordeón** (`app/cuenta/page.tsx`): "Estilo visual" y "Tema de color" ahora son secciones colapsables (flecha que rota), cerradas por defecto → la card queda compacta (mucho más corta que Perfil) y sigue a su lado. Nuevo helper `AccordionRow`.
+- **3 universidades nuevas + todos los logos**: UNC (azul), UNR (bordó), Siglo 21 (verde) agregadas a `UNIVERSIDADES` (`app/lib/paleta.ts`) y al mirror `UNI_PALETA` del signup. Se sumaron los 9 SVG que faltaban a `public/logos/` (ITBA, Austral, UAI, UCEMA, Kennedy, USAL + las 3 nuevas) y al mapa `LOGOS` → ahora **17 universidades con logo**. (Las paletas de UNC/UNR/Siglo 21 las elegí por color de marca; se cambian a mano si Jano prefiere otra.)
+- **Menú hamburguesa en mobile** (`app/components/Nav.tsx`, reescrito): en `< lg` las pestañas (Pomodoro, Métricas…) dejan de estar en la barra y pasan a un **desplegable hamburguesa** minimalista (ícono que se transforma en X). Eso libera espacio para mostrar **universidad y carrera al lado de la "s."** también en mobile (antes solo en `lg+`). En desktop las pestañas siguen inline. El dropdown usa `rounded-[16px]` (no hereda el material Vidrio).
+- **Alta de exámenes movida al calendario** (cambio de flujo):
+  - **Semestre** (`app/semestre/page.tsx`) queda solo para **agregar/renombrar materias**: las cards muestran la fecha de examen y las horas estudiadas **como texto** (ya no inputs), el alta pide solo el nombre, y sigue el bloque de "Guardar" + cerrar/archivar semestre. El título pasó de "Materias y fechas" a "Materias".
+  - **Calendario** (`app/calendario/page.tsx`): al abrir un día, arriba de **"Estudiar ese día:"** (antes "Plan de estudio") hay un control minimalista "+ Agregar examen" que despliega: elegir materia + horas a estudiar + hora. Se pueden cargar **varios exámenes** el mismo día y cada uno tiene su **× para quitarlo** (con confirmación inline). Quitar un examen vuelve la materia a "sin fecha" (no la borra).
+  - **Modelo intacto**: no hizo falta migración — `MateriaSchema.examen` ya aceptaba `""` (→ `NULL` en la base). Una materia sin fecha se maneja en toda la app: en la home la fila muestra "sin fecha" en vez de un countdown roto (`app/page.tsx`).
+  - Se excluyó `/logos` del matcher del `middleware.ts` (assets públicos de marca: no deben pasar por auth ni refrescar sesión).
+
+**Verificación**: `npm run build` en verde (27/27, sin errores de tipo ni eslint). En local (`/registro`, pública) se confirmó: las 3 universidades nuevas en el dropdown y los 17 logos sirviendo 200 (SVG). El resto (métricas, cuenta, calendario, semestre, hamburguesa mobile) vive tras el login y Turnstile solo pasa en `*.vercel.app` → **eyeball en el preview de Vercel**. Ojo especial ahí al flujo nuevo del calendario (agregar/quitar examen) y a que las materias sin fecha se vean bien.
+
+---
+
 ## v10.2 — UI dinámica + ajustes post-prueba (branch `main`)
 
 Tanda de UI sobre `main` tras seguir usando la app. Seis cambios:

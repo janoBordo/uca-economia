@@ -16,6 +16,21 @@ function isoKey(y: number, m: number, d: number) {
   return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
 }
 
+/* Quitar examen: × con confirmación inline (regla de acciones destructivas). */
+function BtnQuitarExamen({ onConfirm }: { onConfirm: () => void }) {
+  const [c, setC] = useState(false);
+  if (!c) return (
+    <button onClick={() => setC(true)} aria-label="Quitar examen"
+      className="w-6 h-6 rounded-full text-navy/30 hover:text-red-500 hover:bg-red-50 transition-colors text-base leading-none shrink-0 flex items-center justify-center">×</button>
+  );
+  return (
+    <div className="flex items-center gap-1 shrink-0">
+      <button onClick={onConfirm} className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[11px] font-semibold hover:bg-red-600 transition-colors">Sí</button>
+      <button onClick={() => setC(false)} className="px-2 py-0.5 rounded-full border border-navy/20 text-navy/40 text-[11px] hover:border-navy/40 transition-colors">No</button>
+    </div>
+  );
+}
+
 export default function Calendario() {
   const hoy = new Date();
   const { data } = useData();
@@ -24,9 +39,15 @@ export default function Calendario() {
   const notas       = data.notas ?? [];
 
   const [vista, setVista] = useState({ y: hoy.getFullYear(), m: hoy.getMonth() });
-  const [modal, setModal] = useState<{ dia: number; key: string; exams: Materia[] } | null>(null);
+  const [modal, setModal] = useState<{ dia: number; key: string } | null>(null);
   const [planLocal, setPlanLocal] = useState<string[]>([]);
   const [guardandoPlan, setGuardandoPlan] = useState(false);
+
+  // Alta de examen desde el día seleccionado
+  const [addExam, setAddExam] = useState(false);
+  const [exSel, setExSel] = useState("");
+  const [exHoras, setExHoras] = useState(15);
+  const [exHora, setExHora] = useState("09:00");
 
   // notas
   const [notaInput, setNotaInput] = useState("");
@@ -61,7 +82,8 @@ export default function Calendario() {
   function abrirModal(dia: number) {
     const key = isoKey(vista.y, vista.m, dia);
     setPlanLocal(planEstudio[key] ?? []);
-    setModal({ dia, key, exams: examMap[key] ?? [] });
+    setModal({ dia, key });
+    cancelAddExam();
   }
 
   function toggleMateria(id: string) {
@@ -78,10 +100,27 @@ export default function Calendario() {
     setModal(null);
   }
 
-  async function guardarHora(matId: string, date: string, time: string) {
-    const nuevoISO = `${date}T${time}`;
-    const updated  = materias.map(m => m.id === matId ? { ...m, examen: nuevoISO } : m);
+  function cancelAddExam() { setAddExam(false); setExSel(""); setExHoras(15); setExHora("09:00"); }
+
+  // Asigna un examen a este día: setea examen (día + hora) y las horas a estudiar
+  // (metaHoras) de la materia elegida. Se puede repetir para varias materias.
+  async function agregarExamen() {
+    if (!modal || !exSel) return;
+    const examen  = `${modal.key}T${exHora || "09:00"}`;
+    const updated = materias.map(m => m.id === exSel ? { ...m, examen, metaHoras: exHoras || m.metaHoras } : m);
     await saveMaterias(updated);
+    cancelAddExam();
+  }
+  // Quitar el examen de una materia (vuelve a "sin fecha"; la materia no se borra)
+  async function eliminarExamen(id: string) {
+    const updated = materias.map(m => m.id === id ? { ...m, examen: "" } : m);
+    await saveMaterias(updated);
+  }
+  // Al elegir la materia, prefill de las horas con su valor actual
+  function elegirMateriaExamen(id: string) {
+    setExSel(id);
+    const m = materias.find(x => x.id === id);
+    if (m) setExHoras(m.metaHoras || 15);
   }
 
   async function agregarNota() {
@@ -104,6 +143,10 @@ export default function Calendario() {
     const d = new Date(m.examen);
     return d.getFullYear() === vista.y && d.getMonth() === vista.m;
   });
+
+  // Exámenes del día abierto (live) + materias que todavía no rinden ese día
+  const modalExams = modal ? (examMap[modal.key] ?? []) : [];
+  const materiasSinDia = modal ? materias.filter(m => !modalExams.some(e => e.id === m.id)) : [];
 
   return (
     <section className="flex-1 w-full max-w-5xl xl:max-w-6xl mx-auto px-4 sm:px-8 lg:px-12 py-12 flex flex-col gap-10">
@@ -285,32 +328,76 @@ export default function Calendario() {
                 {MESES[vista.m]} {modal.dia}
               </h3>
 
-              {modal.exams.length > 0 && (
-                <div className="mb-6">
-                  <p className="text-xs text-navy/40 uppercase tracking-wider mb-3 font-semibold">Examen</p>
-                  <div className="flex flex-col gap-4">
-                    {modal.exams.map(ex => {
-                      const [d = "", t = ""] = ex.examen.split("T");
+              {/* Exámenes ese día: lista + alta minimalista (materia + horas + hora) */}
+              <div className="mb-6">
+                <p className="text-xs text-navy/40 uppercase tracking-wider mb-3 font-semibold">Exámenes ese día</p>
+                {modalExams.length > 0 && (
+                  <div className="flex flex-col gap-2 mb-3">
+                    {modalExams.map(ex => {
+                      const t = ex.examen.split("T")[1]?.slice(0,5) ?? "";
                       return (
-                        <div key={ex.id}>
-                          <p className="font-semibold text-navy text-sm mb-2">{ex.nombre}</p>
-                          <div className="flex gap-2">
-                            <input type="date" defaultValue={d}
-                              onChange={e => guardarHora(ex.id, e.target.value, t.slice(0,5))}
-                              className="flex-1 bg-navy/5 rounded-xl px-3 py-2.5 text-navy text-sm border border-navy/10 focus:outline-none focus:ring-2 focus:ring-ocre/50" />
-                            <input type="time" defaultValue={t.slice(0,5)}
-                              onChange={e => guardarHora(ex.id, d, e.target.value)}
-                              className="w-24 bg-navy/5 rounded-xl px-3 py-2.5 text-navy text-sm border border-navy/10 focus:outline-none focus:ring-2 focus:ring-ocre/50" />
+                        <div key={ex.id} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-ocre/8 border border-ocre/25">
+                          <div className="min-w-0">
+                            <p className="text-navy text-sm font-medium truncate">{ex.nombre}</p>
+                            <p className="text-navy/40 text-xs">{t} · {ex.metaHoras}h a estudiar</p>
                           </div>
+                          <BtnQuitarExamen onConfirm={() => eliminarExamen(ex.id)} />
                         </div>
                       );
                     })}
                   </div>
-                </div>
-              )}
+                )}
+                <AnimatePresence mode="wait">
+                  {!addExam ? (
+                    <motion.button key="add" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+                      onClick={() => setAddExam(true)}
+                      className="flex items-center gap-2 text-navy/50 text-sm font-medium hover:text-ocre transition-colors">
+                      <span className="w-6 h-6 rounded-full border border-navy/25 flex items-center justify-center text-base leading-none">+</span>
+                      Agregar examen
+                    </motion.button>
+                  ) : (
+                    <motion.div key="form" initial={{ opacity:0, y:4 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
+                      className="rounded-xl border border-ocre/30 bg-ocre/5 p-3 flex flex-col gap-3">
+                      {materiasSinDia.length === 0 ? (
+                        <p className="text-navy/50 text-xs">
+                          {materias.length === 0
+                            ? "Primero agregá materias en Semestres."
+                            : "Ya asignaste todas tus materias a este día."}
+                        </p>
+                      ) : (
+                        <>
+                          <select value={exSel} onChange={e => elegirMateriaExamen(e.target.value)}
+                            className="w-full appearance-none bg-canvas rounded-lg px-3 py-2 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40">
+                            <option value="">— Elegí la materia —</option>
+                            {materiasSinDia.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                          </select>
+                          <div className="flex gap-2">
+                            <div className="flex-1 min-w-0">
+                              <label className="block text-[10px] text-navy/40 uppercase tracking-wider mb-1">Horas a estudiar</label>
+                              <input type="number" min={1} max={200} value={exHoras} onChange={e => setExHoras(+e.target.value)}
+                                className="w-full appearance-none bg-canvas rounded-lg px-3 py-2 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40" />
+                            </div>
+                            <div className="w-28 shrink-0">
+                              <label className="block text-[10px] text-navy/40 uppercase tracking-wider mb-1">Hora</label>
+                              <input type="time" value={exHora} onChange={e => setExHora(e.target.value)}
+                                className="w-full appearance-none bg-canvas rounded-lg px-3 py-2 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40" />
+                            </div>
+                          </div>
+                        </>
+                      )}
+                      <div className="flex gap-2">
+                        <button onClick={agregarExamen} disabled={!exSel}
+                          className="px-4 py-2 rounded-full bg-navy text-canvas text-xs font-semibold hover:bg-navy-soft transition-colors disabled:opacity-40">Agregar</button>
+                        <button onClick={cancelAddExam}
+                          className="px-4 py-2 rounded-full border border-navy/15 text-navy/50 text-xs hover:border-navy/30 transition-colors">Cancelar</button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
               <div>
-                <p className="text-xs text-navy/40 uppercase tracking-wider mb-3 font-semibold">Plan de estudio</p>
+                <p className="text-xs text-navy/40 uppercase tracking-wider mb-3 font-semibold">Estudiar ese día:</p>
                 <div className="flex flex-wrap gap-2">
                   {materias.map((m, i) => {
                     const sel = planLocal.includes(m.id);

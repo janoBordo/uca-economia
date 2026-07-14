@@ -27,7 +27,7 @@ function BarHoras({ data }: { data: BarDatum[] }) {
   const navy = rgbVar("--navy-rgb"), ocre = rgbVar("--ocre-rgb");
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top:0, right:0, left:-24, bottom:40 }} barGap={2}>
+      <BarChart data={data} margin={{ top:8, right:8, left:-6, bottom:44 }} barGap={2}>
         <XAxis dataKey="corto" angle={-35} textAnchor="end" interval={0}
           tick={{ fill:rgbVar("--navy-rgb",0.4), fontSize:11 }} axisLine={false} tickLine={false} />
         <YAxis tick={{ fill:rgbVar("--navy-rgb",0.3), fontSize:10 }} axisLine={false} tickLine={false} />

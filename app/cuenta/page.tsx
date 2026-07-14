@@ -219,6 +219,30 @@ function SeccionPerfil({ perfil }: { perfil: Perfil }) {
   );
 }
 
+/* Fila de acordeón: encabezado con flecha + contenido colapsable. Colapsada
+   por defecto para que la card quede compacta. */
+function AccordionRow({ titulo, children, defaultOpen = false }: { titulo: string; children: React.ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border-b border-navy/8 last:border-b-0">
+      <button onClick={() => setOpen(o => !o)} aria-expanded={open}
+        className="w-full flex items-center justify-between py-4 text-left">
+        <span className="text-navy/70 text-sm font-semibold">{titulo}</span>
+        <motion.span animate={{ rotate: open ? 90 : 0 }} transition={{ duration: 0.18 }}
+          className="text-navy/35 text-xs leading-none">▶</motion.span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden">
+            <div className="pb-5">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 /* ── Apariencia ── */
 function SeccionApariencia({ perfil }: { perfil: Perfil }) {
   const [elegida, setElegida] = useState<Paleta>(perfil.temaColor);
@@ -244,43 +268,45 @@ function SeccionApariencia({ perfil }: { perfil: Perfil }) {
 
   return (
     <Seccion titulo="Apariencia">
-      <div className="mb-8">
-        <p className="text-navy/50 text-sm font-semibold mb-3">Estilo visual</p>
-        <ThemeToggle />
-      </div>
-      <div className="h-px bg-navy/8 mb-8" />
-      <p className="text-navy/50 text-sm font-semibold mb-1">Tema de color</p>
-      <p className="text-navy/35 text-xs mb-4">
-        Se asigna automáticamente según tu universidad — si no te gusta, elegí acá el que quieras.
-      </p>
-      <div className="flex flex-wrap gap-3 mb-6">
-        {PALETAS.map(p => (
-          <button key={p.id} onClick={() => previsualizar(p.id)}
-            aria-pressed={elegida === p.id}
-            className={`flex items-center gap-2.5 pl-2 pr-4 py-2 rounded-full border transition-colors text-sm font-medium ${
-              elegida === p.id ? "border-navy/50 bg-navy/5 text-navy" : "border-navy/12 text-navy/50 hover:border-navy/30"
-            }`}>
-            <span className="relative w-6 h-6 shrink-0">
-              <span className="absolute inset-0 rounded-full" style={{ background: p.primario }} />
-              <span className="absolute right-0 bottom-0 w-3 h-3 rounded-full border-2 border-white" style={{ background: p.acento }} />
-            </span>
-            {p.label}
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center gap-4 flex-wrap">
-        <GlassButton onClick={guardar} disabled={guardando || !sucia}
-          className="px-8 py-3 rounded-full bg-navy text-canvas font-semibold text-sm hover:bg-navy-soft transition-colors disabled:opacity-60">
-          {guardando ? "Guardando…" : "Guardar apariencia"}
-        </GlassButton>
-        <AnimatePresence>
-          {estado === "ok" && (
-            <motion.span initial={{ opacity:0, x:-8 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0 }}
-              className="text-sm text-navy/50 flex items-center gap-2"><span className="text-ocre">✓</span> Guardado</motion.span>
-          )}
-        </AnimatePresence>
-        {estado === "error" && <span className="text-sm text-red-500">No se pudo guardar. Probá de nuevo.</span>}
-        {sucia && estado === "" && <span className="text-navy/35 text-xs">Vista previa — todavía no está guardado.</span>}
+      {/* Acordeón: cada sección se expande/contrae con su flecha (card compacta) */}
+      <div className="-mt-2">
+        <AccordionRow titulo="Estilo visual">
+          <ThemeToggle />
+        </AccordionRow>
+        <AccordionRow titulo="Tema de color">
+          <p className="text-navy/35 text-xs mb-4">
+            Se asigna automáticamente según tu universidad — si no te gusta, elegí acá el que quieras.
+          </p>
+          <div className="flex flex-wrap gap-3 mb-6">
+            {PALETAS.map(p => (
+              <button key={p.id} onClick={() => previsualizar(p.id)}
+                aria-pressed={elegida === p.id}
+                className={`flex items-center gap-2.5 pl-2 pr-4 py-2 rounded-full border transition-colors text-sm font-medium ${
+                  elegida === p.id ? "border-navy/50 bg-navy/5 text-navy" : "border-navy/12 text-navy/50 hover:border-navy/30"
+                }`}>
+                <span className="relative w-6 h-6 shrink-0">
+                  <span className="absolute inset-0 rounded-full" style={{ background: p.primario }} />
+                  <span className="absolute right-0 bottom-0 w-3 h-3 rounded-full border-2 border-white" style={{ background: p.acento }} />
+                </span>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-4 flex-wrap">
+            <GlassButton onClick={guardar} disabled={guardando || !sucia}
+              className="px-8 py-3 rounded-full bg-navy text-canvas font-semibold text-sm hover:bg-navy-soft transition-colors disabled:opacity-60">
+              {guardando ? "Guardando…" : "Guardar apariencia"}
+            </GlassButton>
+            <AnimatePresence>
+              {estado === "ok" && (
+                <motion.span initial={{ opacity:0, x:-8 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0 }}
+                  className="text-sm text-navy/50 flex items-center gap-2"><span className="text-ocre">✓</span> Guardado</motion.span>
+              )}
+            </AnimatePresence>
+            {estado === "error" && <span className="text-sm text-red-500">No se pudo guardar. Probá de nuevo.</span>}
+            {sucia && estado === "" && <span className="text-navy/35 text-xs">Vista previa — todavía no está guardado.</span>}
+          </div>
+        </AccordionRow>
       </div>
     </Seccion>
   );

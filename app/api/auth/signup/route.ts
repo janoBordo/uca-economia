@@ -29,10 +29,10 @@ const Body = z.object({
 // Mapeo universidad → tema_color. Espejo server-safe de UNIVERSIDADES en
 // app/lib/paleta.ts (ese módulo es "use client") — mantener en sync.
 const UNI_PALETA: Record<string, string> = {
-  UCA: "azul", UADE: "azul", ITBA: "azul", Austral: "azul", Udesa: "azul",
-  UAI: "bordo", UCEMA: "bordo", Kennedy: "bordo", UB: "bordo",
+  UCA: "azul", UADE: "azul", ITBA: "azul", Austral: "azul", Udesa: "azul", UNC: "azul",
+  UAI: "bordo", UCEMA: "bordo", Kennedy: "bordo", UB: "bordo", UNR: "bordo",
   UBA: "negro", UTN: "negro", UP: "negro",
-  USAL: "verde", UNLP: "verde",
+  USAL: "verde", UNLP: "verde", "Siglo 21": "verde",
 };
 
 const generico = (msg: string, status: number) =>
