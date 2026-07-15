@@ -106,17 +106,42 @@ export default function Semestre() {
 
   const totalMins    = Object.values(data.sesiones).reduce((a, v) => a + v, 0);
   const totalHoras   = (totalMins / 60).toFixed(1);
-  const cantMat      = data.materias.length;
-  const masEstudiada = data.materias.reduce<{ nombre: string; mins: number }>(
-    (best, m) => { const mins = data.sesiones[m.id] || 0; return mins > best.mins ? { nombre: m.nombre, mins } : best; },
+  // Agrupado por nombre: cada materia cuenta UNA vez aunque tenga varias fechas.
+  const porNombre = data.materias.reduce((acc, m) => {
+    const k = m.nombre.trim().toLowerCase();
+    const cur = acc.get(k) ?? { nombre: m.nombre, mins: 0 };
+    cur.mins += data.sesiones[m.id] || 0;
+    acc.set(k, cur);
+    return acc;
+  }, new Map<string, { nombre: string; mins: number }>());
+  const cantMat = porNombre.size;
+  const masEstudiada = Array.from(porNombre.values()).reduce(
+    (best, v) => (v.mins > best.mins ? v : best),
     { nombre: "—", mins: 0 }
   );
   const nextNumero = data.semestres.length + 1;
 
-  function updateField(id: string, field: keyof Materia, val: string | number) {
-    setLocal(ms => ms.map(m => m.id === id ? { ...m, [field]: val } : m));
+  // Filas agrupadas por materia (nombre) para las cards: una card = una materia,
+  // con todas sus fechas de examen adentro. La key usa el id de la 1ª fila (estable
+  // al renombrar → el input no pierde el foco).
+  const grupos = (() => {
+    const map = new Map<string, { key: string; nombre: string; rows: Materia[] }>();
+    for (const m of local) {
+      const k = m.nombre.trim().toLowerCase();
+      const g = map.get(k);
+      if (g) g.rows.push(m);
+      else map.set(k, { key: m.id, nombre: m.nombre, rows: [m] });
+    }
+    return Array.from(map.values());
+  })();
+
+  // Renombrar/eliminar afecta a TODAS las filas de esa materia.
+  function renombrarGrupo(ids: string[], nombre: string) {
+    setLocal(ms => ms.map(m => ids.includes(m.id) ? { ...m, nombre } : m));
   }
-  function quitar(id: string) { setLocal(ms => ms.filter(m => m.id !== id)); }
+  function quitarGrupo(ids: string[]) {
+    setLocal(ms => ms.filter(m => !ids.includes(m.id)));
+  }
   function agregar() {
     const nombre = nueva.nombre.trim();
     if (!nombre) return;
@@ -151,26 +176,38 @@ export default function Semestre() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           <AnimatePresence>
-            {local.map((m, i) => {
-              const horasEstudiadas = ((data.sesiones[m.id] || 0) / 60).toFixed(1);
-              const sinFecha = !m.examen;
+            {grupos.map((g, i) => {
+              const ids = g.rows.map(r => r.id);
+              const totalMins = g.rows.reduce((a, r) => a + (data.sesiones[r.id] || 0), 0);
+              const horasEstudiadas = (totalMins / 60).toFixed(1);
+              // Todas las fechas de examen de la materia (ordenadas de más próxima a más lejana).
+              const fechas = g.rows.filter(r => r.examen)
+                .sort((a, b) => new Date(a.examen).getTime() - new Date(b.examen).getTime());
               return (
-                <GlassCard key={m.id}
+                <GlassCard key={g.key}
                   initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, scale:0.96 }}
                   transition={{ delay: i * 0.02 }}
                   className="p-5 rounded-2xl flex flex-col gap-4"
                   style={{ background:"#fff", border:"1px solid rgba(11,31,77,0.08)", boxShadow:"0 2px 12px rgba(11,31,77,0.06), 0 1px 3px rgba(11,31,77,0.04)" }}>
                   <div className="flex items-start justify-between gap-2">
-                    <input value={m.nombre} onChange={e => updateField(m.id, "nombre", e.target.value)}
+                    <input value={g.nombre} onChange={e => renombrarGrupo(ids, e.target.value)}
                       className="font-semibold text-navy bg-transparent border-b border-transparent hover:border-navy/20 focus:border-ocre focus:outline-none text-sm w-full pb-0.5" />
-                    <BtnEliminar onConfirm={() => quitar(m.id)} />
+                    <BtnEliminar onConfirm={() => quitarGrupo(ids)} />
                   </div>
                   <div className="h-px bg-navy/6" />
-                  {/* Fecha y horas como texto (se cargan desde el calendario) */}
+                  {/* Todas las fechas de examen + total estudiado (se cargan desde el calendario) */}
                   <div className="flex flex-col gap-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-navy/35 text-xs uppercase tracking-wider">Examen</span>
-                      <span className={`text-xs font-medium ${sinFecha ? "text-navy/30" : "text-navy/70"}`}>{fechaExamenTexto(m.examen)}</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-navy/35 text-xs uppercase tracking-wider shrink-0 pt-0.5">{fechas.length > 1 ? "Exámenes" : "Examen"}</span>
+                      {fechas.length === 0 ? (
+                        <span className="text-navy/30 text-xs font-medium">Sin fecha</span>
+                      ) : (
+                        <div className="flex flex-col items-end gap-0.5 min-w-0">
+                          {fechas.map(r => (
+                            <span key={r.id} className="text-navy/70 text-xs font-medium text-right">{fechaExamenTexto(r.examen)}</span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-navy/35 text-xs uppercase tracking-wider">Estudiado</span>

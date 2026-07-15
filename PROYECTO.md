@@ -6,6 +6,12 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.3.5 — Semestre: una card por materia (todas sus fechas) (branch `main`)
+
+En Semestre cada fila de examen se mostraba como una card aparte (una materia con 2 fechas = 2 cards). Ahora `app/semestre/page.tsx` **agrupa por nombre**: una card = una materia, y adentro lista **todas sus fechas de examen** (ordenadas de más próxima a más lejana) + el **total** estudiado (suma de todas sus filas). Renombrar o eliminar afecta a todas las filas de esa materia. La key de la card usa el id de la 1ª fila (estable al renombrar → el input no pierde foco). Los KPIs de "En curso" (Materias / Más estudiada) también cuentan por materia, no por fila.
+
+---
+
 ## v10.3.4 — Dominio `stuniv.vercel.app` (branch `main`)
 
 El dominio de la app dejó de ser `uca-economia.vercel.app` y ahora es **`stuniv.vercel.app`**, hecho de forma **no destructiva** (nada de lo que andaba se rompió):
