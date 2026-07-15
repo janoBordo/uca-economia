@@ -6,6 +6,14 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.3.3 — Fix sesión mobile + dedup en calendario + nav (branch `main`)
+
+- **Sesión que se perdía en el celular (pedía login cada vez; en PC recordaba):** las cookies de sesión de Supabase se seteaban **sin `maxAge`** → eran cookies de SESIÓN que el navegador borra al cerrarse (la PC las restaura, el celular no). Ahora `hardenCookie` (`app/lib/supabase/server.ts`) y el `harden` del `middleware.ts` les ponen `maxAge` persistente (~400 días, tope de los navegadores) **sin pisar** el `maxAge:0`/`expires` que Supabase manda para borrarlas en el logout (se preserva con `?? `). El logout sigue funcionando.
+- **Materia duplicada en el modal del calendario:** los chips de "Estudiar ese día", la leyenda y el dropdown de alta de examen usaban `data.materias` (con las filas duplicadas por varias fechas). Ahora usan `materiasEfectivas` (una por nombre). `colorMap` mapea todas las filas de una materia al mismo color. El listado de exámenes del día (`modalExams`) sigue mostrando cada examen real.
+- **Nav (desktop):** las pestañas (Pomodoro, Métricas, etc.) un poco más grandes (`text-[15px]`, más padding) y en hover pasan de `navy/45` a `navy/80` (más opacas/visibles).
+
+---
+
 ## v10.3.2 — Fix: métricas cuenta la materia una vez (examen más próximo) (branch `main`)
 
 Corrección de los efectos colaterales de v10.3.1 (una materia con varias fechas se guarda como filas duplicadas con el mismo nombre): en Métricas la materia aparecía dos veces y sumaba las horas de TODOS sus exámenes, y el radar "Matriz de Confianza" quedaba roto (dos ejes con el mismo nombre) y no respondía a los sliders.

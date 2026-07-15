@@ -124,8 +124,9 @@ export default function Nav() {
               const active = esActivo(path, l.href);
               return (
                 <Link key={l.href} href={l.href}
-                  className="relative px-3.5 py-2 rounded-lg text-sm font-medium transition-colors"
-                  style={{ color: active ? "rgb(var(--navy-rgb))" : "rgb(var(--navy-rgb) / 0.45)" }}>
+                  className={`relative px-4 py-2.5 rounded-lg text-[15px] font-medium transition-colors ${
+                    active ? "text-navy" : "text-navy/45 hover:text-navy/80"
+                  }`}>
                   {active && (
                     <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-lg bg-navy/8"
                       transition={{ type:"spring", stiffness:400, damping:35 }} />

@@ -2,7 +2,7 @@
 import { useMemo, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useData } from "../lib/useData";
-import { saveMaterias, savePlanEstudio, saveNotas } from "../lib/api";
+import { saveMaterias, savePlanEstudio, saveNotas, materiasEfectivas } from "../lib/api";
 import type { Materia } from "../lib/types";
 import { COLORES_MATERIAS } from "../lib/types";
 import { GlassButton, GlassInput, GlassModal } from "../components/glass";
@@ -54,11 +54,20 @@ export default function Calendario() {
   const [guardandoNota, setGuardandoNota] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Una entrada por materia (sin duplicar por varias fechas de examen): se usa
+  // para la leyenda, los chips de "Estudiar ese día" y el alta de examen.
+  const materiasUnicas = useMemo(() => materiasEfectivas(materias), [materias]);
+
   const colorMap = useMemo(() => {
     const m: Record<string, string> = {};
-    materias.forEach((mat, i) => { m[mat.id] = COLORES_MATERIAS[i % COLORES_MATERIAS.length]; });
+    materiasUnicas.forEach((mat, i) => {
+      const c = COLORES_MATERIAS[i % COLORES_MATERIAS.length];
+      const k = mat.nombre.trim().toLowerCase();
+      // Todas las filas de esa materia (fechas extra incluidas) comparten color.
+      materias.forEach(x => { if (x.nombre.trim().toLowerCase() === k) m[x.id] = c; });
+    });
     return m;
-  }, [materias]);
+  }, [materias, materiasUnicas]);
 
   const examMap = useMemo(() => {
     const m: Record<string, Materia[]> = {};
@@ -155,7 +164,10 @@ export default function Calendario() {
 
   // Exámenes del día abierto (live) + materias que todavía no rinden ese día
   const modalExams = modal ? (examMap[modal.key] ?? []) : [];
-  const materiasSinDia = modal ? materias.filter(m => !modalExams.some(e => e.id === m.id)) : [];
+  // Materias (una por nombre) que todavía no rinden ese día — para el alta.
+  const materiasSinDia = modal
+    ? materiasUnicas.filter(m => !modalExams.some(e => e.nombre.trim().toLowerCase() === m.nombre.trim().toLowerCase()))
+    : [];
 
   return (
     <section className="flex-1 w-full max-w-5xl xl:max-w-6xl mx-auto px-4 sm:px-8 lg:px-12 py-12 flex flex-col gap-10">
@@ -257,7 +269,7 @@ export default function Calendario() {
         <span className="flex items-center gap-1.5 text-xs text-navy/35">
           <span className="w-3 h-3 rounded inline-block" style={{ background:"rgba(201,162,39,0.25)", border:"1px solid rgba(201,162,39,0.4)" }} /> Rendido
         </span>
-        {materias.slice(0, 8).map((m, i) => (
+        {materiasUnicas.slice(0, 8).map((m, i) => (
           <span key={m.id} className="flex items-center gap-1.5 text-xs text-navy/50">
             <span className="inline-block rounded-sm" style={{ width: BAR_W, height: 16, background: COLORES_MATERIAS[i] }} />
             {m.nombre.split(" ")[0]}
@@ -408,7 +420,7 @@ export default function Calendario() {
               <div>
                 <p className="text-xs text-navy/40 uppercase tracking-wider mb-3 font-semibold">Estudiar ese día:</p>
                 <div className="flex flex-wrap gap-2">
-                  {materias.map((m, i) => {
+                  {materiasUnicas.map((m, i) => {
                     const sel = planLocal.includes(m.id);
                     const color = COLORES_MATERIAS[i % COLORES_MATERIAS.length];
                     return (

@@ -15,8 +15,17 @@ const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
  * el auth pasa por /api/auth/*), Secure y SameSite=Lax (mitiga CSRF).
  * Compartido con middleware.ts — cualquier cookie de sesión sale con esto.
  */
+// ~400 días: tope que aceptan los navegadores modernos para maxAge.
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 400;
+
 export function hardenCookie<T extends object | undefined>(options: T) {
-  return { ...options, httpOnly: true, secure: true, sameSite: "lax" as const, path: "/" };
+  const o = { ...options, httpOnly: true, secure: true, sameSite: "lax" as const, path: "/" } as Record<string, unknown>;
+  // Persistente: sin maxAge/expires, @supabase/ssr deja cookies de SESIÓN que el
+  // navegador borra al cerrarse (en mobile pasa seguido → pedía login cada vez;
+  // la PC las "restaura" y por eso ahí sí recordaba). Le damos vida propia. Ojo:
+  // no pisar maxAge:0 / expires que Supabase manda para BORRAR en el logout.
+  if (o.maxAge == null && o.expires == null) o.maxAge = COOKIE_MAX_AGE;
+  return o;
 }
 
 /**

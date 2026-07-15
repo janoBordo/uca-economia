@@ -13,8 +13,14 @@ const AUTH_PAGES = new Set(["/login", "/registro", "/recuperar"]);
 
 // Mismos atributos que hardenCookie() de app/lib/supabase/server.ts (no se
 // importa para no arrastrar imports de next/headers al edge runtime).
-const harden = (o?: object) =>
-  ({ ...o, httpOnly: true, secure: true, sameSite: "lax" as const, path: "/" });
+// maxAge persistente para que la sesión NO se pierda al cerrar el navegador
+// (sobre todo en mobile). No se pisa el maxAge:0/expires del logout.
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 400;
+const harden = (o?: Record<string, unknown>) => {
+  const c = { ...o, httpOnly: true, secure: true, sameSite: "lax" as const, path: "/" } as Record<string, unknown>;
+  if (c.maxAge == null && c.expires == null) c.maxAge = COOKIE_MAX_AGE;
+  return c;
+};
 
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: req });
