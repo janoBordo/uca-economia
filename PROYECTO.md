@@ -6,6 +6,19 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.3.4 — Dominio `stuniv.vercel.app` (branch `main`)
+
+El dominio de la app dejó de ser `uca-economia.vercel.app` y ahora es **`stuniv.vercel.app`**, hecho de forma **no destructiva** (nada de lo que andaba se rompió):
+
+- **Vercel**: se **agregó** `stuniv.vercel.app` como dominio del proyecto `uca-economia` (verificado, sirviendo la misma producción). No se renombró el proyecto ni se sacó `uca-economia.vercel.app` — sigue activo. Hecho vía API con `VERCEL_TOKEN`.
+- **Supabase**: `site_url` → `https://stuniv.vercel.app` (los mails de confirmación/recuperación ahora apuntan ahí). El `uri_allow_list` ya incluía ambos dominios + localhost, así que no hubo que tocarlo.
+- **Turnstile**: verificado en vivo que el widget **emite token** en `stuniv.vercel.app` (el CAPTCHA acepta el dominio) → login/registro/recuperar funcionan. No hizo falta tocar Cloudflare.
+- **Verificación**: en `stuniv.vercel.app` → `/login` 200, `/` 307 a `/login` del mismo host, `/api/db` 401 (protección intacta). `uca-economia.vercel.app` sigue respondiendo igual.
+
+Queda como pendiente opcional (no bloquea nada): si se quiere que `uca-economia.vercel.app` **redirija** a stuniv en vez de servir en paralelo, se configura el redirect en Vercel; hoy conviven los dos.
+
+---
+
 ## v10.3.3 — Fix sesión mobile + dedup en calendario + nav (branch `main`)
 
 - **Sesión que se perdía en el celular (pedía login cada vez; en PC recordaba):** las cookies de sesión de Supabase se seteaban **sin `maxAge`** → eran cookies de SESIÓN que el navegador borra al cerrarse (la PC las restaura, el celular no). Ahora `hardenCookie` (`app/lib/supabase/server.ts`) y el `harden` del `middleware.ts` les ponen `maxAge` persistente (~400 días, tope de los navegadores) **sin pisar** el `maxAge:0`/`expires` que Supabase manda para borrarlas en el logout (se preserva con `?? `). El logout sigue funcionando.
@@ -314,7 +327,7 @@ Ver detalle completo de v2 a v6.2 en la sección "Historia completa" al final de
 - **Base de datos (branch `migracion-v10`)**: Supabase Postgres 17, proyecto `stuniv` (`sfwntnljelgxrtyrizht`, `sa-east-1`) — 6 tablas por-usuario con RLS forzado + bucket privado `avatars` en Supabase Storage. `/api/db` sirve el `AppData` del usuario logueado desde ahí. **En `main` la app todavía usa Vercel KV** (key `uca_data`) hasta mergear; los datos de Jano se migran con `scripts/migrar-kv-a-supabase.mjs` cuando exista su cuenta.
 - **Rate limiting**: Upstash Redis `stuniv-ratelimit` (`sa-east-1`), activo en todos los endpoints
 - **Backups**: repo privado `janoBordo/stuniv-backups`, diario 03:00 AR con prueba de restore
-- **Dominio**: el que da Vercel por defecto (sin dominio propio comprado)
+- **Dominio**: `stuniv.vercel.app` (dominio principal, agregado al proyecto Vercel `uca-economia`; `uca-economia.vercel.app` sigue activo y sirviendo lo mismo). Sin dominio propio comprado. `site_url` de Supabase = `https://stuniv.vercel.app`; el allow list cubre ambos dominios + localhost.
 - **Auth/login**: Supabase Auth completo en el branch (`/login`, `/registro`, `/recuperar` por OTP, middleware, logout real, sesión en cookies HttpOnly, CAPTCHA Turnstile obligatorio) — en `main` la app sigue sin login hasta mergear
 - **Servicios externos pagos**: ninguno. (Para el MP3 se usa el TTS gratuito de Google Translate vía proxy `/api/tts`, no oficial y sin costo; si Google lo bloqueara, la descarga MP3 fallaría con aviso, pero escuchar en vivo con Web Speech seguiría andando.)
 - **⚠ Migración multi-usuario COMPLETA en el branch `migracion-v10`** (las 3 fases de [`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md)): falta solo que Jano se registre, se corra la migración de sus datos y se mergee — ver "pasos manuales" en la entrada v10 Fase 3.
