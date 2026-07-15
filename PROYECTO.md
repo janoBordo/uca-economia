@@ -15,7 +15,7 @@ El dominio de la app dejó de ser `uca-economia.vercel.app` y ahora es **`stuniv
 - **Turnstile**: verificado en vivo que el widget **emite token** en `stuniv.vercel.app` (el CAPTCHA acepta el dominio) → login/registro/recuperar funcionan. No hizo falta tocar Cloudflare.
 - **Verificación**: en `stuniv.vercel.app` → `/login` 200, `/` 307 a `/login` del mismo host, `/api/db` 401 (protección intacta). `uca-economia.vercel.app` sigue respondiendo igual.
 
-Queda como pendiente opcional (no bloquea nada): si se quiere que `uca-economia.vercel.app` **redirija** a stuniv en vez de servir en paralelo, se configura el redirect en Vercel; hoy conviven los dos.
+**Redirect (hecho):** `uca-economia.vercel.app` ahora **redirige 308** (permanente, preservando el path) a `stuniv.vercel.app` — el link posta pasa a ser stuniv. Verificado: `uca-economia.vercel.app/login` → 308 → `stuniv.vercel.app/login` (200).
 
 ---
 
@@ -327,7 +327,7 @@ Ver detalle completo de v2 a v6.2 en la sección "Historia completa" al final de
 - **Base de datos (branch `migracion-v10`)**: Supabase Postgres 17, proyecto `stuniv` (`sfwntnljelgxrtyrizht`, `sa-east-1`) — 6 tablas por-usuario con RLS forzado + bucket privado `avatars` en Supabase Storage. `/api/db` sirve el `AppData` del usuario logueado desde ahí. **En `main` la app todavía usa Vercel KV** (key `uca_data`) hasta mergear; los datos de Jano se migran con `scripts/migrar-kv-a-supabase.mjs` cuando exista su cuenta.
 - **Rate limiting**: Upstash Redis `stuniv-ratelimit` (`sa-east-1`), activo en todos los endpoints
 - **Backups**: repo privado `janoBordo/stuniv-backups`, diario 03:00 AR con prueba de restore
-- **Dominio**: `stuniv.vercel.app` (dominio principal, agregado al proyecto Vercel `uca-economia`; `uca-economia.vercel.app` sigue activo y sirviendo lo mismo). Sin dominio propio comprado. `site_url` de Supabase = `https://stuniv.vercel.app`; el allow list cubre ambos dominios + localhost.
+- **Dominio**: `stuniv.vercel.app` (dominio principal del proyecto Vercel `uca-economia`). `uca-economia.vercel.app` **redirige 308** a stuniv (ya no sirve en paralelo). Sin dominio propio comprado. `site_url` de Supabase = `https://stuniv.vercel.app`; el allow list cubre ambos dominios + localhost.
 - **Auth/login**: Supabase Auth completo en el branch (`/login`, `/registro`, `/recuperar` por OTP, middleware, logout real, sesión en cookies HttpOnly, CAPTCHA Turnstile obligatorio) — en `main` la app sigue sin login hasta mergear
 - **Servicios externos pagos**: ninguno. (Para el MP3 se usa el TTS gratuito de Google Translate vía proxy `/api/tts`, no oficial y sin costo; si Google lo bloqueara, la descarga MP3 fallaría con aviso, pero escuchar en vivo con Web Speech seguiría andando.)
 - **⚠ Migración multi-usuario COMPLETA en el branch `migracion-v10`** (las 3 fases de [`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md)): falta solo que Jano se registre, se corra la migración de sus datos y se mergee — ver "pasos manuales" en la entrada v10 Fase 3.
