@@ -3,7 +3,7 @@ import { useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { useData } from "../lib/useData";
-import { savePreparacion } from "../lib/api";
+import { savePreparacion, materiasEfectivas } from "../lib/api";
 import { COLORES_MATERIAS } from "../lib/types";
 import { GlassCard, GlassPanel } from "../components/glass";
 
@@ -15,7 +15,10 @@ const UMBRAL_SOLIDO = 70; // valor de referencia "sólido" (mismo umbral que los
 
 export default function Metricas() {
   const { data } = useData();
-  const { materias, sesiones, preparacion: prepInit } = data;
+  const { sesiones, preparacion: prepInit } = data;
+  // Una entrada por materia (examen más próximo) — sin filas duplicadas por
+  // varias fechas, y contando solo las horas del examen relevante.
+  const materias = useMemo(() => materiasEfectivas(data.materias), [data.materias]);
   const [prep, setPrep] = useState<Record<string,number>>({});
   const prepReal = useMemo(() => ({ ...prepInit, ...prep }), [prepInit, prep]);
 

@@ -76,6 +76,33 @@ export async function archivarSemestre(nombre: string, mats: Materia[]) {
   return patch({ _archivar: { nombre }, materias: mats });
 }
 
+/* Una materia puede tener varias fechas de examen (se guardan como filas
+   duplicadas con el mismo nombre, ver v10.3.1). Para mostrarla UNA sola vez y
+   tomar en cuenta el examen relevante, se agrupa por nombre y se elige por grupo:
+   el examen más próximo a FUTURO; si todos están rendidos, el más reciente
+   (cuando se cargue uno nuevo a futuro, pasa a mostrarse ese). */
+export function materiasEfectivas(materias: Materia[]): Materia[] {
+  const now = Date.now();
+  const grupos = new Map<string, Materia[]>();
+  for (const m of materias) {
+    const k = m.nombre.trim().toLowerCase();
+    const arr = grupos.get(k);
+    if (arr) arr.push(m); else grupos.set(k, [m]);
+  }
+  const elegir = (ms: Materia[]): Materia => {
+    let futuro: { m: Materia; t: number } | null = null;
+    let pasado: { m: Materia; t: number } | null = null;
+    for (const m of ms) {
+      const t = new Date(m.examen).getTime();
+      if (isNaN(t)) continue;
+      if (t >= now) { if (!futuro || t < futuro.t) futuro = { m, t }; }
+      else          { if (!pasado || t > pasado.t) pasado = { m, t }; }
+    }
+    return (futuro ?? pasado)?.m ?? ms[0];
+  };
+  return Array.from(grupos.values()).map(elegir);
+}
+
 // Ordena por proximidad de examen: primero los FUTUROS (el más próximo arriba),
 // después los ya rendidos (el más reciente arriba). Evita el NaN de Infinity-Infinity
 // que dejaba el orden original (y hacía caer siempre en la primera materia).

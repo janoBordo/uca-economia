@@ -6,6 +6,18 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.3.2 — Fix: métricas cuenta la materia una vez (examen más próximo) (branch `main`)
+
+Corrección de los efectos colaterales de v10.3.1 (una materia con varias fechas se guarda como filas duplicadas con el mismo nombre): en Métricas la materia aparecía dos veces y sumaba las horas de TODOS sus exámenes, y el radar "Matriz de Confianza" quedaba roto (dos ejes con el mismo nombre) y no respondía a los sliders.
+
+- Helper nuevo `materiasEfectivas(materias)` en `app/lib/api.ts`: agrupa por nombre y devuelve **una** entrada por materia = la del examen **más próximo a futuro** (si todos están rendidos, el más reciente; cuando se carga uno nuevo a futuro, pasa a mostrarse ese). Toma en cuenta solo las horas/meta de ese examen (no la suma de todos, como sí hace Semestre a propósito).
+- `app/metricas/page.tsx` usa `materiasEfectivas` para el gráfico de horas, el radar y los sliders → cada materia una sola vez y el radar con ejes únicos (vuelve a responder a los sliders).
+- `app/page.tsx` (home) también deduplica la lista de materias con el mismo helper.
+
+Sin cambios en la base ni en el modelo.
+
+---
+
 ## v10.3.1 — Fix: varios exámenes por materia (branch `main`)
 
 Corrección del flujo de v10.3: como cada `Materia` tiene una sola fecha (`examen`), asignarle una fecha nueva desde el calendario **pisaba** la anterior. Ahora, si la materia **ya tiene un examen en otra fecha**, `agregarExamen` (`app/calendario/page.tsx`) crea una **entrada nueva** (misma materia, otra fecha) en vez de sobreescribir — así una materia puede rendir en varias fechas y conviven todas. Cada examen extra es su propia fila (aparece también en Semestres con su fecha y sus horas). Sin cambios en la base. (Si en el futuro se quiere una sola materia con varias fechas en una fila, eso sí requiere cambio de modelo.)

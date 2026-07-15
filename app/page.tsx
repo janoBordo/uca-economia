@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useData } from "./lib/useData";
-import { materiasPorProximidad } from "./lib/api";
+import { materiasPorProximidad, materiasEfectivas } from "./lib/api";
 import type { Materia } from "./lib/types";
 
 function useDiff(target: string, intervalMs = 1000) {
@@ -58,7 +58,8 @@ function RowItem({ m, index }: { m: Materia; index: number }) {
 
 export default function Inicio() {
   const { data } = useData();
-  const orden = materiasPorProximidad(data);
+  // Materias sin duplicar por varias fechas (una entrada = examen más próximo).
+  const orden = materiasPorProximidad({ ...data, materias: materiasEfectivas(data.materias) });
 
   // Cuenta nueva sin materias todavía: invitación a cargarlas (antes: null)
   if (!orden.length) return (
