@@ -6,6 +6,17 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.4.1 — Mails por Gmail SMTP (registros 90 → ~450/día) (branch `main`)
+
+Jano configuró el SMTP custom de Supabase con **Gmail directo** (`smtp.gmail.com:587`, user `soporte.stuniv@gmail.com`, App Password de Google) reemplazando a SendGrid. Con eso los mails de confirmación/OTP salen de Gmail de verdad (SPF/DKIM alineados → inbox, no spam) y el cupo pasa de 100/día (SendGrid free) a **~500/día** (límite de Gmail para cuentas gratis).
+
+- **Cero cambios de código**: los mails los manda Supabase server-side con el SMTP configurado; la app solo llama a `signUp`/`recover`. Verificado por Management API que la config quedó tomada (`smtp_host: smtp.gmail.com`) y **probado con un envío real** (invite admin a `janobordo+smtptest@gmail.com` → enviado OK por el SMTP nuevo; el user de prueba se borró al toque).
+- **`rate_limit_email_sent` 30/h → 50/h** (vía Management API): el 30/h protegía los 100/día de SendGrid; con ~500/día de Gmail conviene aguantar picos de registro más grandes. Sigue siendo un freno anti-abuso del cupo diario (Turnstile + rate limit de signup 8/h/IP siguen igual).
+- **Números de registro actualizados**: ~**450 registros/día** (~3.000/semana), dejando margen para OTP de recuperación dentro de los 500. El "Minimum interval per user" de 60s del SMTP no afecta registros distintos (es por destinatario).
+- Nota: la advertencia del dashboard de Supabase ("designed for personal rather than transactional email") es esperable — es el trade-off elegido a propósito: gratis y a inbox hoy; el paso serio siguiente es dominio propio + SES/Resend (ver plan de pagos en v10.4).
+
+---
+
 ## v10.4 — Optimización de capacidad y fluidez, todo en planes gratis (branch `main`)
 
 Auditoría completa de consumo de los 5 servicios (Vercel Hobby, Supabase Free, Upstash free, Turnstile, SendGrid free) + optimización para aguantar la mayor cantidad de usuarios sin salir del tier gratis. **Cero cambios visuales/funcionales y la seguridad auditada intacta** (mismo `getUser()` server-side en todas las rutas, mismos rate limits de seguridad fail-closed en Redis, CSP incluso más estricta).
@@ -375,9 +386,9 @@ Ver detalle completo de v2 a v6.2 en la sección "Historia completa" al final de
 - **Rate limiting**: límites de **seguridad** (login, signup, OTP, contraseña, delete, perfil, avatar) en Upstash Redis `stuniv-ratelimit` (`sa-east-1`), fail-closed; límites de lectura/escritura general de datos (`rlDb`, `rlTts`, que ya eran fail-open) **en memoria por instancia** desde v10.4 (ahorra los comandos free de Upstash).
 - **Backups**: repo privado `janoBordo/stuniv-backups`, diario 03:00 AR con prueba de restore
 - **Dominio**: `stuniv.vercel.app` (dominio principal del proyecto Vercel `uca-economia`). `uca-economia.vercel.app` **redirige 308** a stuniv (ya no sirve en paralelo). Sin dominio propio comprado. `site_url` de Supabase = `https://stuniv.vercel.app`; el allow list cubre ambos dominios + localhost.
-- **Auth/login**: Supabase Auth completo en `main` (`/login`, `/registro`, `/recuperar` por OTP, middleware, logout real, sesión en cookies HttpOnly persistentes, CAPTCHA Turnstile obligatorio). Mails por SendGrid free (100/día — el limitante de registros; ver v10.4 para el upgrade gratis a Gmail SMTP).
+- **Auth/login**: Supabase Auth completo en `main` (`/login`, `/registro`, `/recuperar` por OTP, middleware, logout real, sesión en cookies HttpOnly persistentes, CAPTCHA Turnstile obligatorio). Mails por **Gmail SMTP directo** (`smtp.gmail.com`, `soporte.stuniv@gmail.com` con App Password, desde v10.4.1) — ~500/día con SPF/DKIM alineados; `rate_limit_email_sent` 50/h. SendGrid quedó fuera de uso.
 - **Tipografía**: Inter **self-hosteada** vía `next/font` desde v10.4 (sin requests a Google Fonts; orígenes quitados de la CSP).
-- **Capacidad medida (v10.4)**: ~1.300 activos/día · ~4.000/semana · ~90 registros/día, todo en planes gratis; el limitante es Vercel (1M invocaciones/mes) y para registros el mail (100/día SendGrid).
+- **Capacidad medida (v10.4/v10.4.1)**: ~1.300 activos/día · ~4.000/semana · ~10.000 MAU · **~450 registros/día** (~3.000/semana), todo en planes gratis; el limitante de activos es Vercel (1M invocaciones/mes) y el de registros el mail (~500/día de Gmail).
 - **Servicios externos pagos**: ninguno. (Para el MP3 se usa el TTS gratuito de Google Translate vía proxy `/api/tts`, no oficial y sin costo; si Google lo bloqueara, la descarga MP3 fallaría con aviso, pero escuchar en vivo con Web Speech seguiría andando.)
 
 ## Stack técnico
