@@ -9,7 +9,10 @@ let cacheFull = false;     // ¿el cache incluye el historial de semestres? (sol
 let lastFetched = 0;
 let inFlight: Promise<AppData> | null = null;
 let inFlightFull = false;
-const TTL = 15000; // ms: dentro de esta ventana, navegar entre páginas sirve del cache (sin pegarle a /api/db)
+const TTL = 60000; // ms: dentro de esta ventana, navegar entre páginas sirve del cache (sin pegarle a /api/db).
+// 60s (antes 15s): las escrituras propias refrescan el cache al instante igual,
+// así que en el mismo dispositivo no cambia nada; solo se alarga la ventana de
+// revalidación al navegar → ~3x menos GETs a /api/db por sesión (3.2.1).
 const listeners = new Set<() => void>();
 
 // Sesión vencida/cerrada (ej. botón "atrás" después del logout): a /login.

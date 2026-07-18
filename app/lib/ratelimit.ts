@@ -8,17 +8,44 @@ import { Redis } from "@upstash/redis";
 
 const redis = Redis.fromEnv();
 
-export const rlDb = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(120, "1 m"),
-  prefix: "rl:db",
-});
+/** Interfaz mínima común entre Upstash Ratelimit y el limiter local. */
+type Limiter = { limit(key: string): Promise<{ success: boolean; reset: number }> };
 
-export const rlTts = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(60, "1 m"),
-  prefix: "rl:tts",
-});
+/**
+ * Sliding window EN MEMORIA (por instancia) para los limiters de lectura
+ * general que ya eran fail-open. Mismo límite y semántica que antes, pero sin
+ * gastar comandos de Upstash en cada GET/POST de datos (el tier gratis es de
+ * 500k comandos/mes y era el recurso más ajustado). Los límites de SEGURIDAD
+ * (login, signup, OTP, contraseña, borrar cuenta, perfil, avatar) siguen en
+ * Redis, compartidos entre instancias y fail-closed — esos no se tocan.
+ */
+class LocalRatelimit implements Limiter {
+  private hits = new Map<string, number[]>();
+  constructor(private max: number, private windowMs: number) {}
+  async limit(key: string) {
+    const now = Date.now();
+    const desde = now - this.windowMs;
+    // Barrido ocasional para que el Map no crezca sin techo (IPs efímeras)
+    if (this.hits.size > 5000) {
+      const arr = Array.from(this.hits.entries());
+      for (const [k, ts] of arr) {
+        if (ts[ts.length - 1] < desde) this.hits.delete(k);
+      }
+    }
+    const ts = (this.hits.get(key) ?? []).filter(t => t > desde);
+    if (ts.length >= this.max) {
+      this.hits.set(key, ts);
+      return { success: false, reset: ts[0] + this.windowMs };
+    }
+    ts.push(now);
+    this.hits.set(key, ts);
+    return { success: true, reset: now + this.windowMs };
+  }
+}
+
+export const rlDb: Limiter = new LocalRatelimit(120, 60_000);
+
+export const rlTts: Limiter = new LocalRatelimit(60, 60_000);
 
 export const rlPassword = new Ratelimit({
   redis,
@@ -97,7 +124,7 @@ export type LimitResult = { ok: true } | { ok: false; retryAfter: number };
  * true → se rechaza el request (endpoints de seguridad), false → se deja pasar.
  */
 export async function checkLimit(
-  rl: Ratelimit,
+  rl: Limiter,
   key: string,
   failClosed: boolean
 ): Promise<LimitResult> {

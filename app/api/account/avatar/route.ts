@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseForRequest, supabaseAdmin } from "../../../lib/supabase/server";
 import { rlAvatar, checkLimit, clientIp, tooMany } from "../../../lib/ratelimit";
+import { guardarAvatarUrl, invalidarAvatarUrl } from "../../../lib/avatar-url-cache";
 
 // Foto de perfil (6.17, reglas de uploads seguros de 6.4):
 // - Tipo REAL validado por magic bytes (la extensión/Content-Type se falsean).
@@ -72,6 +73,9 @@ export async function POST(req: Request) {
 
     const { data: signed, error: signErr } = await admin.storage.from("avatars").createSignedUrl(path, 3600);
     if (signErr) throw new Error(signErr.message);
+    // Foto nueva ⇒ URL cacheada vieja fuera; se cachea la recién firmada.
+    invalidarAvatarUrl(userId);
+    guardarAvatarUrl(path, signed.signedUrl);
     return NextResponse.json({ ok: true, fotoUrl: signed.signedUrl });
   } catch (e) {
     console.error("avatar POST:", e instanceof Error ? e.message : e);
@@ -92,6 +96,7 @@ export async function DELETE(req: Request) {
   try {
     const admin = supabaseAdmin();
     await admin.storage.from("avatars").remove(["jpg", "png", "webp"].map(e => `${userId}.${e}`));
+    invalidarAvatarUrl(userId);
     const { error } = await sb.from("profiles").update({ foto_url: null }).eq("id", userId);
     if (error) throw new Error(error.message);
     return NextResponse.json({ ok: true });

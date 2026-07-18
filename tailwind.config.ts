@@ -19,7 +19,8 @@ const config: Config = {
         },
         canvas:"#F5F4F0",
       },
-      fontFamily: { sans: ["Inter","system-ui","sans-serif"] },
+      // var(--font-inter) = Inter self-hosteada por next/font (layout.tsx)
+      fontFamily: { sans: ["var(--font-inter)","Inter","system-ui","sans-serif"] },
     },
   },
   plugins: [],

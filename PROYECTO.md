@@ -6,6 +6,47 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.4 — Optimización de capacidad y fluidez, todo en planes gratis (branch `main`)
+
+Auditoría completa de consumo de los 5 servicios (Vercel Hobby, Supabase Free, Upstash free, Turnstile, SendGrid free) + optimización para aguantar la mayor cantidad de usuarios sin salir del tier gratis. **Cero cambios visuales/funcionales y la seguridad auditada intacta** (mismo `getUser()` server-side en todas las rutas, mismos rate limits de seguridad fail-closed en Redis, CSP incluso más estricta).
+
+**Lo que encontró la auditoría (medido contra la config real por API):**
+- Las funciones corrían en **iad1 (Washington DC)** con Supabase y Upstash en `sa-east-1` (São Paulo) y los usuarios en Argentina: cada API call cruzaba el continente 2-3 veces → **~400-600ms por request**. Era LA causa de la lentitud, no el código.
+- El recurso gratis más ajustado no era el egress de Supabase sino los **comandos de Upstash** (500k/mes): cada GET/POST de datos gastaba comandos en el rate limit por IP → techo real ~300-550 activos/día.
+- Cada GET de perfil firmaba una **signed URL nueva** del avatar → URL distinta cada vez → el navegador no podía cachear la foto (re-descarga por visita, el ítem más pesado de egress) + 1 llamada a Storage por request.
+- Google Fonts como stylesheet externo render-blocking; crawlers sin robots.txt pasando por el middleware (invocación + `getUser` por hit).
+
+**Cambios de infra/config (sin código):**
+- **Región de funciones Vercel: `iad1` → `gru1` (São Paulo)** vía API. Latencia de `/api/db` estimada ~500ms → ~50-80ms (funciones al lado de Supabase/Upstash y de los usuarios).
+
+**Cambios de código (6 quirúrgicos):**
+- `app/lib/ratelimit.ts`: los limiters que ya eran **fail-open** (`rlDb`, `rlTts` — lectura/escritura general de datos) pasan a **sliding window en memoria por instancia** (mismos límites, misma semántica, verificado el 429 con 125 requests). Los de **seguridad** (login, signup, OTP, contraseña, delete, perfil, avatar) **siguen en Upstash fail-closed, intactos**. Upstash pasa de ser el recurso limitante a gastar comandos solo en flujos de auth.
+- `app/lib/api.ts`: TTL del cache cliente 15s → 60s (las escrituras propias siguen refrescando el cache al instante; solo se alarga la ventana de revalidación al navegar → ~3x menos GETs).
+- `app/lib/avatar-url-cache.ts` (nuevo) + rutas de perfil/avatar: la signed URL del avatar (que sigue durando 1h — el parámetro de seguridad no cambió) se **reusa ~55min** desde un cache en memoria → misma URL ⇒ el navegador cachea la imagen, menos egress de Storage y una llamada menos por GET de perfil. Se invalida al subir/quitar la foto.
+- `app/layout.tsx` + `tailwind.config.ts` + `globals.css`: **Inter self-hosteada con `next/font`** (misma variable font 300-900, cero cambio visual) — sin round-trip a Google Fonts en cada visita y **CSP más estricta** (se quitaron `fonts.googleapis.com` y `fonts.gstatic.com`).
+- `middleware.ts` + `public/robots.txt`: robots/sitemap fuera del matcher y robots.txt que permite solo `/login`, `/registro`, `/recuperar` (el resto está tras login igual) → los bots dejan de quemar invocaciones y `getUser`s.
+- `next.config.mjs`: Cache-Control largo para `/logos/*` e `icon.svg`.
+
+**Evaluado y DESCARTADO a propósito (por seguridad):** verificación local del JWT (`getClaims` + JWKS ES256, que el proyecto ya tiene activo) habría ahorrado el round-trip a Auth en cada request, pero abre una ventana de ≤15 min en la que una sesión **revocada** (logout, cambio de contraseña, ban) seguiría pasando — y la suite e2e de Fase 2 verifica explícitamente "cookies viejas post-logout → 401 inmediato". La regla es que la seguridad no se afloja: la latencia se resolvió por región, no bajando la vara.
+
+**Capacidad después de esto (techo por servicio, uso mixto realista ~20-25 requests/activo/día):**
+| Servicio | Límite free | Techo de usuarios |
+|---|---|---|
+| Vercel (1M invocaciones + 1M edge requests/mes) | ~33k/día | **~1.300-1.500 activos/día ← el limitante** |
+| Supabase egress (5GB/mes) | ~166MB/día | ~4.000 activos/día |
+| Upstash (500k comandos/mes) | ~16.6k/día | ya no limita (solo auth: >10.000 activos/día) |
+| SendGrid (100 mails/día) | 100/día | **~90 registros/día** (~2.700/mes) ← limita el crecimiento |
+| Supabase DB (500MB) / Auth (50k MAU) | — | >25.000 registrados |
+| Turnstile (1M/mes) | ~33k/día | no limita |
+
+**Resumen: ~1.300 activos/día · ~4.000 activos/semana · ~10.000 MAU · ~90 registros/día** — antes: ~300-500 activos/día con ~0.5s de latencia por request.
+
+**Pendiente manual recomendado (gratis, lo hace Jano): mails por Gmail SMTP.** SendGrid free son 100/día y encima manda "de @gmail.com" sin SPF/DKIM alineados → spam. Con una **App Password** de `soporte.stuniv@gmail.com` (Google Account → Seguridad → verificación en 2 pasos → Contraseñas de aplicaciones) y el SMTP de Supabase apuntando a `smtp.gmail.com:587` (user = el gmail, pass = la app password), los mails salen de Gmail de verdad: **~500/día y a inbox**. Con eso el techo de registros pasa de ~90 a ~450/día. (El rate `rate_limit_email_sent` de Supabase quedó en 30/h a propósito mientras siga SendGrid: protege la cuota diaria de 100.)
+
+**Verificación:** `npm run build` en verde (27/27, bundles idénticos); suite e2e Fase 3 **33/33 PASS** contra dev local (cubre `/api/db`, perfil y avatar — justo lo tocado); verificado en dev: robots.txt 200 sin middleware, Cache-Control de logos, 307→/login sin sesión, 401 en `/api/db` anónimo, CSP endurecida, Inter self-hosted cargando (`document.fonts`), y el limiter in-memory cortando en 429 tras ~120 req/min. Verificación en producción post-deploy al final de esta entrada.
+
+---
+
 ## v10.3.5 — Semestre: una card por materia (todas sus fechas) (branch `main`)
 
 En Semestre cada fila de examen se mostraba como una card aparte (una materia con 2 fechas = 2 cards). Ahora `app/semestre/page.tsx` **agrupa por nombre**: una card = una materia, y adentro lista **todas sus fechas de examen** (ordenadas de más próxima a más lejana) + el **total** estudiado (suma de todas sus filas). Renombrar o eliminar afecta a todas las filas de esa materia. La key de la card usa el id de la 1ª fila (estable al renombrar → el input no pierde foco). Los KPIs de "En curso" (Materias / Más estudiada) también cuentan por materia, no por fila.
@@ -328,15 +369,16 @@ Ver detalle completo de v2 a v6.2 en la sección "Historia completa" al final de
 **stuniv** (marca de la app web; el repo sigue llamándose `uca-economia`). App multi-usuario para estudiantes universitarios (nacida como app personal de Jano, estudiante de Economía, UCA Buenos Aires) para gestionar el semestre: fechas de examen, horas de estudio, plan diario, lectura de apuntes en voz. Cada usuario tiene su cuenta, sus datos aislados por RLS y su personalización (perfil + tema de color por universidad). El claim "Tu futuro. Tu camino." del manual de marca NO se usa en la app.
 
 ## Infraestructura (ESTO PUEDE CAMBIAR — mantener actualizado)
-- **Hosting**: Vercel
+- **Hosting**: Vercel Hobby, funciones serverless en **`gru1` (São Paulo)** desde v10.4 (antes iad1) — al lado de Supabase/Upstash (`sa-east-1`) y de los usuarios.
 - **Repo**: GitHub `janoBordo/uca-economia`, branch `main`
-- **Base de datos (branch `migracion-v10`)**: Supabase Postgres 17, proyecto `stuniv` (`sfwntnljelgxrtyrizht`, `sa-east-1`) — 6 tablas por-usuario con RLS forzado + bucket privado `avatars` en Supabase Storage. `/api/db` sirve el `AppData` del usuario logueado desde ahí. **En `main` la app todavía usa Vercel KV** (key `uca_data`) hasta mergear; los datos de Jano se migran con `scripts/migrar-kv-a-supabase.mjs` cuando exista su cuenta.
-- **Rate limiting**: Upstash Redis `stuniv-ratelimit` (`sa-east-1`), activo en todos los endpoints
+- **Base de datos**: Supabase Postgres 17, proyecto `stuniv` (`sfwntnljelgxrtyrizht`, `sa-east-1`) — 6 tablas por-usuario con RLS forzado + bucket privado `avatars` en Supabase Storage. `/api/db` sirve el `AppData` del usuario logueado desde ahí (migración multi-usuario v10 mergeada; Vercel KV eliminado).
+- **Rate limiting**: límites de **seguridad** (login, signup, OTP, contraseña, delete, perfil, avatar) en Upstash Redis `stuniv-ratelimit` (`sa-east-1`), fail-closed; límites de lectura/escritura general de datos (`rlDb`, `rlTts`, que ya eran fail-open) **en memoria por instancia** desde v10.4 (ahorra los comandos free de Upstash).
 - **Backups**: repo privado `janoBordo/stuniv-backups`, diario 03:00 AR con prueba de restore
 - **Dominio**: `stuniv.vercel.app` (dominio principal del proyecto Vercel `uca-economia`). `uca-economia.vercel.app` **redirige 308** a stuniv (ya no sirve en paralelo). Sin dominio propio comprado. `site_url` de Supabase = `https://stuniv.vercel.app`; el allow list cubre ambos dominios + localhost.
-- **Auth/login**: Supabase Auth completo en el branch (`/login`, `/registro`, `/recuperar` por OTP, middleware, logout real, sesión en cookies HttpOnly, CAPTCHA Turnstile obligatorio) — en `main` la app sigue sin login hasta mergear
+- **Auth/login**: Supabase Auth completo en `main` (`/login`, `/registro`, `/recuperar` por OTP, middleware, logout real, sesión en cookies HttpOnly persistentes, CAPTCHA Turnstile obligatorio). Mails por SendGrid free (100/día — el limitante de registros; ver v10.4 para el upgrade gratis a Gmail SMTP).
+- **Tipografía**: Inter **self-hosteada** vía `next/font` desde v10.4 (sin requests a Google Fonts; orígenes quitados de la CSP).
+- **Capacidad medida (v10.4)**: ~1.300 activos/día · ~4.000/semana · ~90 registros/día, todo en planes gratis; el limitante es Vercel (1M invocaciones/mes) y para registros el mail (100/día SendGrid).
 - **Servicios externos pagos**: ninguno. (Para el MP3 se usa el TTS gratuito de Google Translate vía proxy `/api/tts`, no oficial y sin costo; si Google lo bloqueara, la descarga MP3 fallaría con aviso, pero escuchar en vivo con Web Speech seguiría andando.)
-- **⚠ Migración multi-usuario COMPLETA en el branch `migracion-v10`** (las 3 fases de [`MIGRACION-MULTIUSUARIO.md`](./MIGRACION-MULTIUSUARIO.md)): falta solo que Jano se registre, se corra la migración de sus datos y se mergee — ver "pasos manuales" en la entrada v10 Fase 3.
 
 ## Stack técnico
 - Next.js 14 (App Router), TypeScript, Tailwind CSS

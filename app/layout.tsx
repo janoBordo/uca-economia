@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import Nav from "./components/Nav";
+
+// Inter self-hosteada (next/font): se descarga UNA vez en el build y se sirve
+// desde el propio dominio con cache inmutable — sin round-trip a Google Fonts
+// en cada visita (menos latencia de primer paint) y una dependencia externa
+// menos en la CSP. Variable font: cubre los mismos pesos 300–900 que antes.
+const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "stuniv",
@@ -14,13 +21,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es">
+    <html lang="es" className={inter.variable}>
       <head>
         {/* Aplica tema (Clásico/Vidrio) y paleta de color guardados antes del primer paint (evita parpadeo) */}
         <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem('uca_theme')==='glass')document.documentElement.setAttribute('data-theme','glass');var p=localStorage.getItem('uca_palette');if(p&&['bordo','negro','verde','dorado'].indexOf(p)>-1)document.documentElement.setAttribute('data-palette',p)}catch(e){}` }} />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
       </head>
       <body className="min-h-screen flex flex-col bg-canvas">
         <Nav />

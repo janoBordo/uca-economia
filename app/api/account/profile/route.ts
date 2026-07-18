@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseForRequest, supabaseAdmin } from "../../../lib/supabase/server";
 import { rlDb, rlProfile, checkLimit, clientIp, tooMany } from "../../../lib/ratelimit";
+import { avatarUrlCacheada, guardarAvatarUrl } from "../../../lib/avatar-url-cache";
 
 // Perfil del usuario (pantalla de Cuenta, 6.17). Lecturas y escrituras SIEMPRE
 // sobre la fila propia vía el cliente por-request (RLS: profiles_*_own). El
@@ -28,9 +29,12 @@ const CAMPOS = "nombre,apellido,apodo,universidad,carrera,foto_url,tema_color";
 
 async function firmarFoto(path: string | null): Promise<string | null> {
   if (!path) return null;
+  const cacheada = avatarUrlCacheada(path);
+  if (cacheada) return cacheada;
   const { data, error } = await supabaseAdmin()
     .storage.from("avatars").createSignedUrl(path, 3600);
   if (error) { console.error("profile: signed url falló", error.message); return null; }
+  guardarAvatarUrl(path, data.signedUrl);
   return data.signedUrl;
 }
 

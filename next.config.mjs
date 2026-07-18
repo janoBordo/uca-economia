@@ -6,9 +6,11 @@
 const csp = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' https://unpkg.com https://challenges.cloudflare.com",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  // Inter ahora es self-hosteada vía next/font (layout.tsx) — los orígenes de
+  // Google Fonts salieron de la CSP (menos superficie, misma tipografía).
+  "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://*.supabase.co",
-  "font-src 'self' data: https://fonts.gstatic.com",
+  "font-src 'self' data:",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://unpkg.com https://challenges.cloudflare.com",
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
@@ -36,7 +38,19 @@ const nextConfig = {
   // Explícito aunque sea el default: sin source maps en producción (6.2)
   productionBrowserSourceMaps: false,
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    return [
+      { source: "/(.*)", headers: securityHeaders },
+      // Assets de marca: cambian casi nunca — cache largo en el navegador para
+      // no re-pedirlos en cada visita (menos edge requests contra la cuota).
+      {
+        source: "/logos/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      },
+      {
+        source: "/icon.svg",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      },
+    ];
   },
   webpack: (config) => {
     // pdfjs-dist necesita esto para no romper el build
