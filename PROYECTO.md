@@ -6,6 +6,21 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.6 — Google Analytics 4 (branch `main`)
+
+Analítica de producto para las métricas del plan de costos/monetización (DAU/WAU/MAU, registros, retención D1/D7/D30, stickiness, uso por función). Property GA4 de Jano, Measurement ID `G-MY3QS6JTZP` (stream web `stuniv.vercel.app`).
+
+- **`app/layout.tsx`**: gtag.js con `next/script` `afterInteractive` (no bloquea el primer paint). Los `page_view` de navegación SPA los registra la "medición mejorada" del stream (History API, activada por defecto en GA4).
+- **CSP** (`next.config.mjs`): `www.googletagmanager.com` en `script-src`/`img-src`/`connect-src` y `*.google-analytics.com` en `img-src`/`connect-src` — apertura mínima, el resto de la política intacta.
+- **`app/lib/analytics.ts`** (nuevo): helper `track()` fire-and-forget — si gtag no cargó (adblocker/CSP/red) jamás rompe ni demora la app. **Regla fija: CERO datos personales a GA** — ni emails, ni nombres, ni contenido del usuario (nombres de materias, notas, textos); solo nombres de evento y números/enums.
+- **11 eventos custom** cableados a los flujos existentes (cero cambios de comportamiento): `sign_up` (registro ok), `login`, `pomodoro_completado` {minutos, modo}, `horas_manuales` {minutos} (el límite del freemium futuro), `tts_escuchar`, `mp3_descarga` {partes}, `examen_agregado`, `plan_editado`, `nota_creada`, `semestre_archivado`, `tema_cambiado` {tema}, `foto_subida`.
+- **Dónde ver cada métrica**: Usuarios activos (DAU/WAU/MAU + stickiness) en Informes→Interacción; registros = evento `sign_up` (marcarlo como evento clave en Admin→Eventos cuando aparezca, ~24h); retención por cohortes en Informes→Retención; uso por función en Informes→Eventos; tiempo por página en Páginas y pantallas. Las horas de estudio REALES salen de `pomodoro_completado.minutos` (mejor señal que el engagement time).
+- **Pendiente de Jano**: entrar a la app con el deploy nuevo y confirmar en GA4 → Informes → **Tiempo real** que aparece su visita (la verificación local quedó a medias porque el browser embebido del entorno no hidrata JS de terceros; el markup, la CSP y el build están verificados).
+
+**Verificación**: build en verde (bundles casi idénticos, gtag carga diferido); markup de GA presente en el HTML servido; CSP con los orígenes exactos; `track()` no-op seguro sin gtag. Sin cambios en APIs ni en seguridad de datos.
+
+---
+
 ## v10.5 — GET /api/db en 1 round-trip: verificación local del JWT + revocación en la base (branch `main`)
 
 El "escalón 4" del plan de escalado, implementado ahora que es gratis hacerlo: el endpoint más caliente de la app deja de pagar el round-trip a Supabase Auth en cada request **sin aflojar ninguna garantía auditada** (la restricción que en v10.4 hizo descartar la versión ingenua de esta idea).
@@ -408,6 +423,7 @@ Ver detalle completo de v2 a v6.2 en la sección "Historia completa" al final de
 - **Auth/login**: Supabase Auth completo en `main` (`/login`, `/registro`, `/recuperar` por OTP, middleware, logout real, sesión en cookies HttpOnly persistentes, CAPTCHA Turnstile obligatorio). Mails por **Gmail SMTP directo** (`smtp.gmail.com`, `soporte.stuniv@gmail.com` con App Password, desde v10.4.1) — ~500/día con SPF/DKIM alineados; `rate_limit_email_sent` 50/h. SendGrid quedó fuera de uso.
 - **Tipografía**: Inter **self-hosteada** vía `next/font` desde v10.4 (sin requests a Google Fonts; orígenes quitados de la CSP).
 - **Capacidad medida (v10.4/v10.4.1)**: ~1.300 activos/día · ~4.000/semana · ~10.000 MAU · **~450 registros/día** (~3.000/semana), todo en planes gratis; el limitante de activos es Vercel (1M invocaciones/mes) y el de registros el mail (~500/día de Gmail).
+- **Analytics**: Google Analytics 4 (`G-MY3QS6JTZP`, gratis) desde v10.6 — page views + 11 eventos custom vía `app/lib/analytics.ts`; sin datos personales.
 - **Servicios externos pagos**: ninguno. (Para el MP3 se usa el TTS gratuito de Google Translate vía proxy `/api/tts`, no oficial y sin costo; si Google lo bloqueara, la descarga MP3 fallaría con aviso, pero escuchar en vivo con Web Speech seguiría andando.)
 
 ## Stack técnico

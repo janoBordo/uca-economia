@@ -6,6 +6,7 @@ import { saveMaterias, savePlanEstudio, saveNotas, materiasEfectivas } from "../
 import type { Materia } from "../lib/types";
 import { COLORES_MATERIAS } from "../lib/types";
 import { GlassButton, GlassInput, GlassModal } from "../components/glass";
+import { track } from "../lib/analytics";
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const DIAS  = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
@@ -105,6 +106,7 @@ export default function Calendario() {
     const next = { ...planEstudio, [modal.key]: planLocal };
     if (planLocal.length === 0) delete next[modal.key];
     await savePlanEstudio(next);
+    track("plan_editado");
     setGuardandoPlan(false);
     setModal(null);
   }
@@ -127,6 +129,7 @@ export default function Calendario() {
       updated = materias.map(x => x.id === exSel ? { ...x, examen, metaHoras: exHoras || x.metaHoras } : x);
     }
     await saveMaterias(updated);
+    track("examen_agregado");
     cancelAddExam();
   }
   // Quitar el examen de una materia (vuelve a "sin fecha"; la materia no se borra)
@@ -146,6 +149,7 @@ export default function Calendario() {
     if (!texto) return;
     setGuardandoNota(true);
     await saveNotas([texto, ...notas]);
+    track("nota_creada");
     setGuardandoNota(false);
     setNotaInput("");
     inputRef.current?.focus();

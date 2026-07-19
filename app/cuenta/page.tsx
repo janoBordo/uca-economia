@@ -6,6 +6,7 @@ import ThemeToggle from "../components/ThemeToggle";
 import Turnstile from "../components/Turnstile";
 import { usePerfil, guardarPerfil, subirFoto, quitarFoto, iniciales, limpiarPerfilCache, type Perfil } from "../lib/perfil";
 import { PALETAS, UNIVERSIDADES, UNIVERSIDAD_OTRA, aplicarPaleta, paletaSugerida, type Paleta } from "../lib/paleta";
+import { track } from "../lib/analytics";
 
 /* Pantalla de Cuenta / Configuración (6.17). Se llega desde el menú
    desplegable del nombre en el Nav. Secciones: Perfil (foto, nombre, apellido,
@@ -113,6 +114,7 @@ function SeccionPerfil({ perfil }: { perfil: Perfil }) {
     const blob = await reducirFoto(file);
     const url = blob ? await subirFoto(blob) : null;
     setSubiendo(false);
+    if (url) track("foto_subida");
     if (!url) setErrorFoto("No se pudo subir la foto. Probá con otra imagen.");
   }
 
@@ -262,6 +264,7 @@ function SeccionApariencia({ perfil }: { perfil: Perfil }) {
     setGuardando(true); setEstado("");
     const p = await guardarPerfil({ temaColor: elegida });
     setGuardando(false);
+    if (p) track("tema_cambiado", { tema: elegida });
     setEstado(p ? "ok" : "error");
     if (p) setTimeout(() => setEstado(""), 2500);
   }

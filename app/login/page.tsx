@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { AuthCard, AuthError, inputCls, labelCls, btnCls } from "../components/AuthCard";
 import { GlassButton } from "../components/glass";
 import Turnstile from "../components/Turnstile";
+import { track } from "../lib/analytics";
 
 /* Puerta de entrada de la app (6.1). Nada de Supabase en el navegador:
    el form le pega a POST /api/auth/login y la sesión queda en cookies
@@ -34,7 +35,7 @@ function LoginForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, captchaToken: captcha }),
       });
-      if (r.ok) { window.location.assign("/"); return; }
+      if (r.ok) { track("login"); window.location.assign("/"); return; }
       const d = await r.json().catch(() => null);
       setError(d?.error ?? "No se pudo iniciar sesión. Probá de nuevo.");
       setResetKey(k => k + 1); // el token del captcha es de un solo uso

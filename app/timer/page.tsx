@@ -5,6 +5,7 @@ import { useData } from "../lib/useData";
 import { addMinutos, materiasPorProximidad } from "../lib/api";
 import { GlassTabs, GlassButton, GlassInput, GlassSelect } from "../components/glass";
 import { rgbVar } from "../lib/paleta";
+import { track } from "../lib/analytics";
 
 type Modo = "pomodoro" | "cronometro";
 
@@ -217,6 +218,7 @@ export default function Timer() {
       await addMinutos(matId, mins);
       setGuardando(false);
       setSesiones(s => s + 1);
+      track("pomodoro_completado", { minutos: mins, modo });
       const nombre = materias.find(m => m.id === matId)?.nombre ?? "";
       showToast(`+${mins} min guardados en ${nombre}`);
     }
@@ -235,6 +237,7 @@ export default function Timer() {
     await addMinutos(matId, mins);
     setGuardando(false);
     setSesiones(s => s + 1);
+    track("horas_manuales", { minutos: mins });
     const nombre = materias.find(m => m.id === matId)?.nombre ?? "";
     const hLbl = manualH ? `${manualH}h ` : "";
     const mLbl = manualM ? `${manualM}min` : "";

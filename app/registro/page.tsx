@@ -5,6 +5,7 @@ import { AuthCard, AuthError, inputCls, labelCls, btnCls } from "../components/A
 import { GlassButton } from "../components/glass";
 import Turnstile from "../components/Turnstile";
 import { UNIVERSIDADES, UNIVERSIDAD_OTRA, paletaSugerida, aplicarPaleta } from "../lib/paleta";
+import { track } from "../lib/analytics";
 
 /* Crear cuenta (6.1): datos de perfil (nombre, apellido, universidad, carrera)
    + email dos veces (guardia anti-typo), contraseña ≥8, CAPTCHA. Al elegir la
@@ -56,7 +57,7 @@ export default function RegistroPage() {
           nombre: nombre.trim(), apellido: apellido.trim(), universidad, carrera: carrera.trim(),
         }),
       });
-      if (r.ok) { setListo(true); return; }
+      if (r.ok) { track("sign_up"); setListo(true); return; }
       const d = await r.json().catch(() => null);
       setError(d?.error ?? "No se pudo crear la cuenta. Probá de nuevo.");
       setResetKey(k => k + 1);

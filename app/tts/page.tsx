@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GlassButton, GlassSelect, GlassTextarea, GlassCard } from "../components/glass";
+import { track } from "../lib/analytics";
 
 // Lectura:
 // - Escuchar con Web Speech (voz del navegador): gratis, sin límite, por partes,
@@ -195,6 +196,7 @@ export default function TTS() {
     } else if (pausado) {                              // pausado → resumir donde quedó
       reproducirDesde(capIdx, offsetRef.current);
     } else {                                           // detenido → arrancar la parte actual de cero
+      track("tts_escuchar");
       reproducirDesde(capIdx >= capitulos.length ? 0 : capIdx);
     }
   }
@@ -239,6 +241,7 @@ export default function TTS() {
       const a = document.createElement("a");
       a.href = url; a.download = "lectura.mp3";
       document.body.appendChild(a); a.click(); a.remove();
+      track("mp3_descarga", { partes: trozos.length });
       setTimeout(() => URL.revokeObjectURL(url), 15000);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Error generando el MP3.");

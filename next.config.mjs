@@ -5,13 +5,14 @@
 // challenges.cloudflare.com = Turnstile (CAPTCHA del signup, fase siguiente).
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://unpkg.com https://challenges.cloudflare.com",
+  // googletagmanager = gtag.js de Google Analytics 4 (v10.6)
+  "script-src 'self' 'unsafe-inline' https://unpkg.com https://challenges.cloudflare.com https://www.googletagmanager.com",
   // Inter ahora es self-hosteada vía next/font (layout.tsx) — los orígenes de
   // Google Fonts salieron de la CSP (menos superficie, misma tipografía).
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.supabase.co",
+  "img-src 'self' data: blob: https://*.supabase.co https://*.google-analytics.com https://www.googletagmanager.com",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://unpkg.com https://challenges.cloudflare.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://unpkg.com https://challenges.cloudflare.com https://*.google-analytics.com https://www.googletagmanager.com",
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
   "frame-src https://challenges.cloudflare.com",

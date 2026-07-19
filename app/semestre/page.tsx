@@ -5,6 +5,7 @@ import { useData } from "../lib/useData";
 import { archivarSemestre, saveMaterias, resetHoras, clearPlanEstudio } from "../lib/api";
 import { type Materia, type SemestreArchivado } from "../lib/types";
 import { GlassCard, GlassButton } from "../components/glass";
+import { track } from "../lib/analytics";
 
 // Los ids de materias son uuid (PK real en la base)
 function uid() { return crypto.randomUUID(); }
@@ -159,6 +160,7 @@ export default function Semestre() {
     setGuardandoCierre(true);
     // El semestre nuevo arranca vacío: cada uno carga sus materias nuevas
     await archivarSemestre(`Semestre ${nextNumero}`, []);
+    track("semestre_archivado");
     setGuardandoCierre(false); setConfirmCerrar(false);
     setLocal([]);
   }
