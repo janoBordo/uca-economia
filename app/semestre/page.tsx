@@ -211,18 +211,40 @@ export default function Semestre() {
     setNueva({ nombre:"" }); setAgregando(false);
   }
   async function guardar() {
-    setGuardando(true); await saveMaterias(local); setGuardando(false);
-    setGuardado(true); setTimeout(() => setGuardado(false), 2500);
+    setGuardando(true);
+    try {
+      await saveMaterias(local);
+      setGuardado(true); setTimeout(() => setGuardado(false), 2500);
+    } catch (e) {
+      console.error("semestre: no se pudieron guardar las materias", e);
+    } finally {
+      setGuardando(false);
+    }
   }
-  async function doResetHoras() { setEjHoras(true); await resetHoras(); setEjHoras(false); setConfirmHoras(false); }
-  async function doClearPlan()  { setEjPlan(true);  await clearPlanEstudio(); setEjPlan(false);  setConfirmPlan(false); }
+  async function doResetHoras() {
+    setEjHoras(true);
+    try { await resetHoras(); }
+    catch (e) { console.error("semestre: no se pudieron borrar las horas", e); }
+    finally { setEjHoras(false); setConfirmHoras(false); }
+  }
+  async function doClearPlan() {
+    setEjPlan(true);
+    try { await clearPlanEstudio(); }
+    catch (e) { console.error("semestre: no se pudo limpiar el plan", e); }
+    finally { setEjPlan(false); setConfirmPlan(false); }
+  }
   async function cerrarSemestre() {
     setGuardandoCierre(true);
-    // El semestre nuevo arranca vacío: cada uno carga sus materias nuevas
-    await archivarSemestre(`Semestre ${nextNumero}`, []);
-    track("semestre_archivado");
-    setGuardandoCierre(false); setConfirmCerrar(false);
-    setLocal([]);
+    try {
+      // El semestre nuevo arranca vacío: cada uno carga sus materias nuevas
+      await archivarSemestre(`Semestre ${nextNumero}`, []);
+      track("semestre_archivado");
+      setLocal([]); // solo se vacía la lista local si el cierre se concretó
+    } catch (e) {
+      console.error("semestre: no se pudo cerrar el semestre", e);
+    } finally {
+      setGuardandoCierre(false); setConfirmCerrar(false);
+    }
   }
 
   return (

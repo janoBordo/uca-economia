@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseForRequest, supabaseAdmin } from "../../../lib/supabase/server";
 import { rlAvatar, checkLimit, clientIp, tooMany } from "../../../lib/ratelimit";
+import { generico } from "../../../lib/http";
 import { guardarAvatarUrl, invalidarAvatarUrl } from "../../../lib/avatar-url-cache";
 
 // Foto de perfil (6.17, reglas de uploads seguros de 6.4):
@@ -15,9 +16,6 @@ import { guardarAvatarUrl, invalidarAvatarUrl } from "../../../lib/avatar-url-ca
 export const runtime = "nodejs";
 
 const MAX_BYTES = 400 * 1024;
-
-const generico = (msg: string, status: number) =>
-  NextResponse.json({ ok: false, error: msg }, { status });
 
 /** Tipo real por magic bytes: jpeg / png / webp. */
 function tipoReal(buf: Uint8Array): { ext: string; mime: string } | null {

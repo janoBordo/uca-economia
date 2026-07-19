@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { rlSignup, checkLimit, clientIp, tooMany } from "../../../lib/ratelimit";
 import { supabaseAdmin } from "../../../lib/supabase/server";
+import { paletaSugerida } from "../../../lib/universidades";
+import { generico } from "../../../lib/http";
 
 // Crear cuenta (6.1). El CAPTCHA lo verifica el propio Supabase Auth (Turnstile
 // configurado en el proyecto) — sin captchaToken válido el signup se rechaza.
@@ -25,18 +27,6 @@ const Body = z.object({
   universidad: z.string().trim().max(80).optional(),
   carrera: z.string().trim().max(80).optional(),
 });
-
-// Mapeo universidad → tema_color. Espejo server-safe de UNIVERSIDADES en
-// app/lib/paleta.ts (ese módulo es "use client") — mantener en sync.
-const UNI_PALETA: Record<string, string> = {
-  UCA: "azul", UADE: "azul", ITBA: "azul", Austral: "azul", Udesa: "azul", UNC: "azul",
-  UAI: "bordo", UCEMA: "bordo", Kennedy: "bordo", UB: "bordo", UNR: "bordo",
-  UBA: "negro", UTN: "negro", UP: "negro",
-  USAL: "verde", UNLP: "verde", "Siglo 21": "verde",
-};
-
-const generico = (msg: string, status: number) =>
-  NextResponse.json({ ok: false, error: msg }, { status });
 
 export async function POST(req: Request) {
   const lim = await checkLimit(rlSignup, `ip:${clientIp(req)}`, true);
@@ -85,7 +75,8 @@ export async function POST(req: Request) {
     if (body.apellido) cambios.apellido = body.apellido;
     if (body.universidad) cambios.universidad = body.universidad;
     if (body.carrera) cambios.carrera = body.carrera;
-    const pal = body.universidad ? UNI_PALETA[body.universidad] : undefined;
+    // Paleta de la universidad elegida (fuente única en lib/universidades.ts)
+    const pal = body.universidad ? paletaSugerida(body.universidad) : null;
     if (pal) cambios.tema_color = pal;
     if (Object.keys(cambios).length) {
       try {

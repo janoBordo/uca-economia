@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { supabaseForRequest, supabaseAdmin } from "../../../lib/supabase/server";
 import { rlPassword, checkLimit, clientIp, tooMany } from "../../../lib/ratelimit";
+import { generico } from "../../../lib/http";
 
 // Cambiar contraseña estando logueado (sección 6.16).
 // Reglas: exige la contraseña ACTUAL (Supabase no lo fuerza solo), rate limit
@@ -19,9 +20,6 @@ const Body = z.object({
   newPassword: z.string().min(8).max(72),
   captchaToken: z.string().max(4096).optional(),
 });
-
-const generico = (msg: string, status: number) =>
-  NextResponse.json({ ok: false, error: msg }, { status });
 
 export async function POST(req: Request) {
   // Rate limit por IP antes de tocar nada (falla cerrado)

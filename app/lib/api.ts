@@ -1,8 +1,6 @@
 "use client";
-import type { AppData, Materia } from "./types";
+import type { AppData, Materia, PatchBody } from "./types";
 import { DATA_DEFAULT } from "./types";
-
-type PatchBody = Partial<AppData> & { _delta?: boolean; _archivar?: { nombre: string } };
 
 let cache: AppData | null = null;
 let cacheFull = false;     // ¿el cache incluye el historial de semestres? (solo lo pide /semestre)

@@ -1,6 +1,6 @@
 {
-  "name": "uca-economia",
-  "version": "4.0.0",
+  "name": "stuniv",
+  "version": "10.8.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

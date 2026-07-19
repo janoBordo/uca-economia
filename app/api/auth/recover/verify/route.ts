@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { rlOtp, rlAuth, checkLimit, clientIp, tooMany } from "../../../../lib/ratelimit";
+import { generico } from "../../../../lib/http";
 
 // Paso 2 de la recuperación (6.1): verifica el código OTP y define la
 // contraseña nueva. Límite ESTRICTO de intentos por email (5/15min,
@@ -19,9 +20,6 @@ const Body = z.object({
   code: z.string().trim().regex(/^\d{6}$/),
   newPassword: z.string().min(8).max(72),
 });
-
-const generico = (msg: string, status: number) =>
-  NextResponse.json({ ok: false, error: msg }, { status });
 
 export async function POST(req: Request) {
   const ip = clientIp(req);

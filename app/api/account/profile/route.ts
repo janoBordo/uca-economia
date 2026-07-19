@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseForRequest, supabaseAdmin } from "../../../lib/supabase/server";
 import { rlDb, rlProfile, checkLimit, clientIp, tooMany } from "../../../lib/ratelimit";
+import { generico } from "../../../lib/http";
 import { avatarUrlCacheada, guardarAvatarUrl } from "../../../lib/avatar-url-cache";
 
 // Perfil del usuario (pantalla de Cuenta, 6.17). Lecturas y escrituras SIEMPRE
@@ -21,9 +22,6 @@ const Body = z.object({
   carrera: z.string().trim().max(80).optional(),
   temaColor: z.enum(TEMAS).optional(),
 }).strict();
-
-const generico = (msg: string, status: number) =>
-  NextResponse.json({ ok: false, error: msg }, { status });
 
 const CAMPOS = "nombre,apellido,apodo,universidad,carrera,foto_url,tema_color";
 

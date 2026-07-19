@@ -96,12 +96,12 @@ export default function Inicio() {
         </motion.div>
       ) : (
         <>
+          {/* Overline editorial (mismo idioma que "Todas las materias": label
+              tipográfico + línea fina, sin pill ni chrome) — v10.8 */}
           <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex items-center gap-3 mb-8">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-ocre/40 bg-ocre/8">
-              <div className="w-1.5 h-1.5 rounded-full bg-ocre animate-pulse" />
-              <span className="text-ocre text-xs font-semibold uppercase tracking-widest">Próximo examen</span>
-            </div>
-            <span className="text-navy/40 text-sm capitalize">{fechaProximo}</span>
+            <span className="text-ocre text-xs font-semibold uppercase tracking-widest">Próximo examen</span>
+            <span className="w-10 h-px bg-ocre/30" aria-hidden />
+            <span className="text-navy/45 text-sm capitalize">{fechaProximo}</span>
           </motion.div>
 
           <motion.h1 initial={{ opacity:0, y:24 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.1, duration:0.6, ease:[0.22,1,0.36,1] }}

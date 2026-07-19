@@ -23,6 +23,15 @@ export type AppData = {
   notas:       string[];
 };
 
+/** Cuerpo del POST /api/db: merge parcial de AppData + flags de operación
+    (`_delta` = sesiones como incremento atómico; `_archivar` = cerrar
+    semestre). Contrato compartido entre el cliente (lib/api.ts) y el server
+    (api/db/route.ts). */
+export type PatchBody = Partial<AppData> & {
+  _delta?: boolean;
+  _archivar?: { nombre: string };
+};
+
 // Multi-usuario (v10): las cuentas nuevas arrancan sin materias — cada
 // estudiante carga las suyas en /semestre (ya no existen las de UCA·Economía
 // pre-cargadas, que eran el semestre personal de Jano).

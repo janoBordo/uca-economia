@@ -6,6 +6,26 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.8 — Rediseño del overline de la home + auditoría de calidad de código (branch `main`)
+
+Dos pedidos de Jano: sacarle a la home el look de "sitio hecho con IA" y dejar el código a nivel de un desarrollador profesional, **sin tocar funcionalidad, visual (fuera de lo pedido), seguridad ni las optimizaciones de v10.4-v10.7**.
+
+**1. "Próximo examen" rediseñado (`app/page.tsx`):** el pill con borde redondeado, fondo ocre y puntito pulsante (el patrón badge típico de IA) se reemplazó por un **overline editorial**: label tipográfico ocre en uppercase + línea fina de 40px + la fecha — el mismo idioma que ya usaba "Todas las materias" (label + hairline), así el hero y el pie de la home hablan igual. Verificado por computed style: cero borde, cero fondo, cero radius, cero animación.
+
+**2. Auditoría de calidad (todo verificado con build + suites e2e 33/33 y 7/7 en verde):**
+- **Código muerto**: `app/lib/useUser.ts` eliminado (no lo importaba nadie desde que el Nav pasó a `usePerfil`). El endpoint `GET /api/auth/me` queda (es el "quién soy" de la API, cubierto por la suite de Fase 2).
+- **Duplicación real eliminada**:
+  - `app/lib/http.ts` (nuevo): `generico()` / `noAuth()` / `fallo()` — los helpers de respuesta de error que **6 rutas** definían copiados a mano ahora viven en un solo lugar (db, profile, avatar, login, signup, recover/verify los importan; mismas respuestas byte a byte).
+  - `app/lib/universidades.ts` (nuevo, sin `"use client"`): la fuente ÚNICA del mapeo universidad→paleta. Antes `/api/auth/signup` tenía un espejo copiado con el comentario "mantener en sync" (bomba de tiempo clásica); ahora server y cliente importan lo mismo (`paleta.ts` re-exporta para no tocar las vistas).
+  - `PatchBody` (el contrato del POST /api/db) estaba definido dos veces — cliente y server; ahora vive en `app/lib/types.ts` y ambos lo importan.
+- **Control de errores en la UI**: todos los handlers async que hacían `await` de un guardado sin try/catch (timer, calendario ×5, semestre ×4, métricas, cuenta ×2) dejaban el botón colgado en "Guardando…" y el fallo sin rastro si la red fallaba — y en el timer el usuario creía que sus minutos se habían guardado. Ahora: `try/catch/finally` con log en consola, los flags de carga siempre se liberan, las acciones de éxito (cerrar modal, limpiar input, toast de confirmación) solo corren si el guardado se concretó, y el timer muestra un toast honesto de error. Cero cambio en el camino feliz.
+- **Metadata**: `package.json` pasó de `uca-economia@4.0.0` a **`stuniv@10.8.0`** (alineado con la marca y el versionado real de este documento).
+- **Verificado sin hallazgos**: sin secretos hardcodeados (scan de patrones de keys), `tsconfig` con `strict` activo, `.gitignore` correcto (los artefactos de build no están trackeados), sin `console.log` de debug. Dependencias: los 2 advisories conocidos de `next@14.2.35` siguen documentados (fix = Next 16, breaking — decisión pendiente de Jano, no se toma sola).
+
+**Verificación:** build en verde; suite Fase 3 **33/33 PASS** y revocación **7/7 PASS** contra build de producción local (cubren justo las 7 rutas tocadas por el refactor); hero nuevo verificado con sesión real (label ocre, hairline, sin pill); usuario de prueba borrado.
+
+---
+
 ## v10.7 — Compartir app + resumen real del semestre archivado + nav más protagonista (branch `main`)
 
 Tres pedidos de Jano:

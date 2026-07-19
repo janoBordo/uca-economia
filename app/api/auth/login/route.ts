@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseForRequest } from "../../../lib/supabase/server";
 import { rlAuth, checkLimit, clientIp, tooMany } from "../../../lib/ratelimit";
+import { generico } from "../../../lib/http";
 
 // Iniciar sesión (6.1). El CAPTCHA lo verifica Supabase Auth (Turnstile).
 // La sesión queda en cookies HttpOnly+Secure+SameSite (hardenCookie) — nunca
@@ -16,9 +17,6 @@ const Body = z.object({
   password: z.string().min(1).max(72),
   captchaToken: z.string().min(1).max(4096),
 });
-
-const generico = (msg: string, status: number) =>
-  NextResponse.json({ ok: false, error: msg }, { status });
 
 export async function POST(req: Request) {
   const ip = clientIp(req);

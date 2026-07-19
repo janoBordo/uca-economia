@@ -8,7 +8,13 @@
    (atributo + espejo localStorage para el anti-flash), y resolver colores
    computados para SVG/charts (donde var() no funciona como atributo). */
 
-export type Paleta = "azul" | "bordo" | "negro" | "verde" | "dorado";
+import { type Paleta } from "./universidades";
+
+/* El catálogo universidad → paleta vive en universidades.ts (módulo sin
+   "use client": también lo usa el server en /api/auth/signup). Acá se
+   re-exporta para que las vistas sigan importando todo desde paleta.ts. */
+export { UNIVERSIDADES, UNIVERSIDAD_OTRA, paletaSugerida } from "./universidades";
+export type { Paleta } from "./universidades";
 
 export const PALETAS: { id: Paleta; label: string; primario: string; acento: string }[] = [
   // primario/acento = espejo de globals.css (solo para swatches del selector)
@@ -20,34 +26,6 @@ export const PALETAS: { id: Paleta; label: string; primario: string; acento: str
 ];
 
 export const ES_PALETA = (v: string): v is Paleta => PALETAS.some(p => p.id === v);
-
-/* Mapeo fijo del documento de migración. "Otra" = texto libre, sin paleta
-   automática (se elige a mano). La asignación automática es solo el valor
-   sugerido inicial — la paleta siempre se puede cambiar a mano en /cuenta. */
-export const UNIVERSIDADES: { nombre: string; paleta: Paleta }[] = [
-  { nombre: "UCA",     paleta: "azul"  },
-  { nombre: "UADE",    paleta: "azul"  },
-  { nombre: "ITBA",    paleta: "azul"  },
-  { nombre: "Austral", paleta: "azul"  },
-  { nombre: "Udesa",   paleta: "azul"  },
-  { nombre: "UAI",     paleta: "bordo" },
-  { nombre: "UCEMA",   paleta: "bordo" },
-  { nombre: "Kennedy", paleta: "bordo" },
-  { nombre: "UB",      paleta: "bordo" },
-  { nombre: "UBA",     paleta: "negro" },
-  { nombre: "UTN",     paleta: "negro" },
-  { nombre: "UP",      paleta: "negro" },
-  { nombre: "USAL",    paleta: "verde" },
-  { nombre: "UNLP",    paleta: "verde" },
-  { nombre: "UNC",     paleta: "azul"  },
-  { nombre: "UNR",     paleta: "bordo" },
-  { nombre: "Siglo 21", paleta: "verde" },
-];
-export const UNIVERSIDAD_OTRA = "Otra";
-
-export function paletaSugerida(universidad: string): Paleta | null {
-  return UNIVERSIDADES.find(u => u.nombre === universidad)?.paleta ?? null;
-}
 
 /* Logos de universidad (nav). Solo las que Jano pasó; el resto no muestra logo.
    Archivos en public/logos/. La clave es el `nombre` exacto de UNIVERSIDADES. */

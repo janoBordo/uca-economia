@@ -105,10 +105,15 @@ export default function Calendario() {
     setGuardandoPlan(true);
     const next = { ...planEstudio, [modal.key]: planLocal };
     if (planLocal.length === 0) delete next[modal.key];
-    await savePlanEstudio(next);
-    track("plan_editado");
-    setGuardandoPlan(false);
-    setModal(null);
+    try {
+      await savePlanEstudio(next);
+      track("plan_editado");
+      setModal(null); // solo se cierra si guardó de verdad
+    } catch (e) {
+      console.error("calendario: no se pudo guardar el plan", e);
+    } finally {
+      setGuardandoPlan(false);
+    }
   }
 
   function cancelAddExam() { setAddExam(false); setExSel(""); setExHoras(15); setExHora("09:00"); }
@@ -128,14 +133,19 @@ export default function Calendario() {
       // Primera fecha de la materia: se la asigno directamente.
       updated = materias.map(x => x.id === exSel ? { ...x, examen, metaHoras: exHoras || x.metaHoras } : x);
     }
-    await saveMaterias(updated);
-    track("examen_agregado");
-    cancelAddExam();
+    try {
+      await saveMaterias(updated);
+      track("examen_agregado");
+      cancelAddExam(); // solo se cierra el mini-form si guardó de verdad
+    } catch (e) {
+      console.error("calendario: no se pudo agregar el examen", e);
+    }
   }
   // Quitar el examen de una materia (vuelve a "sin fecha"; la materia no se borra)
   async function eliminarExamen(id: string) {
     const updated = materias.map(m => m.id === id ? { ...m, examen: "" } : m);
-    await saveMaterias(updated);
+    try { await saveMaterias(updated); }
+    catch (e) { console.error("calendario: no se pudo quitar el examen", e); }
   }
   // Al elegir la materia, prefill de las horas con su valor actual
   function elegirMateriaExamen(id: string) {
@@ -148,16 +158,22 @@ export default function Calendario() {
     const texto = notaInput.trim().slice(0, MAX_NOTA);
     if (!texto) return;
     setGuardandoNota(true);
-    await saveNotas([texto, ...notas]);
-    track("nota_creada");
-    setGuardandoNota(false);
-    setNotaInput("");
-    inputRef.current?.focus();
+    try {
+      await saveNotas([texto, ...notas]);
+      track("nota_creada");
+      setNotaInput(""); // el texto solo se limpia si la nota se guardó
+    } catch (e) {
+      console.error("calendario: no se pudo guardar la nota", e);
+    } finally {
+      setGuardandoNota(false);
+      inputRef.current?.focus();
+    }
   }
 
   async function borrarNota(idx: number) {
     const next = notas.filter((_, i) => i !== idx);
-    await saveNotas(next);
+    try { await saveNotas(next); }
+    catch (e) { console.error("calendario: no se pudo borrar la nota", e); }
   }
 
   const hoyStr  = isoKey(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());

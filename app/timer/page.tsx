@@ -215,12 +215,20 @@ export default function Timer() {
 
     if (mins > 0 && matId) {
       setGuardando(true);
-      await addMinutos(matId, mins);
-      setGuardando(false);
-      setSesiones(s => s + 1);
-      track("pomodoro_completado", { minutos: mins, modo });
-      const nombre = materias.find(m => m.id === matId)?.nombre ?? "";
-      showToast(`+${mins} min guardados en ${nombre}`);
+      try {
+        await addMinutos(matId, mins);
+        setSesiones(s => s + 1);
+        track("pomodoro_completado", { minutos: mins, modo });
+        const nombre = materias.find(m => m.id === matId)?.nombre ?? "";
+        showToast(`+${mins} min guardados en ${nombre}`);
+      } catch (e) {
+        // Sin esto, un fallo de red dejaba el botón en "Guardando…" y el
+        // usuario creía que los minutos se habían guardado (v10.8).
+        console.error("timer: no se pudieron guardar los minutos", e);
+        showToast("No se pudieron guardar los minutos. Revisá tu conexión.");
+      } finally {
+        setGuardando(false);
+      }
     }
     dispRef.current = { restante: totalSecs, elapsed: 0 };
     setDialVersion(v => v + 1);
@@ -234,15 +242,21 @@ export default function Timer() {
     const mins = Math.min(1440, Math.max(0, Math.round(manualH * 60 + manualM)));
     if (mins <= 0 || !matId) return;
     setGuardando(true);
-    await addMinutos(matId, mins);
-    setGuardando(false);
-    setSesiones(s => s + 1);
-    track("horas_manuales", { minutos: mins });
-    const nombre = materias.find(m => m.id === matId)?.nombre ?? "";
-    const hLbl = manualH ? `${manualH}h ` : "";
-    const mLbl = manualM ? `${manualM}min` : "";
-    showToast(`+${(hLbl + mLbl).trim() || `${mins} min`} guardados en ${nombre}`);
-    setManualOpen(false); setManualH(1); setManualM(0);
+    try {
+      await addMinutos(matId, mins);
+      setSesiones(s => s + 1);
+      track("horas_manuales", { minutos: mins });
+      const nombre = materias.find(m => m.id === matId)?.nombre ?? "";
+      const hLbl = manualH ? `${manualH}h ` : "";
+      const mLbl = manualM ? `${manualM}min` : "";
+      showToast(`+${(hLbl + mLbl).trim() || `${mins} min`} guardados en ${nombre}`);
+      setManualOpen(false); setManualH(1); setManualM(0);
+    } catch (e) {
+      console.error("timer: no se pudieron guardar los minutos", e);
+      showToast("No se pudieron guardar los minutos. Revisá tu conexión.");
+    } finally {
+      setGuardando(false);
+    }
   }
 
   function reset() {

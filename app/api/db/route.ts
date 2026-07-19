@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import type { AppData, Materia } from "../../lib/types";
+import type { AppData, Materia, PatchBody } from "../../lib/types";
 import { rlDb, checkLimit, clientIp, tooMany } from "../../lib/ratelimit";
+import { generico, noAuth, fallo } from "../../lib/http";
 import { supabaseForRequest } from "../../lib/supabase/server";
 import { usuarioVerificado } from "../../lib/supabase/verificar";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -15,8 +16,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // Los incrementos de minutos van por el RPC atómico add_minutos (6.13).
 
 export const runtime = "nodejs";
-
-type PatchBody = Partial<AppData> & { _delta?: boolean; _archivar?: { nombre: string } };
 
 // Validación server-side del body (6.4). Ids ahora son uuid (PKs reales de la
 // base); examen mantiene el semántico del modelo viejo: "YYYY-MM-DDTHH:MM"
@@ -45,14 +44,6 @@ const PatchSchema = z
   })
   .partial()
   .strict();
-
-const noAuth = () =>
-  NextResponse.json({ ok: false, error: "No autenticado." }, { status: 401 });
-const fallo = (e: unknown, donde: string) => {
-  // Detalle completo al log del server; al cliente solo un mensaje genérico (6.9)
-  console.error(`api/db ${donde}:`, e instanceof Error ? e.message : e);
-  return NextResponse.json({ ok: false, error: "Algo salió mal." }, { status: 500 });
-};
 
 /** Arma el AppData del usuario en UN solo round-trip (RPC get_app_data,
     migración 0003). El RPC corre bajo RLS (security invoker) y además valida
@@ -83,7 +74,7 @@ export async function GET(req: Request) {
     return NextResponse.json(await getData(sb, full));
   } catch (e) {
     if (esSesionMuerta(e)) return noAuth();
-    return fallo(e, "GET");
+    return fallo(e, "api/db GET");
   }
 }
 
@@ -99,10 +90,10 @@ export async function POST(req: Request) {
   try {
     const parsed = PatchSchema.safeParse(await req.json());
     if (!parsed.success) {
-      return NextResponse.json({ ok: false, error: "Datos inválidos." }, { status: 400 });
+      return generico("Datos inválidos.", 400);
     }
     body = parsed.data as PatchBody;
-  } catch { return NextResponse.json({ ok: false, error: "Datos inválidos." }, { status: 400 }); }
+  } catch { return generico("Datos inválidos.", 400); }
 
   try {
     // ── Cerrar semestre: snapshot + limpieza en UNA transacción (RPC) ──
@@ -144,7 +135,7 @@ export async function POST(req: Request) {
         // Incremento ATÓMICO por materia (RPC upsert — 6.13; nunca leer-modificar-escribir)
         for (const [materiaId, mins] of entries) {
           if (mins < 1 || mins > 1440) {
-            return NextResponse.json({ ok: false, error: "Datos inválidos." }, { status: 400 });
+            return generico("Datos inválidos.", 400);
           }
           const { error } = await sb.rpc("add_minutos", { p_materia_id: materiaId, p_delta: mins });
           if (error) throw new Error(error.message);
@@ -158,7 +149,7 @@ export async function POST(req: Request) {
         // permitiría insertar una fila con materia_id AJENO (el FK valida
         // existencia, no dueño) y romperle el add_minutos a ese usuario.
         // La UI jamás manda esto; si llega, es malicioso o un bug.
-        return NextResponse.json({ ok: false, error: "Datos inválidos." }, { status: 400 });
+        return generico("Datos inválidos.", 400);
       }
     }
 
@@ -194,7 +185,7 @@ export async function POST(req: Request) {
   } catch (e) {
     // Carrera: sesión revocada entre el getUser de arriba y la relectura final
     if (esSesionMuerta(e)) return noAuth();
-    return fallo(e, "POST");
+    return fallo(e, "api/db POST");
   }
 }
 

@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { supabaseForRequest } from "../../../lib/supabase/server";
 import { rlDb, checkLimit, clientIp, tooMany } from "../../../lib/ratelimit";
 
-// Usuario de la sesión actual, para la UI (hook useUser). Solo id + email:
-// las cookies son HttpOnly, así que el cliente no puede leer el JWT — este
-// endpoint es la única forma de saber "quién soy" desde el navegador.
+// Usuario de la sesión actual ("quién soy"). Solo id + email: las cookies son
+// HttpOnly, así que el JS del navegador no puede leer el JWT — este endpoint
+// es la única forma de conocer la identidad de la sesión desde el cliente.
 
 export const runtime = "nodejs";
 

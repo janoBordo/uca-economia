@@ -56,8 +56,9 @@ export default function Metricas() {
 
   const cambiarPrep = useCallback(async (id: string, v: number) => {
     const next = { ...prepReal, [id]: v };
-    setPrep(next);
-    await savePreparacion(next);
+    setPrep(next); // la UI responde al instante; el guardado va detrás
+    try { await savePreparacion(next); }
+    catch (e) { console.error("métricas: no se pudo guardar la preparación", e); }
   }, [prepReal]);
 
   return (

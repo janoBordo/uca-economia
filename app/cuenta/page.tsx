@@ -111,11 +111,17 @@ function SeccionPerfil({ perfil }: { perfil: Perfil }) {
     setErrorFoto("");
     if (file.size > MAX_FOTO_ORIGEN) { setErrorFoto("La imagen es demasiado grande (máx. 8MB)."); return; }
     setSubiendo(true);
-    const blob = await reducirFoto(file);
-    const url = blob ? await subirFoto(blob) : null;
-    setSubiendo(false);
+    let url: string | null = null;
+    try {
+      const blob = await reducirFoto(file);
+      url = blob ? await subirFoto(blob) : null;
+    } catch (e) {
+      console.error("cuenta: no se pudo subir la foto", e);
+    } finally {
+      setSubiendo(false);
+    }
     if (url) track("foto_subida");
-    if (!url) setErrorFoto("No se pudo subir la foto. Probá con otra imagen.");
+    else setErrorFoto("No se pudo subir la foto. Probá con otra imagen.");
   }
 
   const sugerida = form.uniSel !== UNIVERSIDAD_OTRA ? paletaSugerida(form.uniSel) : null;
@@ -146,7 +152,11 @@ function SeccionPerfil({ perfil }: { perfil: Perfil }) {
             {confirmQuitar && (
               <span className="flex items-center gap-2 text-sm">
                 <span className="text-navy/60">¿Quitar la foto?</span>
-                <button onClick={async () => { await quitarFoto(); setConfirmQuitar(false); }}
+                <button onClick={async () => {
+                    try { await quitarFoto(); }
+                    catch (e) { console.error("cuenta: no se pudo quitar la foto", e); }
+                    finally { setConfirmQuitar(false); }
+                  }}
                   className="px-3 py-1 rounded-full bg-red-500 text-white text-xs font-semibold hover:bg-red-600 transition-colors">Sí</button>
                 <button onClick={() => setConfirmQuitar(false)}
                   className="px-3 py-1 rounded-full text-navy/50 text-xs font-medium hover:text-navy transition-colors">No</button>
