@@ -59,7 +59,18 @@ export async function POST(req: Request) {
 
   // 3. Cerrar sesión en TODOS los dispositivos (incluido este)
   const { error: soError } = await supabase.auth.signOut({ scope: "global" });
-  if (soError) console.error("delete-account: signOut global falló", soError.message);
+  if (soError) {
+    // Con Authorization: Bearer no hay sesión en el storage del cliente y el
+    // signOut de arriba no aplica — se revoca por admin con el token del
+    // request, para que las filas de auth.sessions mueran igual (v10.5).
+    console.error("delete-account: signOut global falló", soError.message);
+    const auth = req.headers.get("authorization");
+    const token = auth?.toLowerCase().startsWith("bearer ") ? auth.slice(7) : null;
+    if (token) {
+      const { error: adminSoErr } = await admin.auth.admin.signOut(token, "global");
+      if (adminSoErr) console.error("delete-account: signOut admin falló", adminSoErr.message);
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

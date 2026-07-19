@@ -6,6 +6,25 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.5 — GET /api/db en 1 round-trip: verificación local del JWT + revocación en la base (branch `main`)
+
+El "escalón 4" del plan de escalado, implementado ahora que es gratis hacerlo: el endpoint más caliente de la app deja de pagar el round-trip a Supabase Auth en cada request **sin aflojar ninguna garantía auditada** (la restricción que en v10.4 hizo descartar la versión ingenua de esta idea).
+
+**El problema**: `GET /api/db` hacía `getUser()` (ida y vuelta al Auth server, ~30-40ms en gru1 y carga sobre Auth) + 5 queries paralelas a PostgREST. Verificar el JWT localmente ahorra ese round-trip, pero abría una ventana de ≤15 min para sesiones **revocadas** (logout / cambio de contraseña / cuenta eliminada) — y la suite e2e de Fase 2 verifica explícitamente "cookies viejas post-logout → 401 inmediato" y "GET /api/db con cookies viejas → 401".
+
+**La solución (misma garantía, cero round-trip extra)**:
+- **Migración `0003_get_app_data_y_sesion_viva.sql`**: RPC `get_app_data(p_full)` (SECURITY INVOKER — todo pasa por las políticas RLS de 0001/0002) que arma el `AppData` completo en **una sola llamada** y ANTES valida: (1) que la **sesión del JWT siga viva en `auth.sessions`** — la misma tabla que consulta getUser(); logout/cambio de contraseña/delete borran esa fila, así que corta al instante — y (2) que el **perfil no esté soft-deleted** (matriz de acceso: usuario eliminado = nada). Si algo falla lanza `sesion_revocada` → la ruta lo mapea a 401. Helper `sesion_viva(uuid)` SECURITY DEFINER mínimo (uuid→boolean, `search_path` vacío) porque `authenticated` no puede leer `auth.sessions`.
+- **`app/lib/supabase/verificar.ts`** (nuevo, edge-safe): `usuarioVerificado()` verifica la firma del JWT **localmente** con `getClaims()` + JWKS ES256 cacheado a nivel módulo (el proyecto ya firmaba con clave asimétrica desde el 2026-07-11). Exige `role=authenticated` + `sub` + `session_id`. Ante CUALQUIER duda (JWKS caído, algoritmo viejo, error raro) cae en **fallback a `getUser()`** — nunca menos seguro.
+- **`app/api/db/route.ts`**: GET = verificación local + RPC (2 round-trips → **1**). POST **mantiene `getUser()`** (escrituras = vara máxima) y su relectura final pasa de 5 queries a 1 RPC. `sesion_revocada` → 401 en ambos.
+- **`app/api/account/delete/route.ts` endurecido** (hallazgo del nuevo test): con `Authorization: Bearer` el `signOut global` del cliente no aplicaba (sin sesión en storage) y las filas de `auth.sessions` quedaban vivas (el 401 lo daba solo el ban). Ahora, si el signOut falla, se revoca por **admin** con el token del request — las sesiones mueren en la base también por esta vía.
+- **Sin cambios**: middleware (la suite de Fase 2 testea "volver a / con cookies viejas → redirect a /login", así que sigue con `getUser()`), `/api/account/*`, `/api/auth/*`, `/api/tts`. Cero cambios visuales/funcionales.
+
+**Verificación**: build en verde; suite **nueva** `scripts/test-revocacion-e2e.mjs` 7/7 PASS (logout con cookies → `/api/db` 401 INMEDIATO con token aún válido; eliminar cuenta vía Bearer → 401 INMEDIATO); suite Fase 3 re-corrida **33/33 PASS** (el RPC replica el contrato del getData viejo exacto: orden de materias, formato de examen, `?full=1`, archivar, aislación A/B). Verificación en producción al final de esta entrada.
+
+**Impacto en capacidad**: cada GET de datos pasa de 2 round-trips + 5 queries a **1 round-trip + 1 query** → menos latencia percibida (~50-80ms → ~30-40ms por GET), ~5x menos statements sobre Postgres y sin carga sobre el Auth server en el hot path. El techo gratis sigue siendo Vercel (~1.300 activos/día — las invocaciones no cambian), pero el compute de Supabase deja de ser el próximo cuello: en los planes pagos el techo por compute sube ~3x (ver tabla de escalones en el mensaje de cierre de esta versión).
+
+---
+
 ## v10.4.1 — Mails por Gmail SMTP (registros 90 → ~450/día) (branch `main`)
 
 Jano configuró el SMTP custom de Supabase con **Gmail directo** (`smtp.gmail.com:587`, user `soporte.stuniv@gmail.com`, App Password de Google) reemplazando a SendGrid. Con eso los mails de confirmación/OTP salen de Gmail de verdad (SPF/DKIM alineados → inbox, no spam) y el cupo pasa de 100/día (SendGrid free) a **~500/día** (límite de Gmail para cuentas gratis).

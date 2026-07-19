@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import type { AppData, Materia, SemestreArchivado } from "../../lib/types";
+import type { AppData, Materia } from "../../lib/types";
 import { rlDb, checkLimit, clientIp, tooMany } from "../../lib/ratelimit";
 import { supabaseForRequest } from "../../lib/supabase/server";
+import { usuarioVerificado } from "../../lib/supabase/verificar";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Fase 3: /api/db ya NO toca Vercel KV. Sirve y escribe los datos POR USUARIO
@@ -53,60 +54,37 @@ const fallo = (e: unknown, donde: string) => {
   return NextResponse.json({ ok: false, error: "Algo salió mal." }, { status: 500 });
 };
 
-const normExamen = (v: string | null): string => (v ? v.slice(0, 16) : "");
-
-/** Arma el AppData del usuario desde las tablas (todo bajo RLS). */
+/** Arma el AppData del usuario en UN solo round-trip (RPC get_app_data,
+    migración 0003). El RPC corre bajo RLS (security invoker) y además valida
+    que la sesión del JWT siga viva en auth.sessions — la misma tabla que
+    consulta getUser() — lanzando 'sesion_revocada' si no: la garantía de
+    "sesión revocada → 401 inmediato" se conserva exacta (v10.5). */
 async function getData(sb: SupabaseClient, full: boolean): Promise<AppData> {
-  const [mats, ses, plan, notas, sems] = await Promise.all([
-    sb.from("materias")
-      .select("id,nombre,examen,meta_horas,preparacion")
-      .order("posicion", { ascending: true }).order("created_at", { ascending: true })
-      .limit(50),
-    sb.from("sesiones_estudio").select("materia_id,minutos").limit(50),
-    sb.from("plan_estudio").select("fecha,materia_ids").limit(400),
-    sb.from("notas").select("texto").order("posicion", { ascending: true }).limit(100),
-    full
-      ? sb.from("semestres")
-          .select("id,numero,nombre,materias,sesiones,archived_at")
-          .order("numero", { ascending: true }).limit(100)
-      : Promise.resolve({ data: [], error: null } as const),
-  ]);
-  const err = mats.error ?? ses.error ?? plan.error ?? notas.error ?? sems.error;
-  if (err) throw new Error(err.message);
-
-  const materias: Materia[] = (mats.data ?? []).map(m => ({
-    id: m.id, nombre: m.nombre, examen: normExamen(m.examen), metaHoras: Number(m.meta_horas),
-  }));
-  const sesiones: Record<string, number> = {};
-  for (const s of ses.data ?? []) if (s.minutos > 0) sesiones[s.materia_id] = s.minutos;
-  const preparacion: Record<string, number> = {};
-  for (const m of mats.data ?? []) if (m.preparacion > 0) preparacion[m.id] = m.preparacion;
-  const planEstudio: Record<string, string[]> = {};
-  for (const p of plan.data ?? []) if (p.materia_ids?.length) planEstudio[p.fecha] = p.materia_ids;
-  const semestres: SemestreArchivado[] = ((sems.data ?? []) as {
-    id: string; numero: number; nombre: string;
-    materias: Materia[]; sesiones: Record<string, number>; archived_at: string;
-  }[]).map(s => ({
-    id: s.id, numero: s.numero, nombre: s.nombre,
-    materias: s.materias ?? [], sesiones: s.sesiones ?? {}, archivedAt: s.archived_at,
-  }));
-
-  return {
-    materias, sesiones, preparacion, semestres, planEstudio,
-    notas: (notas.data ?? []).map(n => n.texto),
-  };
+  const { data, error } = await sb.rpc("get_app_data", { p_full: full });
+  if (error) throw new Error(error.message);
+  return data as AppData;
 }
+
+/** ¿El error del RPC es "esta sesión ya no existe / no autenticado"? → 401 */
+const esSesionMuerta = (e: unknown) =>
+  e instanceof Error && /sesion_revocada|not_authenticated/.test(e.message);
 
 export async function GET(req: Request) {
   const lim = await checkLimit(rlDb, `get:${clientIp(req)}`, false);
   if (!lim.ok) return tooMany(lim.retryAfter);
   const sb = supabaseForRequest(req);
-  const { data: auth, error: authErr } = await sb.auth.getUser();
-  if (authErr || !auth.user) return noAuth();
+  // Firma del JWT verificada en local (ES256/JWKS, sin round-trip a Auth);
+  // la vivacidad de la sesión la valida el propio RPC en el round-trip de
+  // datos. Revocado ⇒ 'sesion_revocada' ⇒ 401. Fallback a getUser ante dudas.
+  const user = await usuarioVerificado(sb, req);
+  if (!user) return noAuth();
   try {
     const full = new URL(req.url).searchParams.get("full") === "1";
     return NextResponse.json(await getData(sb, full));
-  } catch (e) { return fallo(e, "GET"); }
+  } catch (e) {
+    if (esSesionMuerta(e)) return noAuth();
+    return fallo(e, "GET");
+  }
 }
 
 export async function POST(req: Request) {
@@ -213,7 +191,11 @@ export async function POST(req: Request) {
     // conserva el que ya tiene en cache — menos egress por escritura).
     const data = await getData(sb, false);
     return NextResponse.json({ ok: true, data: { ...data, semestres: undefined } });
-  } catch (e) { return fallo(e, "POST"); }
+  } catch (e) {
+    // Carrera: sesión revocada entre el getUser de arriba y la relectura final
+    if (esSesionMuerta(e)) return noAuth();
+    return fallo(e, "POST");
+  }
 }
 
 /** Reemplaza el set de materias del usuario: upsert de las que vienen (con su
