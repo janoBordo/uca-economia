@@ -20,9 +20,45 @@ function fechaExamenTexto(examen: string): string {
   return d.getTime() < Date.now() ? `Rendido · ${dia}` : `${dia} · ${hora}`;
 }
 
+/* Resumen del semestre archivado (v10.7): horas POR EXAMEN, por materia y en
+   total. Solo se listan los exámenes RENDIDOS (filas con fecha); las filas que
+   quedaron sin fecha (examen quitado) no aparecen como examen, pero sus horas
+   sí suman al total de su materia. El 2º examen de una misma materia se rotula
+   "Materia 2", el 3º "Materia 3", etc. (orden cronológico). */
+type ExamenResumen = { id: string; label: string; mins: number };
+type GrupoResumen  = { key: string; nombre: string; mins: number; examenes: ExamenResumen[] };
+
+function resumenGrupos(sem: SemestreArchivado): GrupoResumen[] {
+  const map = new Map<string, { nombre: string; rows: Materia[] }>();
+  for (const m of sem.materias) {
+    const k = m.nombre.trim().toLowerCase();
+    const g = map.get(k);
+    if (g) g.rows.push(m); else map.set(k, { nombre: m.nombre, rows: [m] });
+  }
+  const grupos: GrupoResumen[] = [];
+  for (const [key, g] of Array.from(map.entries())) {
+    const mins = g.rows.reduce((a, r) => a + (sem.sesiones[r.id] || 0), 0);
+    const rendidos = g.rows
+      .filter(r => r.examen && !isNaN(new Date(r.examen).getTime()))
+      .sort((a, b) => new Date(a.examen).getTime() - new Date(b.examen).getTime());
+    // Fila fantasma (examen quitado y sin horas): no aparece en el resumen.
+    if (mins <= 0 && rendidos.length === 0) continue;
+    grupos.push({
+      key, nombre: g.nombre, mins,
+      examenes: rendidos.map((r, i) => ({
+        id: r.id,
+        label: i === 0 ? g.nombre : `${g.nombre} ${i + 1}`,
+        mins: sem.sesiones[r.id] || 0,
+      })),
+    });
+  }
+  return grupos;
+}
+
 function SemestreCard({ sem, open, onToggle }: { sem: SemestreArchivado; open: boolean; onToggle: () => void }) {
   const totalMins  = Object.values(sem.sesiones).reduce((a, v) => a + v, 0);
   const totalHoras = (totalMins / 60).toFixed(1);
+  const grupos     = resumenGrupos(sem);
   const fecha      = new Date(sem.archivedAt).toLocaleDateString("es-AR", { day:"2-digit", month:"short", year:"numeric" });
   return (
     <GlassCard layout className="rounded-2xl border border-navy/10 overflow-hidden" style={{ background:"rgba(11,31,77,0.025)" }}>
@@ -43,8 +79,8 @@ function SemestreCard({ sem, open, onToggle }: { sem: SemestreArchivado; open: b
               <div className="grid grid-cols-3 gap-4 my-5">
                 {[
                   { label:"Horas totales", val:`${totalHoras}h` },
-                  { label:"Materias",      val:`${sem.materias.length}` },
-                  { label:"Hs/materia",    val:`${sem.materias.length ? (totalMins/60/sem.materias.length).toFixed(1) : "0"}h` },
+                  { label:"Materias",      val:`${grupos.length}` },
+                  { label:"Hs/materia",    val:`${grupos.length ? (totalMins/60/grupos.length).toFixed(1) : "0"}h` },
                 ].map(k => (
                   <div key={k.label}>
                     <span className="text-navy/40 text-xs block mb-0.5">{k.label}</span>
@@ -53,15 +89,39 @@ function SemestreCard({ sem, open, onToggle }: { sem: SemestreArchivado; open: b
                 ))}
               </div>
               <div className="flex flex-col gap-1.5">
-                {sem.materias.map(m => {
-                  const mins = sem.sesiones[m.id] || 0;
-                  const pct  = totalMins > 0 ? Math.round(mins / totalMins * 100) : 0;
+                {grupos.map(g => {
+                  const pctDe = (mins: number) => totalMins > 0 ? Math.round(mins / totalMins * 100) : 0;
+                  // Una sola fila cuando la materia tuvo un examen (o ninguno):
+                  // materia y examen coinciden. Con varios exámenes: una fila
+                  // por examen ("Filosofía", "Filosofía 2") + subtotal materia.
+                  if (g.examenes.length <= 1) {
+                    return (
+                      <div key={g.key} className="flex items-center justify-between py-2 border-b border-navy/6">
+                        <span className="text-navy/70 text-sm">{g.nombre}</span>
+                        <div className="flex gap-4 text-xs text-navy/40 tabular-nums">
+                          <span>{(g.mins/60).toFixed(1)}h</span>
+                          <span className="w-10 text-right">{pctDe(g.mins)}%</span>
+                        </div>
+                      </div>
+                    );
+                  }
                   return (
-                    <div key={m.id} className="flex items-center justify-between py-2 border-b border-navy/6">
-                      <span className="text-navy/70 text-sm">{m.nombre}</span>
-                      <div className="flex gap-4 text-xs text-navy/40 tabular-nums">
-                        <span>{(mins/60).toFixed(1)}h</span>
-                        <span className="w-10 text-right">{pct}%</span>
+                    <div key={g.key} className="border-b border-navy/6">
+                      {g.examenes.map(e => (
+                        <div key={e.id} className="flex items-center justify-between py-2">
+                          <span className="text-navy/70 text-sm">{e.label}</span>
+                          <div className="flex gap-4 text-xs text-navy/40 tabular-nums">
+                            <span>{(e.mins/60).toFixed(1)}h</span>
+                            <span className="w-10 text-right">{pctDe(e.mins)}%</span>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between pb-2">
+                        <span className="text-navy/45 text-xs font-semibold">{g.nombre} · total</span>
+                        <div className="flex gap-4 text-xs text-navy/50 font-semibold tabular-nums">
+                          <span>{(g.mins/60).toFixed(1)}h</span>
+                          <span className="w-10 text-right">{pctDe(g.mins)}%</span>
+                        </div>
                       </div>
                     </div>
                   );

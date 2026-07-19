@@ -67,11 +67,13 @@ function MobileMenu({ path }: { path: string }) {
     return () => { document.removeEventListener("mousedown", click); document.removeEventListener("keydown", esc); };
   }, [open]);
 
-  const bar = "absolute left-0 right-0 h-[1.5px] rounded-full bg-navy/70";
+  const bar = "absolute left-0 right-0 h-[1.75px] rounded-full bg-navy/90";
   return (
     <div className="relative lg:hidden" ref={ref}>
+      {/* v10.7: la hamburguesa (la puerta a las páginas en mobile) gana borde y
+          tamaño — es el control principal de navegación, no un ícono más. */}
       <button onClick={() => setOpen(o => !o)} aria-label="Menú" aria-haspopup="menu" aria-expanded={open}
-        className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-navy/8 transition-colors">
+        className="w-10 h-10 rounded-full border border-navy/15 flex items-center justify-center hover:bg-navy/8 hover:border-navy/30 transition-colors">
         <span className="relative block w-[18px] h-[12px]">
           <motion.span className={bar} style={{ top:0 }} animate={open ? { rotate:45, top:5.25 } : { rotate:0, top:0 }} transition={{ duration:0.2 }} />
           <motion.span className={bar} style={{ top:5.25 }} animate={{ opacity: open ? 0 : 1 }} transition={{ duration:0.15 }} />
@@ -85,12 +87,12 @@ function MobileMenu({ path }: { path: string }) {
             initial={{ opacity:0, y:-6, scale:0.98 }} animate={{ opacity:1, y:0, scale:1 }}
             exit={{ opacity:0, y:-6, scale:0.98 }} transition={{ duration:0.14 }}
             /* rounded-[16px] (no rounded-2xl) para que no herede el material Vidrio */
-            className="absolute right-0 mt-2 w-44 rounded-[16px] border border-navy/10 bg-white shadow-xl overflow-hidden py-1.5 z-50">
+            className="absolute right-0 mt-2 w-52 rounded-[16px] border border-navy/10 bg-white shadow-xl overflow-hidden py-1.5 z-50">
             {LINKS.map(l => {
               const active = esActivo(path, l.href);
               return (
                 <Link key={l.href} href={l.href} role="menuitem" onClick={() => setOpen(false)}
-                  className={`block px-4 py-2.5 text-sm transition-colors ${active ? "text-navy font-semibold bg-navy/5" : "text-navy/60 hover:bg-navy/5 hover:text-navy"}`}>
+                  className={`block px-5 py-3 text-base transition-colors ${active ? "text-navy font-bold bg-navy/5" : "text-navy/75 font-medium hover:bg-navy/5 hover:text-navy"}`}>
                   {l.label}
                 </Link>
               );
@@ -124,8 +126,8 @@ export default function Nav() {
               const active = esActivo(path, l.href);
               return (
                 <Link key={l.href} href={l.href}
-                  className={`relative px-4 py-2.5 rounded-lg text-[15px] font-medium transition-colors ${
-                    active ? "text-navy" : "text-navy/45 hover:text-navy/80"
+                  className={`relative px-4 py-2.5 rounded-lg text-base font-semibold transition-colors ${
+                    active ? "text-navy" : "text-navy/60 hover:text-navy"
                   }`}>
                   {active && (
                     <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-lg bg-navy/8"

@@ -315,6 +315,34 @@ function SeccionApariencia({ perfil }: { perfil: Perfil }) {
   );
 }
 
+/* ── Compartir la app (v10.7): Web Share nativo en mobile, copiar link en PC ── */
+function SeccionCompartir() {
+  const [copiado, setCopiado] = useState(false);
+  async function compartir() {
+    track("app_compartida");
+    const url = "https://stuniv.vercel.app";
+    if (typeof navigator.share === "function") {
+      // Hoja de compartir nativa (mobile). Cancelarla no es un error.
+      try { await navigator.share({ title: "stuniv", text: "Organizá tu semestre: exámenes, horas de estudio y plan diario.", url }); } catch {}
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    } catch {}
+  }
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <GlassButton onClick={compartir}
+        className="px-7 py-3 rounded-full bg-navy text-canvas text-sm font-semibold hover:bg-navy-deep transition-colors glass-solid">
+        {copiado ? "Link copiado ✓" : "Compartir stuniv"}
+      </GlassButton>
+      <p className="text-navy/35 text-xs">Invitá a alguien a organizar su semestre.</p>
+    </div>
+  );
+}
+
 /* ── Seguridad: cambiar contraseña (colapsado — es secundario, se expande a pedido) ── */
 function SeccionPassword() {
   const [abierto, setAbierto] = useState(false);
@@ -539,6 +567,11 @@ export default function Cuenta() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
             <SeccionPerfil perfil={perfil} />
             <SeccionApariencia perfil={perfil} />
+          </div>
+
+          {/* Compartir la app (v10.7): crecimiento boca a boca. */}
+          <div className="mt-2">
+            <SeccionCompartir />
           </div>
 
           {/* Opciones secundarias: planas, integradas al fondo, sin peso de card. */}

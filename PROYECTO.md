@@ -6,6 +6,18 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.7 — Compartir app + resumen real del semestre archivado + nav más protagonista (branch `main`)
+
+Tres pedidos de Jano:
+
+- **Botón "Compartir stuniv" en `/cuenta`** (`SeccionCompartir`, entre las cards principales y la zona secundaria): en mobile abre la hoja de compartir nativa (Web Share API); en PC copia `https://stuniv.vercel.app` al portapapeles y muestra "Link copiado ✓". Cancelar el share nativo no es error. Emite el evento GA `app_compartida` (se suma a los 11 de v10.6 — mide el boca a boca).
+- **Resumen del semestre archivado arreglado** (`app/semestre/page.tsx`, `SemestreCard` + helper `resumenGrupos`): antes listaba TODAS las filas del snapshot (incluidas las de exámenes quitados — "sin fecha" — y las filas duplicadas por materia). Ahora: **horas por examen, por materia y en total** — solo exámenes RENDIDOS (filas con fecha, orden cronológico); el 2º examen de una misma materia se rotula **"Materia 2"** (3º "Materia 3", etc.); si una materia tuvo varios exámenes, debajo va la fila **"Materia · total"**; las filas fantasma (examen quitado y 0 horas) no aparecen, pero las horas de filas sin fecha SÍ suman al total de su materia (no se pierde nada). Los KPIs (Materias / Hs por materia) ahora cuentan materias únicas, no filas. Compatible con snapshots viejos (sin cambios de modelo ni migración).
+- **Nav con las páginas como protagonistas** (`app/components/Nav.tsx`): en desktop las pestañas pasan de `text-[15px] font-medium navy/45` a **`text-base font-semibold navy/60`** (hover navy pleno; el pill activo queda igual). En mobile la hamburguesa gana **borde y tamaño** (`w-10 h-10 border-navy/15`, barras más marcadas) para leerse como EL control de navegación, y el desplegable pasa a `w-52` con ítems `text-base py-3` más oscuros (activo en bold).
+
+**Verificación (build de producción local con sesión real vía magiclink admin):** build en verde; sembrado un semestre con 2 exámenes de Filosofía (12.5h y 4h), Matemática (8h) y una fila fantasma (Historia, examen quitado, 0h) → la card archivada muestra exactamente "Filosofía 12.5h · Filosofía 2 4.0h · Filosofía · total 16.5h · Matemática 8.0h", sin Historia, KPIs "Materias 2 / 12.3h" y total 24.5h; botón Compartir presente en `/cuenta` con su caption y click funcionando (el portapapeles del navegador embebido está capado por permisos — en navegador real copia); estilos del nav confirmados por computed style (16px / weight 600 / navy 0.6). Usuario de prueba borrado al final.
+
+---
+
 ## v10.6 — Google Analytics 4 (branch `main`)
 
 Analítica de producto para las métricas del plan de costos/monetización (DAU/WAU/MAU, registros, retención D1/D7/D30, stickiness, uso por función). Property GA4 de Jano, Measurement ID `G-MY3QS6JTZP` (stream web `stuniv.vercel.app`).
