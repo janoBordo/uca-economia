@@ -26,7 +26,7 @@ Pedido de Jano: auditoría completa de ciberseguridad contra su checklist de 50 
 
 **Suite nueva**: `scripts/test-v10-9-hardening.mjs` (7 checks: topes de records → 400, resets intactos → 200, `tl` malicioso → audio igual con `es`).
 
-**Verificación:** build en verde (27/27; el único warning es el preexistente de supabase-js en edge). Contra build de producción local: revocación **7/7 PASS**, Fase 3 **33/33 PASS**, hardening nuevo **7/7 PASS**. La Lectura de PDFs probada END-TO-END en navegador real con sesión (magiclink admin): PDF cargado → texto extraído ✓, worker servido desde `/pdf.worker.min.mjs` propio ✓, cero errores de consola/CSP ✓. Producción re-verificada: 401 sin sesión en `/api/db`, `/api/tts`, `/api/account/*`, `/api/auth/me`; `/` → 307 `/login`; headers completos. Usuarios de prueba borrados.
+**Verificación:** build en verde (27/27; el único warning es el preexistente de supabase-js en edge). Contra build de producción local: revocación **7/7 PASS**, Fase 3 **33/33 PASS**, hardening nuevo **7/7 PASS**. La Lectura de PDFs probada END-TO-END en navegador real con sesión (magiclink admin): PDF cargado → texto extraído ✓, worker servido desde `/pdf.worker.min.mjs` propio ✓, cero errores de consola/CSP ✓. **En producción (commit `2a4bfd5`, deploy verificado):** worker self-hosted sirviendo 200, CSP SIN unpkg, header COOP presente, 401 sin sesión en todas las APIs, `/` → 307 `/login`, y la suite de revocación corrida CONTRA el deploy vivo → **7/7 PASS**. Usuarios de prueba borrados.
 
 ---
 
