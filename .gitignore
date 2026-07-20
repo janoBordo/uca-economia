@@ -5,3 +5,7 @@ node_modules
 .DS_Store
 next-env.d.ts
 tsconfig.tsbuildinfo
+# Datos de usuario exportados (el repo es público — jamás commitearlos)
+backups/
+# Generado por scripts/copiar-pdf-worker.mjs en predev/prebuild
+public/pdf.worker.min.mjs

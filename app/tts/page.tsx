@@ -267,9 +267,11 @@ export default function TTS() {
           };
         }
         const pdfjsLib: any = await import("pdfjs-dist");
-        // Worker bundleado desde el mismo paquete (extensión .mjs correcta para v4)
-        pdfjsLib.GlobalWorkerOptions.workerSrc =
-          `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+        // Worker SELF-HOSTED desde public/ (lo copia scripts/copiar-pdf-worker.mjs
+        // en predev/prebuild, siempre la misma versión que el paquete). Antes
+        // venía de unpkg.com — un CDN de terceros sirviendo código ejecutable
+        // no pertenece a la CSP.
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
         const ab  = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
         const partes: string[] = [];

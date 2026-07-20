@@ -71,5 +71,7 @@ export const config = {
   // Todo menos /api (cada handler se protege solo), assets y archivos estáticos.
   // robots.txt y sitemap.xml también afuera: los bots los piden todo el tiempo
   // y cada pasada por acá cuesta una invocación + un getUser contra Supabase.
-  matcher: ["/((?!api|_next/static|_next/image|logos|icon\\.svg|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)"],
+  // pdf.worker.min.mjs: asset público de librería (self-hosted, v10.9) — como
+  // /logos, no debe pasar por auth ni gastar un getUser por fetch.
+  matcher: ["/((?!api|_next/static|_next/image|logos|icon\\.svg|favicon\\.ico|robots\\.txt|sitemap\\.xml|pdf\\.worker\\.min\\.mjs).*)"],
 };

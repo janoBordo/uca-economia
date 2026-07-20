@@ -1,18 +1,20 @@
 // Content-Security-Policy (6.4/6.6): el navegador solo ejecuta scripts propios
 // y de los orígenes listados. 'unsafe-inline' en script-src es necesario hoy
 // por los scripts inline de Next.js y el anti-flash del tema (mejorable con
-// nonces más adelante). unpkg.com = worker de pdf.js (Lectura).
+// nonces más adelante).
 // challenges.cloudflare.com = Turnstile (CAPTCHA del signup, fase siguiente).
+// unpkg.com salió (v10.9): el worker de pdf.js ahora es self-hosted — cero
+// CDNs de terceros sirviendo código ejecutable.
 const csp = [
   "default-src 'self'",
   // googletagmanager = gtag.js de Google Analytics 4 (v10.6)
-  "script-src 'self' 'unsafe-inline' https://unpkg.com https://challenges.cloudflare.com https://www.googletagmanager.com",
+  "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://www.googletagmanager.com",
   // Inter ahora es self-hosteada vía next/font (layout.tsx) — los orígenes de
   // Google Fonts salieron de la CSP (menos superficie, misma tipografía).
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://*.supabase.co https://*.google-analytics.com https://www.googletagmanager.com",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://unpkg.com https://challenges.cloudflare.com https://*.google-analytics.com https://www.googletagmanager.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://challenges.cloudflare.com https://*.google-analytics.com https://www.googletagmanager.com",
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
   "frame-src https://challenges.cloudflare.com",
@@ -32,6 +34,9 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+  // Aísla la ventana de referencias cross-origin (window.opener y afines).
+  // No afecta a Turnstile (iframe) ni a la Web Share API.
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
 ];
 
 /** @type {import('next').NextConfig} */

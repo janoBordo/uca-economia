@@ -32,12 +32,20 @@ const PatchSchema = z
     materias: z.array(MateriaSchema).max(50),
     // _delta: incrementos 1..1440 min (mismo rango que el RPC). Sin _delta solo
     // se usa para resetear ({}), pero se acepta reemplazo explícito acotado.
-    sesiones: z.record(z.string().uuid(), z.number().int().min(0).max(100000000)),
-    preparacion: z.record(z.string().uuid(), z.number().min(0).max(100)),
-    planEstudio: z.record(
-      z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-      z.array(z.string().uuid()).max(32)
-    ),
+    // Los records llevan tope de claves (v10.9): sin él, un body podía traer
+    // miles de entradas (bloat en la base / un RPC por entrada en _delta).
+    sesiones: z
+      .record(z.string().uuid(), z.number().int().min(0).max(100000000))
+      .refine(r => Object.keys(r).length <= 50, "demasiadas entradas"),
+    preparacion: z
+      .record(z.string().uuid(), z.number().min(0).max(100))
+      .refine(r => Object.keys(r).length <= 50, "demasiadas entradas"),
+    planEstudio: z
+      .record(
+        z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        z.array(z.string().uuid()).max(32)
+      )
+      .refine(r => Object.keys(r).length <= 400, "demasiadas entradas"),
     notas: z.array(z.string().max(144)).max(100),
     _delta: z.boolean(),
     _archivar: z.object({ nombre: z.string().min(1).max(100) }),

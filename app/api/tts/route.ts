@@ -24,7 +24,9 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const q  = (searchParams.get("q") ?? "").slice(0, 200);
-  const tl = searchParams.get("tl") ?? "es";
+  // Código de idioma con forma válida o "es" — nada libre en la URL upstream.
+  const tlRaw = searchParams.get("tl") ?? "es";
+  const tl = /^[a-z]{2,3}(-[A-Za-z]{2,4})?$/.test(tlRaw) ? tlRaw : "es";
   if (!q.trim()) return NextResponse.json({ error: "Texto vacío." }, { status: 400 });
 
   const url =
