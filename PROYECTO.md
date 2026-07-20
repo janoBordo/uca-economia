@@ -6,6 +6,24 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.9.1 — Re-auditoría de seguridad + migración 0004 aplicada en producción (branch `main`)
+
+Pedido de Jano: nueva revisión de seguridad a fondo de toda la app y aplicar las correcciones que no comprometan funcionalidad ni optimizaciones. **Resultado de la re-auditoría (12 endpoints, middleware, helpers de sesión, RLS/RPCs, CSP/headers, cliente, escaneo de secretos): CERO vulnerabilidades altas o medias — el código coincide con lo documentado en v10.9.** Los únicos hallazgos fueron los 2 bajos ya conocidos.
+
+**Hecho en esta versión:**
+1. **Migración `0004_sesion_viva_solo_propia.sql` APLICADA en producción** (con OK explícito de Jano — la regla de "migraciones nunca automáticas" se levantó para este caso puntual): aplicada vía Management API, verificada con `pg_get_functiondef` (la función viva ya filtra `s.user_id = auth.uid()`) y la suite `test-revocacion-e2e.mjs` corrida CONTRA el deploy vivo → **7/7 PASS** (usuarios de prueba borrados por la propia suite). Se cierra el oráculo de existencia de sesiones ajenas — era el último paso de seguridad concreto abierto. Cero cambio de comportamiento para el caller legítimo (`get_app_data` valida la sesión del propio JWT). El comentario "PENDIENTE" del archivo de la migración se actualizó a "APLICADA".
+
+**Evaluado y decidido NO hacer (comprometía optimizaciones — condición explícita de Jano):**
+2. **CSP con nonces (sacar `'unsafe-inline'` de `script-src`)**: en Next 14 exige generar el nonce en el middleware por request y fuerza el render dinámico de páginas hoy estáticas → más invocaciones y más `getUser()` (en contra del plan de costos/escalado de v10.4+). Hoy no hay vector real (React escapa todo; los 2 inline son estáticos propios). **Queda para el upgrade a Next 16** (que ya está en el roadmap y trae soporte de CSP mejor).
+
+**Sigue pendiente de Jano (sin cambios):**
+3. **Next 14.2.35 → 16** (breaking, planificar como versión propia).
+4. **Revocar tokens de gestión amplios de `.env.local`** que no se usen (VERCEL_TOKEN, UPSTASH_API_KEY, SENDGRID, SENTRY, POSTHOG): son credenciales externas que se revocan desde cada dashboard; ojo que las suites e2e usan SUPABASE_SECRET_KEY (queda) y SUPABASE_ACCESS_TOKEN (además hoy se usó para aplicar 0004).
+
+**Verificación:** función redefinida confirmada en la base de producción; revocación **7/7 PASS contra `stuniv.vercel.app`** (logout con cookies → 401 inmediato, eliminar cuenta vía Bearer → 401 inmediato, GET con sesión viva → 200). Sin cambios de código de la app (solo docs + el comentario de la migración) — no hace falta deploy.
+
+---
+
 ## v10.9 — Auditoría extensa de seguridad (checklist de 50 vulnerabilidades) (branch `main`)
 
 Pedido de Jano: auditoría completa de ciberseguridad contra su checklist de 50 puntos (auth, secrets, RLS, inyecciones, rate limiting, CORS/headers, sesiones, logs, backups, arquitectura). **Resultado global: la app está sólida — cero vulnerabilidades críticas o altas. 5 hallazgos menores/hardening, todos arreglados en esta versión. 3 pendientes que decide Jano (abajo).**

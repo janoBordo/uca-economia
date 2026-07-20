@@ -1,11 +1,10 @@
 -- ============================================================
 -- Stuniv v10.9 — hardening de sesion_viva (auditoría de seguridad)
 --
--- ⚠ PENDIENTE DE APLICAR A MANO (regla fija: las migraciones no se corren
---   automáticas en producción). Es un cambio chico y no destructivo:
---   redefine una función, no toca tablas ni datos. Aplicar desde el SQL
---   Editor del dashboard de Supabase y después re-correr
---   `node scripts/test-revocacion-e2e.mjs` (debe seguir 7/7).
+-- ✔ APLICADA en producción el 2026-07-19 (v10.9.1, con OK explícito de Jano)
+--   vía Management API. Verificada: pg_get_functiondef muestra el filtro
+--   user_id = auth.uid() y la suite `test-revocacion-e2e.mjs` corrida contra
+--   el deploy vivo dio 7/7 PASS.
 --
 -- Qué corrige: sesion_viva(uuid) es SECURITY DEFINER (necesario: el rol
 -- authenticated no puede leer auth.sessions) y respondía si CUALQUIER uuid
