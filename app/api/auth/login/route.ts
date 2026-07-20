@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     if (error.code === "captcha_failed" || /captcha/i.test(error.message))
       return generico("Falló la verificación anti-bot. Recargá e intentá de nuevo.", 400);
     if (error.code === "email_not_confirmed")
-      return generico("Tenés que confirmar tu email antes de entrar. Revisá tu casilla.", 403);
+      return generico("Tenés que confirmar tu email antes de entrar. Revisá tu casilla (también SPAM). Si no te llegó, registrate de nuevo con el mismo email y usá el botón de reenviar.", 403);
     if (error.status === 429) return tooMany(60);
     // Credenciales malas, cuenta baneada/eliminada, etc. → mismo mensaje
     // (no darle señal a un atacante de qué falló exactamente).

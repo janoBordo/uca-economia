@@ -4,6 +4,7 @@ import { z } from "zod";
 import { supabaseForRequest, supabaseAdmin } from "../../../lib/supabase/server";
 import { rlPassword, checkLimit, clientIp, tooMany } from "../../../lib/ratelimit";
 import { generico } from "../../../lib/http";
+import { passwordValida, PASSWORD_MSG } from "../../../lib/password";
 
 // Cambiar contraseña estando logueado (sección 6.16).
 // Reglas: exige la contraseña ACTUAL (Supabase no lo fuerza solo), rate limit
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
   }
   if (body.currentPassword === body.newPassword)
     return generico("La contraseña nueva tiene que ser distinta de la actual.", 400);
+  if (!passwordValida(body.newPassword)) return generico(PASSWORD_MSG, 400);
 
   // Autorización extra: re-verificar la contraseña actual contra Supabase Auth.
   // Cliente descartable sin persistencia — la sesión que genera se revoca abajo.

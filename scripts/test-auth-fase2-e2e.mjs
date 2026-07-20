@@ -74,8 +74,15 @@ r = await req("/api/auth/signup", { method: "POST", body: JSON.stringify({ email
 check("signup con emails distintos → 400", r.status === 400, `(${r.status})`);
 r = await req("/api/auth/signup", { method: "POST", body: JSON.stringify({ email: "a@b.co", emailConfirm: "a@b.co", password: "corta", captchaToken: "x" }) }, false);
 check("signup con contraseña corta → 400", r.status === 400, `(${r.status})`);
+// Política v10.10: mayúscula + minúscula + número obligatorios
+r = await req("/api/auth/signup", { method: "POST", body: JSON.stringify({ email: "a@b.co", emailConfirm: "a@b.co", password: "sinmayuscula1", captchaToken: "x" }) }, false);
+check("signup sin mayúscula → 400 (política de contraseñas)", r.status === 400, `(${r.status})`);
 r = await req("/api/auth/recover/verify", { method: "POST", body: JSON.stringify({ email: "a@b.co", code: "abc123", newPassword: "12345678" }) }, false);
 check("verify con código no numérico → 400", r.status === 400, `(${r.status})`);
+r = await req("/api/auth/recover/verify", { method: "POST", body: JSON.stringify({ email: "a@b.co", code: "123456", newPassword: "solominusculas" }) }, false);
+check("verify con contraseña débil → 400 (política de contraseñas)", r.status === 400, `(${r.status})`);
+r = await req("/api/auth/resend", { method: "POST", body: JSON.stringify({ email: "no-es-mail", captchaToken: "x" }) }, false);
+check("resend con email inválido → 400", r.status === 400, `(${r.status})`);
 
 // ── 4. Fuerza bruta del OTP: 5 intentos por email y después 429 ──
 await admin.auth.admin.createUser({ email: "f2-bruteforce@example.com", password: "Passw0rdSegura!", email_confirm: true });

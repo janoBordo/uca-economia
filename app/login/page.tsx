@@ -19,7 +19,7 @@ function LoginForm() {
   const [resetKey, setResetKey] = useState(0);
   const [error, setError] = useState<string | null>(
     params.get("error") === "confirmacion"
-      ? "El link de confirmación no sirve o ya venció. Registrate de nuevo o pedí recuperar la contraseña."
+      ? "El link de confirmación no sirve o ya venció. Si ya habías confirmado, iniciá sesión. Si no, registrate de nuevo con el mismo email: te llega un mail nuevo."
       : null
   );
   const [enviando, setEnviando] = useState(false);

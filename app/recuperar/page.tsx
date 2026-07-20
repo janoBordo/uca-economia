@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AuthCard, AuthError, inputCls, labelCls, btnCls } from "../components/AuthCard";
 import { GlassButton } from "../components/glass";
 import Turnstile from "../components/Turnstile";
+import { passwordValida, PASSWORD_MSG, PASSWORD_HINT } from "../lib/password";
 
 /* Recuperar contraseña por código OTP (6.1/6.16), en dos pasos contra el
    backend ya existente: 1) email (+CAPTCHA) → llega un código de 6 dígitos
@@ -48,7 +49,7 @@ export default function RecuperarPage() {
   async function confirmar(e: React.FormEvent) {
     e.preventDefault();
     if (enviando) return;
-    if (password.length < 8) { setError("La contraseña necesita al menos 8 caracteres."); return; }
+    if (!passwordValida(password)) { setError(PASSWORD_MSG); return; }
     setEnviando(true); setError(null);
     try {
       const r = await fetch("/api/auth/recover/verify", {
@@ -90,13 +91,19 @@ export default function RecuperarPage() {
               className={inputCls + " text-center tracking-[0.5em] font-bold text-lg"}
               value={codigo}
               onChange={e => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))} />
-            <p className="mt-1.5 text-xs text-navy/40">Vence en 10 minutos y sirve una sola vez.</p>
+            <p className="mt-1.5 text-xs text-navy/40">
+              Vence en 10 minutos y sirve una sola vez. Si no aparece,{" "}
+              <span className="font-bold text-navy/60">revisá SPAM</span> (sale de soporte.stuniv@gmail.com).
+            </p>
           </div>
           <div>
-            <label htmlFor="password" className={labelCls}>Contraseña nueva (mínimo 8 caracteres)</label>
+            <label htmlFor="password" className={labelCls}>Contraseña nueva</label>
             <input id="password" type="password" autoComplete="new-password" required
               minLength={8} maxLength={72}
               className={inputCls} value={password} onChange={e => setPassword(e.target.value)} />
+            <p className={`mt-1.5 text-xs ${password.length > 0 && !passwordValida(password) ? "text-red-600 font-medium" : "text-navy/40"}`}>
+              {PASSWORD_HINT}
+            </p>
           </div>
           <AuthError msg={error} />
           <GlassButton type="submit" tint="navy" disabled={enviando || codigo.length !== 6}

@@ -82,6 +82,20 @@ export const rlRecover = new Ratelimit({
   prefix: "rl:recover",
 });
 
+// Reenviar el mail de confirmación: 3 por hora POR EMAIL (la UI además impone
+// un cooldown de 60s y Supabase otro entre mails al mismo destinatario) y
+// 10 por hora por IP. Fail-closed: manda mails reales, superficie sensible.
+export const rlResend = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(3, "1 h"),
+  prefix: "rl:resend",
+});
+export const rlResendIp = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(10, "1 h"),
+  prefix: "rl:resendip",
+});
+
 // Verificar el código OTP: 5 intentos por 15 min POR EMAIL (6.1: un código de
 // 6 dígitos es adivinable por fuerza bruta sin este límite; además el código
 // vence a los 10 min y es de un solo uso).

@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { rlOtp, rlAuth, checkLimit, clientIp, tooMany } from "../../../../lib/ratelimit";
 import { generico } from "../../../../lib/http";
+import { passwordValida, PASSWORD_MSG } from "../../../../lib/password";
 
 // Paso 2 de la recuperación (6.1): verifica el código OTP y define la
 // contraseña nueva. Límite ESTRICTO de intentos por email (5/15min,
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
   } catch {
     return generico("Datos inválidos.", 400);
   }
+  if (!passwordValida(body.newPassword)) return generico(PASSWORD_MSG, 400);
 
   // El límite que importa contra fuerza bruta: por cuenta objetivo.
   const mailLim = await checkLimit(rlOtp, `email:${body.email}`, true);
