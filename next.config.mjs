@@ -62,6 +62,13 @@ const nextConfig = {
         source: "/showcase/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
       },
+      // robots.txt salía con max-age=0 (default de Next para /public): cada
+      // pasada de un crawler lo re-pedía. Es un archivo de 5 líneas que no
+      // cambia — mismo cache que el resto de los estáticos de marca.
+      {
+        source: "/robots.txt",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      },
     ];
   },
   webpack: (config) => {

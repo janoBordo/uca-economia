@@ -6,6 +6,28 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.11.1 — Auditoría de optimización (medida, no estimada) (branch `main`)
+
+Pedido de Jano: revisar si la app sigue tan liviana y rápida como en v10.4 (que dio ~1.300 activos/día) y optimizar lo que se pueda sin tocar funcionalidad, seguridad, visual ni UX. **Resultado: sigue igual de optimizada — el trabajo de v10.4/v10.5 se sostiene y el modelo de invocaciones medido es incluso mejor que el estimado entonces.** Un solo hallazgo nuevo con impacto real (el troceo del MP3), pendiente de decisión.
+
+**Medido sobre build de producción real (`next start` + curl), no estimado:**
+- **First Load JS**: 128-138 kB gzip según ruta (shared 87.7 kB). El chunk `polyfills` (39.6 kB gzip) se sirve con `noModule` → **los navegadores modernos no lo bajan**; el peso real de una primera visita moderna es ~144 kB gzip, y en Vercel con brotli ~120 kB. CSS 8.2 kB.
+- **Cero código de Supabase en el bundle de cliente** (grep sobre los 17 chunks): el diseño de "auth solo por `/api/auth/*`" además de seguridad ahorra ~35 kB.
+- **Recharts sigue aislado** en chunks lazy (253/39/812) — solo baja en `/metricas`. pdfjs/mammoth siguen diferidos.
+- **Cacheo**: `_next/static/*` con `max-age=31536000, immutable` (visita repetida = 0 bytes de JS/CSS); páginas estáticas con `s-maxage=31536000` (se sirven del CDN, sin función); `/logos`, `/showcase`, `/icon.svg` con 86400+SWR.
+- **Middleware sin cookies de sesión = ~4 ms y CERO round-trip a Auth** (verificado por tiempo contra un Supabase remoto en sa-east-1). O sea: las páginas públicas y los bots no le cuestan nada al Auth server; el `getUser()` solo pega cuando hay sesión real.
+- **Modelo de invocaciones** (enumerando TODOS los call sites de `fetch` del cliente): carga dura de una página de la app = **3 invocaciones** (middleware + `/api/account/profile` + `/api/db`); navegación SPA = **0** salvo que se venza el TTL de 60s; escritura = 1 POST. Da ~**12-16 invocaciones/día por activo**, contra las 20-25 que asumía v10.4 → **el techo de ~1.300 activos/día se sostiene y con más margen del que se creía.**
+
+**Cambio aplicado (único, trivial):** `/robots.txt` salía con `max-age=0` (default de Next para `/public`) y cada pasada de crawler lo re-pedía. Ahora lleva el mismo cache que el resto de los estáticos de marca (86400 + SWR). Verificado en build de producción.
+
+**Hallazgo nuevo, pendiente de decisión de Jano (no se toca solo):**
+1. **`/api/tts` es el único multiplicador sin techo del plan.** Descargar el MP3 hace `ceil(chars/200)` requests **secuenciales**, una invocación edge cada una: 2.251 chars = 12, un PDF de 10 páginas (~20.000 chars) = **100**, uno de 30 páginas = **300** — el presupuesto diario de ~20 usuarios normales en una sola descarga. Con que el 5% de 1.300 activos baje un MP3 de 10 páginas por día ya son ~6.500 invocaciones (≈20% del presupuesto diario de 33.3k). **Fix propuesto**: que `/api/tts` acepte un lote de hasta ~10 trozos por request y devuelva el MP3 concatenado → 10x menos invocaciones, mismo audio, misma UX (solo cambia la granularidad de la barra de progreso), misma auth y validación (array acotado por Zod).
+2. **Fusionar el perfil dentro de `get_app_data`** (migración 0005): `get_app_data` YA lee `profiles` para el chequeo de soft-delete, y el email ya viene en los claims del JWT. Devolviéndolo ahí, `/api/account/profile` deja de pedirse en cada carga dura → **3 invocaciones por carga pasan a 2 (-33%)** y desaparece el último `getUser()` del camino de lectura. Requiere migración (regla: nunca automáticas) + refactor de `perfil.ts`.
+
+**Evaluado y NO recomendado (comprometía seguridad):** sacarle el `getUser()` al middleware y dejar que la revocación la detecte el 401 de `/api/db`. Funcionaría de punta a punta, pero abre una ventana en la que una sesión revocada ve el shell de la app y rompe un check explícito de la suite de Fase 2 ("volver a `/` con cookies viejas → redirect a `/login`"). Mismo criterio que en v10.4 y v10.9: la latencia se resuelve por región, no bajando la vara.
+
+---
+
 ## v10.11 — Vitrina de capturas en las pantallas de entrada (branch `main`)
 
 Pedido de Jano: `/login` y `/registro` eran sólo la card en el medio y la página quedaba vacía. Ahora, **desde xl (≥1280px)**, el form se corre a la derecha y los dos tercios que sobraban los ocupa un collage con capturas reales de la app. **Cambio 100% visual: no toca funcionalidad, auth, seguridad ni performance.**
