@@ -229,12 +229,21 @@ export default function TTS() {
     try {
       const trozos = trozos200(texto);
       const lang = (voces[vozIdx]?.lang ?? "es-AR").slice(0, 2);
+      // Se piden de a LOTES de 8 (v10.11.2): un apunte de 10 páginas pasa de
+      // ~100 requests a ~13. Antes, con un request por trozo, esa descarga
+      // superaba el rate limit del proxy a mitad de camino y se cortaba.
+      const LOTE = 8;
       const partes: Blob[] = [];
-      for (let i = 0; i < trozos.length; i++) {
-        const r = await fetch(`/api/tts?tl=${lang}&q=${encodeURIComponent(trozos[i])}`);
+      for (let i = 0; i < trozos.length; i += LOTE) {
+        const lote = trozos.slice(i, i + LOTE);
+        const r = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tl: lang, q: lote }),
+        });
         if (!r.ok) throw new Error("El servicio de audio no respondió. Probá de nuevo en un momento.");
         partes.push(await r.blob());
-        setMp3Pct(Math.round(((i + 1) / trozos.length) * 100));
+        setMp3Pct(Math.round((Math.min(i + LOTE, trozos.length) / trozos.length) * 100));
       }
       const mp3 = new Blob(partes, { type: "audio/mpeg" });
       const url = URL.createObjectURL(mp3);

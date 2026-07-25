@@ -47,6 +47,12 @@ export const rlDb: Limiter = new LocalRatelimit(120, 60_000);
 
 export const rlTts: Limiter = new LocalRatelimit(60, 60_000);
 
+// Descarga de MP3 por LOTES (v10.11.2): un request trae hasta 8 trozos, así que
+// el techo se cuenta en lotes. 15/min × 8 = 120 trozos/min contra los 60/min del
+// endpoint de a uno: el doble de techo upstream (acotado a propósito), pero
+// suficiente para que un PDF largo termine sin cortarse. Fail-open como rlTts.
+export const rlTtsLote: Limiter = new LocalRatelimit(15, 60_000);
+
 export const rlPassword = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(5, "15 m"),

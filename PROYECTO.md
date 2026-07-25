@@ -6,6 +6,25 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.11.2 — Descarga de MP3 por lotes: 8x menos invocaciones y arregla un techo real (branch `main`)
+
+Implementación del hallazgo #1 de la auditoría de v10.11.1 (el único multiplicador sin techo del plan).
+
+**El problema (medido):** descargar el MP3 hacía `ceil(chars/200)` requests **secuenciales** a `/api/tts`, una invocación edge cada uno. Un apunte de 10 páginas (~20.000 chars) = ~100 invocaciones. Y peor: `rlTts` corta en **60 req/min**, así que esa descarga **superaba el rate limit a mitad de camino y se cortaba** con "El servicio de audio no respondió" — o sea, los apuntes largos (>~12.000 chars) directamente no se podían bajar.
+
+**El cambio:**
+- **`POST /api/tts` (nuevo)**: acepta un lote de hasta **8 trozos** (`{ tl, q: string[] }`), los pide a Google **secuencialmente** (en paralelo Google corta por IP), concatena los frames MP3 y devuelve un solo `audio/mpeg`. El `GET` de a un trozo **queda igual** (sin cambios de contrato ni de comportamiento).
+- **`app/tts/page.tsx`**: la descarga arma lotes de 8 y postea. Misma concatenación final, mismo archivo, mismo evento `mp3_descarga`. Lo único que cambia es que la barra de progreso avanza de a 8 trozos.
+- **`rlTtsLote`** (nuevo, `LocalRatelimit(15, 60s)`, fail-open como `rlTts`): el techo se cuenta en lotes. 15×8 = 120 trozos/min contra los 60/min de antes — el doble de techo upstream, acotado a propósito, y suficiente para que un PDF largo termine sin cortarse.
+
+**Impacto:** un PDF de 10 páginas pasa de **~100 invocaciones a ~13** (y de fallar a funcionar); uno de 30 páginas, de ~300 a ~38. Con eso `/api/tts` deja de ser el cuello del plan gratis y el limitante vuelve a ser Vercel por tráfico de páginas.
+
+**Seguridad (sin cambios):** el POST exige sesión verificada server-side **antes** de parsear el body (verificado: 401 sin sesión, antes de tocar Zod), `tl` validado con el mismo regex, cada trozo acotado a 200 chars y el array topeado en 8 por Zod → el fan-out por request es fijo, no lo elige el cliente. Todo va encodeado a una URL de host fijo (sigue sin ser SSRF).
+
+**Verificación:** build en verde (`/tts` 6.37 → 6.43 kB, Middleware sin cambios). Contra build de producción local: `POST /api/tts` sin sesión → **401** (y el 401 gana antes que el parseo del body), `GET` sin sesión → 401 (intacto). La concatenación se probó con un script que replica exactamente `urlTts` + headers del route: 8 trozos reales de Google → **350.208 B, byte-exactos a la suma de las partes, cabecera `0xff 0xf3` y 6.655 frame syncs → MP3 válido**, en **1,56 s** los 8 pedidos (muy holgado contra el límite de 25 s de una función edge).
+
+---
+
 ## v10.11.1 — Auditoría de optimización (medida, no estimada) (branch `main`)
 
 Pedido de Jano: revisar si la app sigue tan liviana y rápida como en v10.4 (que dio ~1.300 activos/día) y optimizar lo que se pueda sin tocar funcionalidad, seguridad, visual ni UX. **Resultado: sigue igual de optimizada — el trabajo de v10.4/v10.5 se sostiene y el modelo de invocaciones medido es incluso mejor que el estimado entonces.** Un solo hallazgo nuevo con impacto real (el troceo del MP3), pendiente de decisión.
