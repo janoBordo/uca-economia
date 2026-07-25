@@ -6,6 +6,20 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.11 — Vitrina de capturas en las pantallas de entrada (branch `main`)
+
+Pedido de Jano: `/login` y `/registro` eran sólo la card en el medio y la página quedaba vacía. Ahora, **desde xl (≥1280px)**, el form se corre a la derecha y los dos tercios que sobraban los ocupa un collage con capturas reales de la app. **Cambio 100% visual: no toca funcionalidad, auth, seguridad ni performance.**
+
+- **`app/components/AuthShowcase.tsx` (nuevo)**: collage a 2 columnas, la derecha corrida hacia abajo para romper la simetría, con 5 bloques rotulados — *Organizá tu semestre* (home/countdown), *Planificá cada día* (calendario + modal), *Tus apuntes, en audiolibros* (Lectura), *Métricas reales* (Métricas + la card ocre del semestre montada sobre su esquina) y *Personalizá la app* (Cuenta). Los rótulos usan el **overline editorial de v10.8** (label ocre uppercase + hairline), el mismo idioma del hero de la home — nada de pills ni badges.
+- **`app/components/AuthCard.tsx`**: en xl el marco pasa a `max-w-7xl` con el padding adentro, así la vitrina arranca **exactamente en la misma línea vertical que el logo del nav** (verificado: logo x=350 / vitrina x=350 en 1920; card derecha alineada con el borde del nav). Abajo de xl queda **idéntico a antes** (card sola, centrada, `max-w-md` — verificado en 375px: card x=16, ancho 343).
+- **Peso: ~92KB por las 6 capturas** (recortadas al contenido y pasadas a WebP; la más pesada 21KB). Van con `width`/`height` fijos (cero layout shift), `loading="lazy"`, `decoding="async"` y `aria-hidden` (decorativas: no entran al árbol de accesibilidad ni al orden de foco del form). **En mobile/tablet el contenedor está en `display:none` → el navegador NO descarga ni un byte** (verificado: `performance.getEntriesByType('resource')` sin entradas de `/showcase/` en 375px). JS nuevo: un solo `motion.div` de fade.
+- **`middleware.ts`**: `/showcase` fuera del matcher (mismo criterio que `/logos` y el worker de pdf.js) — los assets públicos no deben gastar una invocación + un `getUser()` por fetch. **`next.config.mjs`**: `Cache-Control` largo para `/showcase/:path*`.
+- **Privacidad (el repo es público)**: la captura de `/cuenta` mostraba el **email personal de Jano** — se reemplazó por `estudiante@stuniv.app` reusando el degradé del propio input. *Nota: en esa captura sigue visible el nombre completo en el Perfil; si molesta se tapa igual.*
+
+**Verificación**: build en verde (28/28, `/login` 3.44kB y Middleware 83.6kB — sin cambios de tamaño). Medido en el navegador a 1920/1440/1280/1279/375: layout correcto en los cuatro anchos, corte exacto en xl (a 1279 la vitrina es `display:none` y la card vuelve a los 448px de siempre). Las 6 WebP decodifican OK y sirven 200 con el `Cache-Control` nuevo. En modo **Vidrio 3D** las capturas NO adoptan el material glass (sin `background`, sin `backdrop-filter`, sin borde) y el `drop-shadow` sigue la paleta. Cero errores de consola. Protección intacta: `/` sin sesión → redirect a `/login`, `/api/db` → 401.
+
+---
+
 ## v10.10 — Registro/login a nivel de app grande: cuenta existente clara, política de contraseñas, reenvío de confirmación, mails brandeados (branch `main`)
 
 Batch de pedidos de Jano sobre el flujo de entrada (registro, login, confirmación, recuperación):
@@ -559,7 +573,7 @@ En el branch v10 esto es una **vista armada por `/api/db` desde las tablas por-u
 - `/tts` — Lectura: texto/PDF/Word/TXT; escuchar por capítulos con seek + descargar .mp3 real
 - `/cuenta` — Configuración (6.17): perfil (foto/nombre/apellido/apodo/universidad/carrera), apariencia (Clásico/Vidrio + tema de color), cambiar contraseña, eliminar cuenta, cerrar sesión. Se llega por el menú desplegable del nombre en el Nav.
 - `/configuracion` — redirect a `/semestre` (legacy)
-- `/login`, `/registro`, `/recuperar` (públicas) y `/auth/confirm` (callback de email) — todo lo demás exige sesión vía `middleware.ts`
+- `/login`, `/registro`, `/recuperar` (públicas) y `/auth/confirm` (callback de email) — todo lo demás exige sesión vía `middleware.ts`. Desde v10.11, en ≥1280px las tres muestran la vitrina de capturas al costado del form (`AuthShowcase`, assets en `public/showcase/`)
 
 ## Reglas de diseño fijas
 - **Paleta parametrizada por tema de color** (v10, sección 6.17): navy/ocre son variables CSS (`--navy-rgb`/`--ocre-rgb` + variantes en `globals.css`, consumidas por Tailwind). El default "Azul y Blanco" es la identidad de siempre: navy `#0B1F4D`, ocre `#C9A227`. Canvas `#F5F4F0` fijo en todos los temas. 5 paletas (mapeo universidad→paleta fijo, decidido por Jano): Azul (UCA/UADE/ITBA/Austral/Udesa), Bordó (UAI/UCEMA/Kennedy/UB), Negro (UBA/UTN/UP), Verde (USAL/UNLP), Dorado (solo manual). Preferencia en `profiles.tema_color` + espejo `localStorage.uca_palette` (anti-flash). **Colores nuevos SIEMPRE via variables/Tailwind, nunca hex navy/ocre hardcodeado**; para SVG/charts usar `rgbVar()` de `app/lib/paleta.ts`.

@@ -73,5 +73,6 @@ export const config = {
   // y cada pasada por acá cuesta una invocación + un getUser contra Supabase.
   // pdf.worker.min.mjs: asset público de librería (self-hosted, v10.9) — como
   // /logos, no debe pasar por auth ni gastar un getUser por fetch.
-  matcher: ["/((?!api|_next/static|_next/image|logos|icon\\.svg|favicon\\.ico|robots\\.txt|sitemap\\.xml|pdf\\.worker\\.min\\.mjs).*)"],
+  // showcase: capturas del collage de /login (v10.11), mismo caso que /logos.
+  matcher: ["/((?!api|_next/static|_next/image|logos|showcase|icon\\.svg|favicon\\.ico|robots\\.txt|sitemap\\.xml|pdf\\.worker\\.min\\.mjs).*)"],
 };
