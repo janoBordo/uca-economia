@@ -23,18 +23,26 @@ import { btnCls } from "./authStyles";
    - Cero estado propio: el único JS es el fade de entrada y el callback del
      "ya tengo cuenta". */
 
+/* En el celular cada bloque ocupa ~5/6 del ancho y se va alternando a un lado
+   y al otro. Ese margen que queda libre es lo que hace que el collage "flote"
+   en vez de leerse como un muro de capturas pegadas al borde: en PC ese aire
+   lo da el ancho de la pantalla, acá hay que fabricarlo. Desde sm la grilla es
+   de dos columnas y cada bloque vuelve a ancho completo (el aire ya está). */
+const izq = "w-[84%] sm:w-full";
+const der = "w-[84%] sm:w-full ml-auto sm:ml-0";
+
 export default function AuthIntro({ onEntrar }: { onEntrar: () => void }) {
   return (
     <div className="xl:hidden flex-1 flex flex-col">
       <motion.header
         initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-full max-w-3xl mx-auto px-5 sm:px-8 pt-9 sm:pt-12 pb-7">
+        className="w-full max-w-3xl mx-auto px-5 sm:px-8 pt-12 sm:pt-16 pb-12 sm:pb-14">
         <h1 className="text-navy font-black leading-[1.03]"
           style={{ fontSize: "clamp(2.15rem, 9.5vw, 3.4rem)", letterSpacing: "-0.035em" }}>
           Tu semestre,<br />organizado.
         </h1>
-        <p className="mt-3.5 max-w-md text-navy/50 text-[15px] sm:text-base leading-relaxed">
+        <p className="mt-4 max-w-[20rem] sm:max-w-md text-navy/45 text-[15px] sm:text-base leading-relaxed">
           Cuenta regresiva a cada final, foco real, métricas honestas y tus
           apuntes convertidos en audio.
         </p>
@@ -46,27 +54,27 @@ export default function AuthIntro({ onEntrar }: { onEntrar: () => void }) {
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
         transition={{ delay: 0.12, duration: 0.6, ease: "easeOut" }}
         aria-hidden
-        className="w-full max-w-3xl mx-auto px-5 sm:px-8 grid grid-cols-1 sm:grid-cols-2 gap-x-7 gap-y-9">
-        <div>
+        className="w-full max-w-3xl mx-auto px-5 sm:px-8 grid grid-cols-1 sm:grid-cols-2 gap-x-7 gap-y-14 sm:gap-y-12">
+        <div className={izq}>
           <Titulo>Organizá tu semestre</Titulo>
           <Captura src="/showcase/inicio.webp" w={820} h={412} eager />
         </div>
-        <div>
+        <div className={der}>
           <Titulo>Planificá cada día</Titulo>
           <Captura src="/showcase/calendario.webp" w={820} h={422} />
         </div>
-        <div>
+        <div className={izq}>
           <Titulo>Métricas reales</Titulo>
           <Captura src="/showcase/metricas.webp" w={760} h={377} />
           {/* La card ocre del semestre monta sobre la esquina, como en PC */}
           <Captura src="/showcase/semestre.webp" w={620} h={259}
-            className="relative w-[84%] -mt-8 -ml-4 rounded-md" />
+            className="relative w-[78%] -mt-7 -ml-3 rounded-md" />
         </div>
-        <div>
+        <div className={der}>
           <Titulo>Tus apuntes, en audiolibros</Titulo>
           <Captura src="/showcase/lectura.webp" w={820} h={424} />
         </div>
-        <div className="sm:col-span-2 sm:max-w-md">
+        <div className={`${izq} sm:col-span-2 sm:max-w-md`}>
           <Titulo>Personalizá la app</Titulo>
           <Captura src="/showcase/cuenta.webp" w={820} h={416} />
         </div>

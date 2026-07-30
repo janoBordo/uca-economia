@@ -6,6 +6,22 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.12.1 — La portada de mobile, más aireada (branch `main`)
+
+Feedback de Jano sobre v10.12: el contenido estaba bien pero la portada se sentía "muy cargada" y abrumadora ni bien entrás. **Nada de contenido sacado** — las mismas 5 secciones y las mismas capturas: lo que cambió es el aire.
+
+**El diagnóstico**: en PC el aire lo da el ancho de la pantalla (cada captura mide ~380px dentro de 1920). En mobile cada captura ocupaba el **89% del viewport**, pegada de borde a borde, con 36px entre bloques → un muro de capturas, y en la primera pantalla entraban dos enteras.
+
+**Los cambios (sólo `AuthIntro.tsx`, layout puro):**
+- **Los bloques bajan a `w-[84%]` y se alternan izquierda/derecha** (`izq`/`der`). El margen libre que queda al costado — 73px de un lado, 54px del otro — es lo que hace que el collage "flote" en vez de leerse como un bloque sólido; es la traducción a pantalla angosta de la asimetría que en PC da la columna derecha corrida (`mt-24`). **Desde sm no aplica**: la grilla vuelve a dos columnas de ancho completo, donde el aire ya lo da la segunda columna.
+- **Ritmo vertical**: separación entre bloques de 36 → **56px** (`gap-y-14`).
+- **Hero con espacio real**: `pt-9→pt-12`, `pb-7→pb-12`, bajada a `text-navy/45` y con medida más corta (`max-w-[20rem]`) para que respire en vez de cruzar todo el ancho.
+- La card ocre del semestre monta un poco menos sobre métricas (78% y -7/-3 en vez de 84% y -8/-4), acompañando el bloque más chico.
+
+**Resultado medido a 375×812**: en la primera pantalla ahora entran el hero y **una sola** captura completa (323-493), con el rótulo de la siguiente asomando — antes entraban dos. Y el scroll total **baja** de 1663 a **1597px** pese a los espacios más grandes, porque las capturas son más chicas. Tablet (768) verificado con las dos columnas a 336px y sin rastro de la alternancia. **PC intacta** (1280: vitrina x=32 ancho 768, card x=848 ancho 400, sin scroll — idénticos a v10.12). Build en verde, tamaños de bundle **sin cambios** (login 137 kB, Middleware 83.6 kB).
+
+---
+
 ## v10.12 — Portada de entrada en mobile + wordmark completo en las pantallas de entrada (branch `main`)
 
 Pedido de Jano: la vitrina de v10.11 se ve "increíble en web pero en mobile no aparece" — en el celular `/login` seguía siendo la card sola en una pantalla vacía, sin una sola señal de qué es la app. Ahora, **abajo de xl**, `/login` abre en una **portada** con las mismas capturas y los mismos rótulos ultra cortos que la versión de PC, y el form aparece recién al tocar el CTA. **Cambio 100% visual: no toca auth, seguridad, rate limits ni modelo de datos.**
