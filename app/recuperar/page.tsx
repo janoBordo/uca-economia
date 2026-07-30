@@ -74,7 +74,7 @@ export default function RecuperarPage() {
           Ya podés entrar con tu contraseña nueva.
         </p>
         <div className="mt-6">
-          <Link href="/login" className={btnCls + " block text-center"}>Iniciar sesión</Link>
+          <Link href="/login?entrar=1" className={btnCls + " block text-center"}>Iniciar sesión</Link>
         </div>
       </AuthCard>
     );
@@ -138,7 +138,7 @@ export default function RecuperarPage() {
         </GlassButton>
       </form>
       <p className="mt-6 text-sm text-navy/50 text-center">
-        <Link href="/login" className="font-bold text-navy hover:text-ocre">Volver a iniciar sesión</Link>
+        <Link href="/login?entrar=1" className="font-bold text-navy hover:text-ocre">Volver a iniciar sesión</Link>
       </p>
     </AuthCard>
   );

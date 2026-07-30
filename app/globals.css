@@ -258,6 +258,15 @@ html[data-theme="glass"] body {
     box-shadow: var(--gl-inset), 0 16px 34px -16px rgb(var(--ocre-rgb) / 0.50), 0 5px 14px -8px rgb(var(--ocre-rgb) / 0.38) !important;
   }
 
+  /* Barra de acción de la portada de mobile (v10.12): mismo material que el
+     header, para que el "bookend" marca-arriba / acción-abajo se sostenga. */
+  html[data-theme="glass"] .auth-cta {
+    background: rgba(255,255,255,0.18) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    backdrop-filter: blur(18px) saturate(150%);
+    border-top: 1px solid var(--gl-edge) !important;
+  }
+
   /* Nav / header como panel de vidrio flotante */
   html[data-theme="glass"] header {
     background: rgba(255,255,255,0.18) !important;

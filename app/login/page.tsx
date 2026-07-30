@@ -24,6 +24,11 @@ function LoginForm() {
   );
   const [enviando, setEnviando] = useState(false);
 
+  /* Portada de mobile (v10.12): se muestra al entrar "de cero", pero NO cuando
+     hay algo que leer/hacer ya mismo — un error de confirmación, o una vuelta
+     explícita desde /registro o /recuperar (?entrar=1). En xl no cambia nada. */
+  const conPortada = params.get("entrar") !== "1" && params.get("error") === null;
+
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
     if (enviando) return;
@@ -48,7 +53,7 @@ function LoginForm() {
   }
 
   return (
-    <AuthCard title="Iniciar sesión" subtitle="Tu semestre, organizado.">
+    <AuthCard title="Iniciar sesión" subtitle="Tu semestre, organizado." intro={conPortada}>
       <form onSubmit={entrar} className="space-y-4">
         <div>
           <label htmlFor="email" className={labelCls}>Email</label>

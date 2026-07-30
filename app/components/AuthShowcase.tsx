@@ -14,7 +14,9 @@ import { motion } from "framer-motion";
      así que no agregan nada al árbol de accesibilidad ni al foco del form.
    - Cero JS nuevo más allá de un fade del contenedor (un solo motion.div). */
 
-function Titulo({ children }: { children: string }) {
+// Exportados: la portada de mobile (AuthIntro, v10.12) usa exactamente los
+// mismos rótulos y capturas — un solo idioma visual para las dos versiones.
+export function Titulo({ children }: { children: string }) {
   // Mismo idioma editorial que el hero de la home (v10.8): label ocre + hairline.
   return (
     <div className="flex items-center gap-3 mb-3">
@@ -27,12 +29,15 @@ function Titulo({ children }: { children: string }) {
 }
 
 // El ancho lo pone cada uso (className) — así una captura puede salirse de la
-// grilla sin pelearse con un w-full de base.
-function Captura({ src, w, h, className = "w-full" }: { src: string; w: number; h: number; className?: string }) {
+// grilla sin pelearse con un w-full de base. `eager` sólo para la primera
+// captura de la portada de mobile (la única sobre el pliegue).
+export function Captura({ src, w, h, className = "w-full", eager = false }: {
+  src: string; w: number; h: number; className?: string; eager?: boolean;
+}) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={src} alt="" width={w} height={h} loading="lazy" decoding="async"
+      src={src} alt="" width={w} height={h} loading={eager ? "eager" : "lazy"} decoding="async"
       className={`h-auto select-none pointer-events-none ${className}`}
       style={{ filter: "drop-shadow(0 14px 28px rgb(var(--navy-rgb) / 0.10))" }}
     />

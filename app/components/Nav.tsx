@@ -113,9 +113,13 @@ export default function Nav() {
       <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-3">
         <div className="flex items-center min-w-0 shrink">
           <Link href="/" className="flex items-center shrink-0" aria-label="stuniv — inicio">
-            {/* Logo SIEMPRE azul + punto celeste, sin importar la paleta elegida */}
-            <span className="sm:hidden font-extrabold text-2xl leading-none tracking-tight" style={{ color:"#0B1F4D" }}>s<span style={{ color:"#009CDE" }}>.</span></span>
-            <span className="hidden sm:block font-extrabold text-2xl leading-none tracking-tight" style={{ color:"#0B1F4D" }}>stuniv<span style={{ color:"#009CDE" }}>.</span></span>
+            {/* Logo SIEMPRE azul + punto celeste, sin importar la paleta elegida.
+                En mobile el wordmark se abrevia a "s." porque compite con la
+                identidad académica y la hamburguesa — salvo en las pantallas de
+                entrada (v10.12), donde la barra está vacía y la marca completa
+                es lo único que se ve: ahí va "stuniv." en todos los anchos. */}
+            {!esAuth && <span className="sm:hidden font-extrabold text-2xl leading-none tracking-tight" style={{ color:"#0B1F4D" }}>s<span style={{ color:"#009CDE" }}>.</span></span>}
+            <span className={`${esAuth ? "block" : "hidden sm:block"} font-extrabold text-2xl leading-none tracking-tight`} style={{ color:"#0B1F4D" }}>stuniv<span style={{ color:"#009CDE" }}>.</span></span>
           </Link>
           {!esAuth && <Identidad />}
         </div>

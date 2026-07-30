@@ -162,7 +162,7 @@ export default function RegistroPage() {
         </div>
 
         <p className="mt-6 text-sm text-navy/50 text-center">
-          <Link href="/login" className="font-bold text-navy hover:text-ocre">Volver a iniciar sesión</Link>
+          <Link href="/login?entrar=1" className="font-bold text-navy hover:text-ocre">Volver a iniciar sesión</Link>
         </p>
       </AuthCard>
     );
@@ -236,7 +236,7 @@ export default function RegistroPage() {
       </form>
       <p className="mt-6 text-sm text-navy/50 text-center">
         ¿Ya tenés cuenta?{" "}
-        <Link href="/login" className="font-bold text-navy hover:text-ocre">Iniciá sesión</Link>
+        <Link href="/login?entrar=1" className="font-bold text-navy hover:text-ocre">Iniciá sesión</Link>
       </p>
     </AuthCard>
   );
