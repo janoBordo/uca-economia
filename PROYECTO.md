@@ -757,3 +757,11 @@ Dos cambios grandes.
   - Verificado en el navegador: a 1024px y 1100px se ve la ventana única sin scroll horizontal; a 1000px sigue la portada de mobile con su CTA sticky.
 - **Botón "Compartir stuniv"** (`/cuenta`): menos border radius (`rounded-full` → `rounded-xl`) y con **icono de compartir** al lado (SVG inline de tres nodos unidos, trazo 1.75 en `currentColor`, decorativo). El comportamiento no cambió: hoja nativa en mobile, copiar link en PC.
 - **Versión 2D por defecto**: revisado, ya era así — el tema Vidrio sólo se activa si `localStorage.uca_theme === 'glass'` (lo escribe únicamente el toggle de Configuración). Una instalación nueva abre en Clásico 2D. No hizo falta tocar nada. Si en un dispositivo abre en 3D es porque ahí ya se había elegido Vidrio antes.
+
+### v10.13 — Inicio nunca queda sin próximo paso
+Inicio tenía un CTA sólo cuando había un examen próximo ("Iniciar foco"). Los otros dos estados dejaban al usuario mirando un texto sin nada que tocar. Ahora los tres estados tienen la fila de acciones **en el mismo lugar y con la misma forma** (pill navy = acción principal, pill de contorno = secundaria), extraída a `<Acciones>` + `ctaPrimario`/`ctaSecundario` en `app/page.tsx`:
+- **Cuenta recién creada (sin materias)**: "Agregar materias →" → `/semestre`. El copy pasa a "Cargá tus materias y después anotá las fechas de examen" (dice el orden real de los dos pasos).
+- **Con materias pero sin ninguna fecha anotada**: antes caía en el estado "Sin exámenes próximos / Anotá nuevas fechas cuando las tengas", que suena a "ya rendiste todo" cuando en realidad nunca anotaste nada. Se separó con `sinNingunaFecha`: título "Anotá tu primer examen" y CTA "Anotar fecha de examen →" → `/calendario`, más "Agregar materias" de secundaria.
+- **Todo rendido (había fechas y ya pasaron)**: mismo layout, copy "Rendiste todo lo que tenías anotado" y CTA "Anotar nueva fecha →".
+- **Fix de destino**: "Editar fechas" apuntaba a `/configuracion`, que es sólo un `redirect("/semestre")` — o sea, terminaba en materias, no en fechas. Ahora va a `/calendario`, que es donde realmente se anotan.
+Verificado con `tsc --noEmit` y `next build` limpios. No lo pude mirar en el navegador: Inicio exige sesión y no tengo credenciales de prueba.

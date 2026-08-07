@@ -56,22 +56,41 @@ function RowItem({ m, index }: { m: Materia; index: number }) {
   );
 }
 
+/* Fila de acciones del hero (v10.13). Inicio NUNCA queda sin un próximo paso:
+   con examen próximo el CTA es "Iniciar foco"; sin fecha anotada es "Anotar
+   fecha"; sin materias todavía es "Cargar materias". Siempre el mismo lugar y
+   la misma forma — pill navy la acción principal, pill de contorno la
+   secundaria — así el ojo la encuentra en el mismo sitio en los tres estados.
+   Las fechas se anotan en el calendario; las materias se crean en /semestre. */
+const ctaPrimario = "inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-navy text-canvas text-sm font-semibold hover:bg-navy-soft transition-colors";
+const ctaSecundario = "inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-navy/20 text-navy/60 text-sm font-medium hover:border-navy/40 hover:text-navy transition-colors";
+
+function Acciones({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.35 }}
+      className="flex flex-wrap gap-3 mt-10">
+      {children}
+    </motion.div>
+  );
+}
+
 export default function Inicio() {
   const { data } = useData();
   // Materias sin duplicar por varias fechas (una entrada = examen más próximo).
   const orden = materiasPorProximidad({ ...data, materias: materiasEfectivas(data.materias) });
 
-  // Cuenta nueva sin materias todavía: invitación a cargarlas (antes: null)
+  // Cuenta recién creada, sin materias todavía: el único paso posible es
+  // cargarlas, así que el CTA es ese y nada más.
   if (!orden.length) return (
     <section className="flex-1 w-full max-w-4xl mx-auto px-6 sm:px-8 py-16 sm:py-24 flex flex-col">
       <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}>
         <h1 className="font-black text-navy leading-[0.9] mb-6" style={{ fontSize:"clamp(2.5rem,8vw,5.5rem)", letterSpacing:"-0.04em" }}>
           Tu semestre,<br/>organizado
         </h1>
-        <p className="text-navy/40 text-base mb-10">Cargá tus materias y fechas de examen para arrancar.</p>
-        <Link href="/semestre" className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-navy text-canvas text-sm font-semibold hover:bg-navy-soft transition-colors">
-          Cargar materias →
-        </Link>
+        <p className="text-navy/40 text-base">Cargá tus materias y después anotá las fechas de examen.</p>
+        <Acciones>
+          <Link href="/semestre" className={ctaPrimario}>Agregar materias →</Link>
+        </Acciones>
       </motion.div>
     </section>
   );
@@ -79,6 +98,9 @@ export default function Inicio() {
   const ahora = Date.now();
   const proximo = orden.find(m => new Date(m.examen).getTime() > ahora);
   const todoRendido = !proximo;
+  // Hay materias pero todavía ninguna tiene fecha: no es "ya rendí todo", es
+  // "todavía no anotaste nada" — el texto y el CTA tienen que decir eso.
+  const sinNingunaFecha = orden.every(m => isNaN(new Date(m.examen).getTime()));
   const resto = todoRendido ? orden : orden.filter(m => m.id !== proximo!.id);
   const fechaProximo = proximo
     ? new Date(proximo.examen).toLocaleDateString("es-AR", { weekday:"long", day:"numeric", month:"long" })
@@ -88,11 +110,21 @@ export default function Inicio() {
     <section className="flex-1 w-full max-w-4xl xl:max-w-6xl mx-auto px-6 sm:px-8 lg:px-12 py-16 sm:py-24 flex flex-col">
 
       {todoRendido ? (
-        <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} className="mb-16">
+        <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}>
           <h1 className="font-black text-navy leading-[0.9] mb-6" style={{ fontSize:"clamp(2.5rem,8vw,5.5rem)", letterSpacing:"-0.04em" }}>
-            Sin exámenes<br/>próximos
+            {sinNingunaFecha ? <>Anotá tu<br/>primer examen</> : <>Sin exámenes<br/>próximos</>}
           </h1>
-          <p className="text-navy/40 text-base">Anotá nuevas fechas cuando las tengas.</p>
+          <p className="text-navy/40 text-base">
+            {sinNingunaFecha
+              ? "Ya tenés tus materias. Poné la fecha de un examen y arranca la cuenta regresiva."
+              : "Rendiste todo lo que tenías anotado. Anotá las fechas nuevas cuando las tengas."}
+          </p>
+          <Acciones>
+            <Link href="/calendario" className={ctaPrimario}>
+              {sinNingunaFecha ? "Anotar fecha de examen" : "Anotar nueva fecha"} →
+            </Link>
+            <Link href="/semestre" className={ctaSecundario}>Agregar materias</Link>
+          </Acciones>
         </motion.div>
       ) : (
         <>
@@ -113,14 +145,14 @@ export default function Inicio() {
             <CountdownHero materia={proximo!} />
           </motion.div>
 
-          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.35 }} className="flex gap-3 mt-10">
-            <Link href="/timer" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-navy text-canvas text-sm font-semibold hover:bg-navy-soft transition-colors">
+          <Acciones>
+            <Link href="/timer" className={ctaPrimario}>
               <span>▶</span> Iniciar foco
             </Link>
-            <Link href="/configuracion" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-navy/20 text-navy/60 text-sm font-medium hover:border-navy/40 hover:text-navy transition-colors">
-              Editar fechas
-            </Link>
-          </motion.div>
+            {/* Las fechas se editan en el calendario (/configuracion sólo
+                redirige a /semestre, que son las materias, no las fechas). */}
+            <Link href="/calendario" className={ctaSecundario}>Editar fechas</Link>
+          </Acciones>
         </>
       )}
 

@@ -1,6 +1,6 @@
 {
   "name": "stuniv",
-  "version": "10.12.2",
+  "version": "10.13.0",
   "private": true,
   "scripts": {
     "predev": "node scripts/copiar-pdf-worker.mjs",
