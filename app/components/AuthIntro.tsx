@@ -13,8 +13,10 @@ import { btnCls } from "./authStyles";
    para pantalla angosta — y el form aparece recién al tocar el CTA.
 
    Reglas:
-   - `xl:hidden`: desde 1280px no se renderiza y manda la vitrina de v10.11,
-     que queda EXACTAMENTE igual que antes.
+   - `lg:hidden`: desde 1024px no se renderiza y manda la vitrina de v10.11 —
+     en compu, inicio y login siguen siendo una sola ventana. (Era 1280px, pero
+     una laptop con escalado de Windows reporta menos que eso y terminaba
+     viendo esta portada, que es para celular.)
    - El CTA va en una barra `sticky bottom-0`: entrar a la app nunca queda a
      más de un toque, sin importar cuánto se scrollee el collage.
    - Las capturas siguen siendo decorativas (aria-hidden): lo que informa es el
@@ -33,7 +35,7 @@ const der = "w-[84%] sm:w-full ml-auto sm:ml-0";
 
 export default function AuthIntro({ onEntrar }: { onEntrar: () => void }) {
   return (
-    <div className="xl:hidden flex-1 flex flex-col">
+    <div className="lg:hidden flex-1 flex flex-col">
       <motion.header
         initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}

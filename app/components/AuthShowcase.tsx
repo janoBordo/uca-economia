@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
    sólo la card y quedaban dos tercios vacíos.
 
    Reglas que se respetan (es un cambio MERAMENTE visual):
-   - Sólo se muestra desde xl (≥1280px). Abajo de eso no se renderiza y, al
+   - Sólo se muestra desde lg (≥1024px). Abajo de eso no se renderiza y, al
      estar en display:none con loading="lazy", el navegador ni descarga los
      .webp → el peso de la página en mobile/tablet no cambia en nada.
    - Las 6 capturas están recortadas y comprimidas a WebP: ~90KB EN TOTAL,
@@ -50,10 +50,10 @@ export default function AuthShowcase() {
       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
       transition={{ delay: 0.15, duration: 0.7, ease: "easeOut" }}
       aria-hidden
-      className="hidden xl:grid flex-1 min-w-0 grid-cols-2 gap-x-8 2xl:gap-x-10 items-start">
+      className="hidden lg:grid flex-1 min-w-0 grid-cols-2 gap-x-6 xl:gap-x-8 2xl:gap-x-10 items-start">
 
       {/* Columna izquierda */}
-      <div className="space-y-9">
+      <div className="space-y-7 xl:space-y-9">
         <div>
           <Titulo>Organizá tu semestre</Titulo>
           <Captura src="/showcase/inicio.webp" w={820} h={412} />
@@ -69,7 +69,7 @@ export default function AuthShowcase() {
       </div>
 
       {/* Columna derecha, corrida hacia abajo para romper la simetría */}
-      <div className="space-y-12 mt-24">
+      <div className="space-y-9 mt-16 xl:space-y-12 xl:mt-24">
         <div>
           <Titulo>Métricas reales</Titulo>
           <Captura src="/showcase/metricas.webp" w={760} h={377} />

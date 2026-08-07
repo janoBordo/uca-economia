@@ -345,7 +345,17 @@ function SeccionCompartir() {
   return (
     <div className="flex flex-col items-center gap-2">
       <GlassButton onClick={compartir}
-        className="px-7 py-3 rounded-full bg-navy text-canvas text-sm font-semibold hover:bg-navy-deep transition-colors glass-solid">
+        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-navy text-canvas text-sm font-semibold hover:bg-navy-deep transition-colors glass-solid">
+        {/* Icono de compartir (nodos unidos, el mismo idioma de línea que el resto
+            de la app): 1.75 de trazo, currentColor, decorativo. */}
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+          strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden
+          className="shrink-0">
+          <circle cx="18" cy="5" r="3" />
+          <circle cx="6" cy="12" r="3" />
+          <circle cx="18" cy="19" r="3" />
+          <path d="M8.6 10.5 15.4 6.6M8.6 13.5l6.8 3.9" />
+        </svg>
         {copiado ? "Link copiado ✓" : "Compartir stuniv"}
       </GlassButton>
       <p className="text-navy/35 text-xs">Invitá a alguien a organizar su semestre.</p>
