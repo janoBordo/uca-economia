@@ -1,6 +1,6 @@
 "use client";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence } from "framer-motion";
 import { useData } from "../lib/useData";
 import { addMinutos, materiasPorProximidad } from "../lib/api";
 import { GlassTabs, GlassButton, GlassInput, GlassSelect } from "../components/glass";

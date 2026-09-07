@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { motion } from "framer-motion";
+import { m as motion } from "framer-motion";
 import Link from "next/link";
 import { useData } from "./lib/useData";
 import { materiasPorProximidad, materiasEfectivas } from "./lib/api";
@@ -38,7 +38,11 @@ function RowItem({ m, index }: { m: Materia; index: number }) {
   const d = useDiff(m.examen, 60000); // la fila sólo muestra minutos → basta tickear cada 60s
   const fecha = sinFecha ? "" : new Date(m.examen).toLocaleDateString("es-AR", { day:"2-digit", month:"short" });
   return (
-    <motion.li initial={{ opacity:0, x:-12 }} animate={{ opacity:1, x:0 }} transition={{ delay:0.4+index*0.05 }}
+    // La entrada escalonada se corta a 0.4s en total (v10.14): con 9 materias,
+    // 0.4 + i*0.05 hacía que la última fila apareciera recién a los 0.85s — el
+    // contenido ya estaba, pero la página se "sentía" lenta hasta ahí.
+    <motion.li initial={{ opacity:0, x:-12 }} animate={{ opacity:1, x:0 }}
+      transition={{ delay: Math.min(0.16 + index*0.03, 0.4) }}
       className="flex items-center justify-between py-4 border-b border-navy/8 group">
       <div className="flex items-center gap-3">
         <div className="w-1.5 h-1.5 rounded-full bg-ocre shrink-0" />
@@ -67,7 +71,7 @@ const ctaSecundario = "inline-flex items-center gap-2 px-5 py-2.5 rounded-full b
 
 function Acciones({ children }: { children: React.ReactNode }) {
   return (
-    <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.35 }}
+    <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.22 }}
       className="flex flex-wrap gap-3 mt-10">
       {children}
     </motion.div>
@@ -75,9 +79,29 @@ function Acciones({ children }: { children: React.ReactNode }) {
 }
 
 export default function Inicio() {
-  const { data } = useData();
+  const { data, listo } = useData();
   // Materias sin duplicar por varias fechas (una entrada = examen más próximo).
   const orden = materiasPorProximidad({ ...data, materias: materiasEfectivas(data.materias) });
+
+  /* Primerísima carga en este dispositivo (no hay nada en el cache persistente):
+     todavía no se sabe si el usuario tiene materias, así que NO se puede pintar
+     "Agregá materias" — sería un dato falso que dura un parpadeo y se
+     reemplaza. Va un esqueleto del hero, sin spinner: mismas alturas y mismo
+     ritmo que el contenido real, así el salto es un fundido y no un salto de
+     layout. En cualquier otra carga esto no aparece nunca (v10.14). */
+  if (!listo && !orden.length) return (
+    <section className="flex-1 w-full max-w-4xl mx-auto px-6 sm:px-8 py-16 sm:py-24 flex flex-col" aria-busy>
+      <div className="animate-pulse">
+        <div className="h-3 w-40 rounded-full bg-navy/8 mb-8" />
+        <div className="h-[clamp(2.5rem,8vw,5.5rem)] w-[70%] rounded-2xl bg-navy/8 mb-12" />
+        <div className="flex gap-6 sm:gap-10 md:gap-14">
+          {[0,1,2,3].map(i => (
+            <div key={i} className="h-[clamp(3rem,10vw,7rem)] w-[clamp(2.5rem,8vw,5rem)] rounded-2xl bg-navy/8" />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 
   // Cuenta recién creada, sin materias todavía: el único paso posible es
   // cargarlas, así que el CTA es ese y nada más.
@@ -156,7 +180,7 @@ export default function Inicio() {
         </>
       )}
 
-      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.4 }} className="mt-16 mb-2 flex items-center gap-3">
+      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.16 }} className="mt-16 mb-2 flex items-center gap-3">
         <span className="text-navy/30 text-xs uppercase tracking-widest font-medium">Todas las materias</span>
         <div className="flex-1 h-px bg-navy/8" />
       </motion.div>

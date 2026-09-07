@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence } from "framer-motion";
 import { useData } from "../lib/useData";
 import { archivarSemestre, saveMaterias, resetHoras, clearPlanEstudio } from "../lib/api";
 import { type Materia, type SemestreArchivado } from "../lib/types";

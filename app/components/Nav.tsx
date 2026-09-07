@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEfectoDeHidratacion } from "../lib/hidratacion";
+import { m as motion, AnimatePresence } from "framer-motion";
 import UserMenu from "./UserMenu";
 import { usePerfil } from "../lib/perfil";
 import { logoUniversidad } from "../lib/paleta";
@@ -104,6 +105,61 @@ function MobileMenu({ path }: { path: string }) {
   );
 }
 
+/* Pestañas de escritorio + la pastilla que se desliza de una a otra.
+
+   La pastilla la hacía framer-motion con `layoutId` (animación de layout). Esa
+   feature es la única de toda la app que queda fuera de `domAnimation`, o sea:
+   por una pastilla, cada pantalla cargaba el bundle completo de la librería.
+   Acá se resuelve midiendo la pestaña activa y moviendo UN solo elemento con
+   una transición CSS — mismo deslizamiento, cero JavaScript de animación.
+
+   La medición va en un layout effect (antes del paint, nunca se ve descolocada)
+   y un ResizeObserver la repite si cambian los anchos — sobre todo cuando entra
+   la tipografía Inter y el texto de las pestañas se reacomoda. */
+function TabsDesktop({ path }: { path: string }) {
+  const cont = useRef<HTMLElement>(null);
+  const yaMidio = useRef(false);
+  const [pill, setPill] = useState<{ x: number; w: number; animar: boolean } | null>(null);
+
+  useEfectoDeHidratacion(() => {
+    const medir = () => {
+      const activo = cont.current?.querySelector<HTMLElement>("[data-activo='1']");
+      if (!activo) { setPill(null); yaMidio.current = false; return; }
+      // La primera vez aparece donde va, sin animar (si no, entraría deslizándose
+      // desde el borde izquierdo en cada carga de página).
+      setPill({ x: activo.offsetLeft, w: activo.offsetWidth, animar: yaMidio.current });
+      yaMidio.current = true;
+    };
+    medir();
+    const nav = cont.current;
+    if (!nav || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(medir);
+    ro.observe(nav);
+    return () => ro.disconnect();
+  }, [path]);
+
+  const desliz = "transform .3s cubic-bezier(.34,1.2,.5,1), width .3s cubic-bezier(.34,1.2,.5,1)";
+  return (
+    <nav ref={cont} className="hidden lg:flex items-center gap-0.5 relative">
+      {pill && (
+        <span aria-hidden className="absolute top-0 bottom-0 left-0 rounded-lg bg-navy/8"
+          style={{ width: pill.w, transform: `translateX(${pill.x}px)`, transition: pill.animar ? desliz : "none" }} />
+      )}
+      {LINKS.map(l => {
+        const active = esActivo(path, l.href);
+        return (
+          <Link key={l.href} href={l.href} data-activo={active ? "1" : undefined}
+            className={`relative px-4 py-2.5 rounded-lg text-base font-semibold transition-colors ${
+              active ? "text-navy" : "text-navy/60 hover:text-navy"
+            }`}>
+            {l.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 export default function Nav() {
   const path = usePathname();
   const esAuth = AUTH_PATHS.has(path);
@@ -125,23 +181,7 @@ export default function Nav() {
         </div>
         {!esAuth && <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           {/* Desktop (lg+): pestañas inline */}
-          <nav className="hidden lg:flex items-center gap-0.5">
-            {LINKS.map(l => {
-              const active = esActivo(path, l.href);
-              return (
-                <Link key={l.href} href={l.href}
-                  className={`relative px-4 py-2.5 rounded-lg text-base font-semibold transition-colors ${
-                    active ? "text-navy" : "text-navy/60 hover:text-navy"
-                  }`}>
-                  {active && (
-                    <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-lg bg-navy/8"
-                      transition={{ type:"spring", stiffness:400, damping:35 }} />
-                  )}
-                  <span className="relative">{l.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
+          <TabsDesktop path={path} />
           {/* Mobile / tablet (< lg): hamburguesa */}
           <MobileMenu path={path} />
           {/* Cuenta: menú desplegable desde el nombre/avatar (6.17) */}

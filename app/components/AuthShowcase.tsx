@@ -1,5 +1,5 @@
 "use client";
-import { motion } from "framer-motion";
+import { m as motion } from "framer-motion";
 
 /* Vitrina de las pantallas de entrada (v10.11): capturas reales de la app al
    costado del form de /login, /registro y /recuperar — antes la página era

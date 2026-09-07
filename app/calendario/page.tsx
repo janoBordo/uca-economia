@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence } from "framer-motion";
 import { useData } from "../lib/useData";
 import { saveMaterias, savePlanEstudio, saveNotas, materiasEfectivas } from "../lib/api";
 import type { Materia } from "../lib/types";

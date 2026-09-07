@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseForRequest, supabaseAdmin } from "../../../lib/supabase/server";
-import { rlDb, rlProfile, checkLimit, clientIp, tooMany } from "../../../lib/ratelimit";
+import { rlDb, rlDbIp, rlProfile, checkLimit, clientIp, tooMany } from "../../../lib/ratelimit";
 import { generico } from "../../../lib/http";
 import { avatarUrlCacheada, guardarAvatarUrl } from "../../../lib/avatar-url-cache";
 
@@ -53,13 +53,32 @@ function aPerfil(row: Record<string, unknown>, email: string | null, fotoUrl: st
 }
 
 export async function GET(req: Request) {
-  const lim = await checkLimit(rlDb, `profile:${clientIp(req)}`, false);
-  if (!lim.ok) return tooMany(lim.retryAfter);
+  // Reja barata por IP (techo alto, sólo anti-inundación) y límite fino por
+  // usuario más abajo: mismo criterio que /api/db (v10.14) — detrás del NAT de
+  // una facultad, contar por IP castigaba a todos los alumnos por igual.
+  const limIp = await checkLimit(rlDbIp, `profile:${clientIp(req)}`, false);
+  if (!limIp.ok) return tooMany(limIp.retryAfter);
   const sb = supabaseForRequest(req);
-  const { data: auth, error: authErr } = await sb.auth.getUser();
+
+  // getUser() y la lectura de la fila van EN PARALELO (v10.14). Antes eran
+  // secuenciales y este endpoint —que corre en cada carga de página, porque el
+  // Nav muestra nombre y avatar— pagaba dos round-trips a Supabase encadenados.
+  // Se puede porque el SELECT no necesita el id: RLS (profiles_select_own) ya
+  // limita la consulta a la fila propia, así que `.single()` sólo puede
+  // devolver el perfil del dueño de la sesión. El .eq("id") era redundante con
+  // la política, no la protección. Si no hay sesión válida, getUser falla y se
+  // corta con 401 igual que antes — la fila leída nunca se llega a devolver.
+  const [authRes, filaRes] = await Promise.all([
+    sb.auth.getUser(),
+    sb.from("profiles").select(CAMPOS).single(),
+  ]);
+  const { data: auth, error: authErr } = authRes;
   if (authErr || !auth.user) return generico("No autenticado.", 401);
 
-  const { data: row, error } = await sb.from("profiles").select(CAMPOS).eq("id", auth.user.id).single();
+  const lim = await checkLimit(rlDb, `profile:${auth.user.id}`, false);
+  if (!lim.ok) return tooMany(lim.retryAfter);
+
+  const { data: row, error } = filaRes;
   if (error || !row) {
     console.error("profile GET:", error?.message);
     return generico("Algo salió mal.", 500);

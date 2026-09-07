@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { rlTts, rlTtsLote, checkLimit, clientIp, tooMany } from "../../lib/ratelimit";
+import { rlTts, rlTtsLote, checkLimit, clientIp, tooMany } from "../../lib/ratelimit-local";
 import { supabaseForRequest } from "../../lib/supabase/server";
 
 // Proxy liviano al TTS gratuito de Google Translate.

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence } from "framer-motion";
 import { usePerfil, iniciales, nombreCorto, limpiarPerfilCache } from "../lib/perfil";
 
 /* Menú de cuenta (6.17): el nombre/avatar en la esquina superior derecha abre

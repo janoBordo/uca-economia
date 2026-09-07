@@ -1,6 +1,6 @@
 "use client";
 import { forwardRef, type ReactNode } from "react";
-import { motion, type HTMLMotionProps } from "framer-motion";
+import { m as motion, type HTMLMotionProps } from "framer-motion";
 
 /* ── Sistema Liquid Glass ──
    Primitivos reutilizables. El MATERIAL vive en globals.css (keyed por

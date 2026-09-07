@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { usuarioVerificado } from "./app/lib/supabase/verificar";
 
 // Protección de rutas (6.1): ninguna página de la app es accesible sin sesión.
 // Públicas: solo la puerta de entrada (/login, /registro, /recuperar) y el
@@ -39,9 +40,22 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  // getUser() valida el JWT contra el servidor de Auth (y refresca si venció).
-  // Nunca usar getSession() del lado del server: no verifica la firma.
-  const { data: { user } } = await supabase.auth.getUser();
+  // Verificación de sesión SIN round-trip al Auth server mientras el access
+  // token siga vigente (v10.14). Antes cada navegación —cada click del nav—
+  // pagaba un getUser() contra Supabase antes de poder devolver el HTML: era
+  // el piso de latencia de toda la app y crecía con la cantidad de usuarios.
+  // usuarioVerificado() valida la FIRMA en local (ES256 + JWKS cacheado) y sólo
+  // cae a getUser() cuando el token venció o algo no cierra — que es también el
+  // momento en el que hace falta refrescar la sesión, así que el refresco sigue
+  // ocurriendo, sólo que ~1 vez cada 15 min en vez de en cada navegación.
+  //
+  // Qué NO cambia: la revocación (logout, cambio de contraseña, cuenta borrada)
+  // la sigue cortando /api/db en el mismo round-trip de datos (RPC get_app_data
+  // → 'sesion_revocada' → 401 → el cliente va a /login). El middleware nunca fue
+  // la línea real de protección de datos (ver comentario de arriba): protege
+  // rutas, y una sesión revocada como mucho ve el cascarón de una página vacía
+  // hasta que el primer fetch la echa.
+  const user = await usuarioVerificado(supabase, req);
 
   const path = req.nextUrl.pathname;
   const esPublica = AUTH_PAGES.has(path) || path.startsWith("/auth/confirm");

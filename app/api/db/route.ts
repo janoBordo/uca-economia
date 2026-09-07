@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { AppData, Materia, PatchBody } from "../../lib/types";
-import { rlDb, checkLimit, clientIp, tooMany } from "../../lib/ratelimit";
+import { rlDb, rlDbIp, checkLimit, clientIp, tooMany } from "../../lib/ratelimit-local";
 import { generico, noAuth, fallo } from "../../lib/http";
 import { supabaseForRequest } from "../../lib/supabase/server";
 import { usuarioVerificado } from "../../lib/supabase/verificar";
@@ -69,14 +69,19 @@ const esSesionMuerta = (e: unknown) =>
   e instanceof Error && /sesion_revocada|not_authenticated/.test(e.message);
 
 export async function GET(req: Request) {
-  const lim = await checkLimit(rlDb, `get:${clientIp(req)}`, false);
-  if (!lim.ok) return tooMany(lim.retryAfter);
+  // Reja barata por IP (techo alto, sólo anti-inundación) y recién después el
+  // límite real, que es POR USUARIO: detrás del NAT de una facultad, varios
+  // alumnos comparten IP y un límite por IP los castigaba a todos (v10.14).
+  const limIp = await checkLimit(rlDbIp, `get:${clientIp(req)}`, false);
+  if (!limIp.ok) return tooMany(limIp.retryAfter);
   const sb = supabaseForRequest(req);
   // Firma del JWT verificada en local (ES256/JWKS, sin round-trip a Auth);
   // la vivacidad de la sesión la valida el propio RPC en el round-trip de
   // datos. Revocado ⇒ 'sesion_revocada' ⇒ 401. Fallback a getUser ante dudas.
   const user = await usuarioVerificado(sb, req);
   if (!user) return noAuth();
+  const lim = await checkLimit(rlDb, `get:${user.id}`, false);
+  if (!lim.ok) return tooMany(lim.retryAfter);
   try {
     const full = new URL(req.url).searchParams.get("full") === "1";
     return NextResponse.json(await getData(sb, full));
@@ -87,12 +92,16 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const lim = await checkLimit(rlDb, `post:${clientIp(req)}`, false);
-  if (!lim.ok) return tooMany(lim.retryAfter);
+  const limIp = await checkLimit(rlDbIp, `post:${clientIp(req)}`, false);
+  if (!limIp.ok) return tooMany(limIp.retryAfter);
   const sb = supabaseForRequest(req);
+  // Las escrituras siguen validando la sesión contra el Auth server (getUser):
+  // acá no hay un RPC que chequee revocación como en el GET.
   const { data: auth, error: authErr } = await sb.auth.getUser();
   if (authErr || !auth.user) return noAuth();
   const userId = auth.user.id;
+  const lim = await checkLimit(rlDb, `post:${userId}`, false);
+  if (!lim.ok) return tooMany(lim.retryAfter);
 
   let body: PatchBody;
   try {

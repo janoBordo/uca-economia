@@ -1,6 +1,6 @@
 "use client";
-import { useState, useCallback, useMemo } from "react";
-import { motion } from "framer-motion";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { m as motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { useData } from "../lib/useData";
 import { savePreparacion, materiasEfectivas } from "../lib/api";
@@ -54,12 +54,42 @@ export default function Metricas() {
     color:   COLORES_MATERIAS[i % COLORES_MATERIAS.length],
   })), [materias, prepReal]);
 
-  const cambiarPrep = useCallback(async (id: string, v: number) => {
-    const next = { ...prepReal, [id]: v };
-    setPrep(next); // la UI responde al instante; el guardado va detrás
-    try { await savePreparacion(next); }
-    catch (e) { console.error("métricas: no se pudo guardar la preparación", e); }
-  }, [prepReal]);
+  /* Guardado de los sliders con freno (v10.14).
+
+     `onChange` de un input range dispara en CADA píxel del arrastre: mover un
+     slider de punta a punta mandaba decenas de POST a /api/db, y cada uno
+     valida sesión contra el Auth server, escribe una fila por valor distinto y
+     vuelve a leer todo el estado. Con un par de arrastres se llegaba al techo
+     de 120 pedidos/minuto y la app empezaba a devolver 429 — o sea, la pantalla
+     que más escribe era la que más rápido se rompía con varios usuarios.
+
+     Ahora el número se mueve al instante (state local, igual que antes) y el
+     guardado sale una sola vez, medio segundo después del último movimiento.
+     Al salir de la pantalla se descarga lo pendiente, así nada se pierde. */
+  const prepRef  = useRef(prepReal);
+  prepRef.current = prepReal;
+  const pendiente = useRef<Record<string, number> | null>(null);
+  const reloj     = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const guardarPendiente = useCallback(() => {
+    const p = pendiente.current;
+    if (!p) return;
+    pendiente.current = null;
+    savePreparacion(p).catch(e => console.error("métricas: no se pudo guardar la preparación", e));
+  }, []);
+
+  const cambiarPrep = useCallback((id: string, v: number) => {
+    const next = { ...prepRef.current, [id]: v };
+    setPrep(next);                 // la UI responde al instante
+    pendiente.current = next;      // el guardado espera a que sueltes el slider
+    if (reloj.current) clearTimeout(reloj.current);
+    reloj.current = setTimeout(guardarPendiente, 500);
+  }, [guardarPendiente]);
+
+  useEffect(() => () => {
+    if (reloj.current) clearTimeout(reloj.current);
+    guardarPendiente();
+  }, [guardarPendiente]);
 
   return (
     <section className="flex-1 w-full max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-16 flex flex-col gap-20">
@@ -129,8 +159,11 @@ export default function Metricas() {
           {materias.map((m,i) => {
             const v     = prepReal[m.id] ?? 0;
             const color = v<35 ? "rgb(var(--ocre-rgb))" : v<70 ? "rgb(var(--navy-rgb))" : "rgb(var(--navy-soft-rgb))";
+            // La entrada escalonada se corta a 0.3s en total (v10.14): con muchas
+            // materias el último slider aparecía casi medio segundo tarde, ya con
+            // los datos en pantalla — lento sólo por la animación.
             return (
-              <motion.div key={m.id} initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ delay:i*0.04 }}>
+              <motion.div key={m.id} initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ delay: Math.min(i*0.04, 0.3) }}>
                 <div className="flex items-baseline justify-between mb-3">
                   <span className="text-navy/80 font-medium text-base">{m.nombre}</span>
                   <div className="flex items-center gap-3">

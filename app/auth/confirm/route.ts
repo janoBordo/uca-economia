@@ -34,5 +34,9 @@ export async function GET(req: Request) {
     console.error("auth/confirm:", error.code ?? error.message);
     return irA("/login?error=confirmacion");
   }
-  return irA("/");
+  // `bienvenida=1`: marca de "sesión nueva en este navegador". El cache
+  // persistente del cliente (v10.14) lo lee ANTES del primer render y tira el
+  // espejo del usuario anterior — misma limpieza que hace el form de /login,
+  // pero para el camino que entra por el link del mail.
+  return irA("/?bienvenida=1");
 }

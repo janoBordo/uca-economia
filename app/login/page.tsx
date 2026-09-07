@@ -6,6 +6,7 @@ import { AuthCard, AuthError, inputCls, labelCls, btnCls } from "../components/A
 import { GlassButton } from "../components/glass";
 import Turnstile from "../components/Turnstile";
 import { track } from "../lib/analytics";
+import { limpiarPerfilCache } from "../lib/perfil";
 
 /* Puerta de entrada de la app (6.1). Nada de Supabase en el navegador:
    el form le pega a POST /api/auth/login y la sesión queda en cookies
@@ -40,7 +41,12 @@ function LoginForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, captchaToken: captcha }),
       });
-      if (r.ok) { track("login"); window.location.assign("/"); return; }
+      if (r.ok) {
+        // Compu compartida: el espejo local del usuario anterior se tira acá,
+        // antes de entrar, para que la app nunca pinte datos ajenos (v10.14).
+        limpiarPerfilCache();
+        track("login"); window.location.assign("/"); return;
+      }
       const d = await r.json().catch(() => null);
       setError(d?.error ?? "No se pudo iniciar sesión. Probá de nuevo.");
       setResetKey(k => k + 1); // el token del captcha es de un solo uso
