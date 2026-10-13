@@ -7,6 +7,10 @@ let cacheFull = false;     // ¿el cache incluye el historial de semestres? (sol
 let lastFetched = 0;
 let inFlight: Promise<AppData> | null = null;
 let inFlightFull = false;
+let revision = 0;
+let sesion = 0;
+let ultimaLectura = 0;
+let escrituras: Promise<unknown> = Promise.resolve();
 const TTL = 60000; // ms: dentro de esta ventana, navegar entre páginas sirve del cache (sin pegarle a /api/db).
 // 60s (antes 15s): las escrituras propias refrescan el cache al instante igual,
 // así que en el mismo dispositivo no cambia nada; solo se alarga la ventana de
@@ -57,12 +61,19 @@ function espejar() {
 
 /** Borra el cache (memoria + espejo). Se llama al entrar, al salir y ante 401. */
 export function limpiarCache() {
+  sesion++; revision++; ultimaLectura++;
+  inFlight = null;
+  escrituras = Promise.resolve();
   cache = null; cacheFull = false; lastFetched = 0;
   if (typeof window !== "undefined") { try { localStorage.removeItem(LS_KEY); } catch {} }
+  notify();
 }
 
 /** ¿Ya hay datos reales para pintar? (false sólo en la primerísima carga). */
 export function hayCache(): boolean { return cache !== null; }
+/** El espejo persistente sirve para pintar, pero no para iniciar una edición
+ * antes de que la red confirme los datos de esta sesión de página. */
+export function cacheConfirmado(): boolean { return cache !== null && lastFetched > 0; }
 
 // Sesión vencida/cerrada (ej. botón "atrás" después del logout): a /login.
 function sinSesion() {
@@ -99,6 +110,9 @@ function respuestaAdelantada(pedirFull: boolean): Promise<Response | null> | nul
 }
 
 export async function fetchData(force = false, opts?: { full?: boolean }): Promise<AppData> {
+  const sesionInicial = sesion;
+  await escrituras;
+  if (sesionInicial !== sesion) throw new Error("La sesión cambió");
   const needFull = opts?.full === true;
   const fresco = cache && Date.now() - lastFetched < TTL;
   if (!force && fresco && (!needFull || cacheFull)) return cache!;
@@ -108,26 +122,54 @@ export async function fetchData(force = false, opts?: { full?: boolean }): Promi
   // Se consume SIEMPRE (aunque sea un force y no se use): así no queda una
   // respuesta vieja colgada del window esperando a un fetch posterior.
   const adelantada = respuestaAdelantada(pedirFull);
-  inFlight = (async () => {
+  const revisionInicial = revision;
+  const lectura = ++ultimaLectura;
+  const pedido = (async () => {
     const r = (!force && await adelantada)
       || await fetch(`/api/db${pedirFull ? "?full=1" : ""}`, { cache: "no-store" });
+    if (sesionInicial !== sesion) throw new Error("La sesión cambió");
     if (r.status === 401) { sinSesion(); throw new Error("Sin sesión"); }
     if (!r.ok) throw new Error("Error cargando datos");
     const d: AppData = await r.json();
+    if (sesionInicial !== sesion) throw new Error("La sesión cambió");
+    // Una respuesta iniciada antes de guardar no puede restaurar datos viejos.
+    if (revisionInicial !== revision || lectura !== ultimaLectura) {
+      await escrituras;
+      if (sesionInicial !== sesion) throw new Error("La sesión cambió");
+      return cache && (!needFull || cacheFull) ? cache : fetchData(true, opts);
+    }
     cache = d; cacheFull = pedirFull; lastFetched = Date.now(); espejar(); notify(); return d;
   })();
-  try { return await inFlight; } finally { inFlight = null; }
+  inFlight = pedido;
+  try { return await pedido; } finally { if (inFlight === pedido) inFlight = null; }
 }
 
-async function patch(body: PatchBody): Promise<AppData> {
+function patch(body: PatchBody): Promise<AppData> {
+  const sesionInicial = sesion;
+  respuestaAdelantada(false); // descarta el snapshot iniciado en el head
+  revision++;
+  const pedido = escrituras.then(async () => {
+    if (sesionInicial !== sesion) throw new Error("La sesión cambió");
+    try { return await enviarPatch(body, sesionInicial); }
+    finally { revision++; }
+  });
+  // Serializa escrituras y permite reintentar después de una falla.
+  escrituras = pedido.catch(() => {});
+  return pedido;
+}
+
+async function enviarPatch(body: PatchBody, sesionInicial: number): Promise<AppData> {
   const r = await fetch("/api/db", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (sesionInicial !== sesion) throw new Error("La sesión cambió");
   if (r.status === 401) { sinSesion(); throw new Error("Sin sesión"); }
   if (!r.ok) throw new Error("Error guardando datos");
   const { data } = await r.json();
+  if (sesionInicial !== sesion) throw new Error("La sesión cambió");
+  if (!data) throw new Error("El servidor no confirmó los datos guardados");
   if (data) {
     // Las escrituras normales vuelven sin `semestres` (no cambió — se conserva
     // el del cache); cerrar semestre sí lo trae completo.
@@ -145,6 +187,17 @@ export async function savePreparacion(p: Record<string, number>)    { return pat
 export async function resetHoras()                                   { return patch({ sesiones: {}, preparacion: {} }); }
 export async function clearPlanEstudio()                             { return patch({ planEstudio: {} }); }
 export async function savePlanEstudio(p: Record<string, string[]>)  { return patch({ planEstudio: p }); }
+export async function savePlanDia(fecha: string, materiaIds: string[]) {
+  return patch({ planDia: { fecha, materiaIds } });
+}
+
+/** El plan guarda IDs de filas; varias filas pueden representar una materia.
+ * Al cambiar el examen relevante, seguimos mostrando la selección guardada. */
+export function planDelDia(ids: string[], materias: Materia[], unicas: Materia[]): string[] {
+  const porNombre = new Map(unicas.map(m => [m.nombre.trim().toLowerCase(), m.id]));
+  const porId = new Map(materias.map(m => [m.id, porNombre.get(m.nombre.trim().toLowerCase())!]));
+  return Array.from(new Set(ids.map(id => porId.get(id)).filter((id): id is string => !!id)));
+}
 export async function saveNotas(notas: string[])                    { return patch({ notas }); }
 export async function archivarSemestre(nombre: string, mats: Materia[]) {
   return patch({ _archivar: { nombre }, materias: mats });

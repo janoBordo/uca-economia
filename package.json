@@ -1,13 +1,15 @@
 {
   "name": "stuniv",
-  "version": "10.14.0",
+  "version": "10.14.2",
   "private": true,
   "scripts": {
     "predev": "node scripts/copiar-pdf-worker.mjs",
     "dev": "next dev",
     "prebuild": "node scripts/copiar-pdf-worker.mjs",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test:calendar": "node scripts/test-calendar-data.cjs && node scripts/test-calendar-route.cjs",
+    "test:calendar:ui": "node scripts/test-calendar-ui.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

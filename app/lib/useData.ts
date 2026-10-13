@@ -1,8 +1,7 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { fetchData, getCached, hayCache, subscribe } from "./api";
-import { useEfectoDeHidratacion } from "./hidratacion";
-import { DATA_DEFAULT, type AppData } from "./types";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { fetchData, getCached, subscribe, cacheConfirmado } from "./api";
+import { DATA_DEFAULT } from "./types";
 
 /* `listo` (v10.14): distingue "vacío porque el usuario no cargó nada" de
    "vacío porque todavía no llegó la primera respuesta". Gracias al cache
@@ -10,30 +9,27 @@ import { DATA_DEFAULT, type AppData } from "./types";
    que no sea la primerísima de la vida del dispositivo — así las pantallas no
    parpadean mostrando un estado vacío que no es real.
 
-   El estado ARRANCA vacío a propósito, igual que el HTML estático que sirve
-   Next, y el cache se adopta en un layout effect (ver hidratacion.ts): pintar
-   directo desde localStorage rompería la hidratación de React y costaría un
-   re-render del árbol entero, justo lo contrario de lo que se busca. */
+   El snapshot del servidor es vacío, igual que el HTML estático. React adopta
+   el cache al hidratar. useSyncExternalStore sincroniza las notificaciones con
+   el render: cerrar el editor tras guardar ya no adelanta el cambio de datos. */
+const getServerSnapshot = () => DATA_DEFAULT;
 export function useData(opts?: { full?: boolean }) {
   const full = opts?.full === true;
-  const [data, setData] = useState<AppData>(DATA_DEFAULT);
-  const [listo, setListo] = useState(false);
+  const data = useSyncExternalStore(subscribe, getCached, getServerSnapshot);
+  const listo = data !== DATA_DEFAULT;
+  const [error, setError] = useState("");
   const reload = useCallback(() => {
-    fetchData(true, { full }).then(d => { setData(d); setListo(true); }).catch(console.error);
+    setError("");
+    fetchData(true, { full })
+      .catch(e => { console.error(e); setError("No se pudieron cargar los datos."); });
   }, [full]);
-
-  // Antes del paint: si hay datos conocidos de este dispositivo, se pintan ya.
-  useEfectoDeHidratacion(() => {
-    if (hayCache()) { setData(getCached()); setListo(true); }
-  }, []);
 
   useEffect(() => {
     // Montaje: sirve del cache si está fresco (TTL); sólo pega a la red si hace falta.
+    let activo = true;
     fetchData(false, { full })
-      .then(d => { setData(d); setListo(true); })
-      .catch(e => { console.error(e); setListo(true); });
-    const unsub = subscribe(() => setData(getCached()));
-    return () => { unsub(); };
+      .catch(e => { if (activo) { console.error(e); setError("No se pudieron cargar los datos."); } });
+    return () => { activo = false; };
   }, [full]);
-  return { data, reload, listo };
+  return { data, reload, listo, confirmado: listo && cacheConfirmado(), error };
 }

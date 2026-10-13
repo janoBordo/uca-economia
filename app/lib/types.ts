@@ -28,6 +28,7 @@ export type AppData = {
     semestre). Contrato compartido entre el cliente (lib/api.ts) y el server
     (api/db/route.ts). */
 export type PatchBody = Partial<AppData> & {
+  planDia?: { fecha: string; materiaIds: string[] };
   _delta?: boolean;
   _archivar?: { nombre: string };
 };

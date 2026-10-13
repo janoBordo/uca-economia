@@ -72,6 +72,17 @@ input[type="range"]::-moz-range-thumb { width:24px; height:24px; border-radius:5
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:rgb(var(--navy-rgb) / 0.15); border-radius:99px; }
 
+/* La selección del editor es inmediata y tiene el mismo color en ambos temas.
+   Los tintes/hover genéricos del vidrio no deben ocultar el estado real. */
+html .calendar-subject-chip.calendar-subject-chip {
+  background-color: var(--subject-bg) !important;
+  color: var(--subject-fg) !important;
+  border-color: var(--subject-border) !important;
+  transition: none !important;
+  transform: none !important;
+  filter: none !important;
+}
+
 /* ═══════════════════ SISTEMA LIQUID GLASS ═══════════════════
    Material único para toda la app. Se activa con data-theme="glass"
    en <html> (toggle en Inicio). Mantiene paleta, layout y funcionalidad:

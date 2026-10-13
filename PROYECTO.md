@@ -6,6 +6,30 @@ Este es el ÚNICO documento de contexto. Cada vez que se hace un cambio (nueva v
 
 ---
 
+## v10.14.2 — Editor del calendario: selección estable y cierre inmediato
+
+La web `stuniv.vercel.app` seguía en el commit v10.14: v10.14.1 había quedado local. Esta actualización incluye ambas correcciones.
+
+El borrador del selector identifica materias por nombre normalizado, no por el ID cambiante del examen relevante. Así una respuesta de datos mientras el modal está abierto no cambia la selección ni impide desmarcar una materia. Los chips reflejan inmediatamente el estado real, sin transiciones de color ni overrides del tema Vidrio.
+
+El cache persistente sigue pintando al instante, pero el editor sólo se habilita cuando la red confirma el estado. Esto evita abrir un borrador con selecciones viejas del almacenamiento local.
+
+El editor ahora se monta/desmonta sin `AnimatePresence` ni animaciones de salida; guardar o cerrar lo elimina inmediatamente tras confirmar el guardado. Conserva el material del tema. `useData` usa `useSyncExternalStore` para que el calendario refleje el cache confirmado antes de cerrar el editor, sin un render intermedio con el plan viejo. Las regresiones comprueban Macro sin selección en un día vacío, seleccionar/desmarcar, guardar sólo Matemática, cambio del examen durante la edición, color calculado en ambos temas y ausencia de reapariciones frame por frame.
+
+---
+
+## v10.14.1 — Calendario: selección persistente y guardados sin carreras
+
+El video del 13/10 mostró selecciones guardadas que no se reflejaban consistentemente en las barras. Se encontraron dos carreras en el código: un GET atrasado podía reemplazar el cache posterior a un guardado, y editar un día borraba y reconstruía todo el plan mediante varias consultas, permitiendo lecturas intermedias vacías.
+
+El calendario guarda sólo el día editado con `planDia` (upsert sobre la clave existente `user_id,fecha`; al vaciar, delete filtrado por fecha). No requiere migración. El cliente serializa escrituras y descarta lecturas anteriores a un cambio, respuestas de otras sesiones y el precargado viejo del head. Los hooks toman el cache vigente y no snapshots de promesas atrasadas.
+
+Los IDs de distintas fechas de una misma materia se resuelven a la materia visible, sin perder la selección cuando cambia el examen relevante. Las barras usan segmentos con posición y altura explícitas. Guardar bloquea cambios/cierre hasta confirmar; si falla, conserva la selección y muestra un reintento. Sin datos cargados, no permite editar un calendario vacío falso.
+
+Regresión: `npm run test:calendar` prueba carreras, cola de escrituras, reintentos, cambio de sesión, historial, IDs duplicados y contrato/autenticación del endpoint. `npm run test:calendar:ui` usa el HTML y JS del build real con API simulada, sin modificar cuentas: guardar/reabrir, GET atrasado, selecciones repetidas, error y recarga, a 1440/768/390 px en Clásico y Vidrio. Requiere Playwright del runtime (o `CODEX_NODE_MODULES`) y Chrome (`CHROME_PATH` opcional).
+
+---
+
 ## v10.12.1 — La portada de mobile, más aireada (branch `main`)
 
 Feedback de Jano sobre v10.12: el contenido estaba bien pero la portada se sentía "muy cargada" y abrumadora ni bien entrás. **Nada de contenido sacado** — las mismas 5 secciones y las mismas capturas: lo que cambió es el aire.

@@ -1,11 +1,11 @@
 "use client";
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, type CSSProperties } from "react";
 import { m as motion, AnimatePresence } from "framer-motion";
 import { useData } from "../lib/useData";
-import { saveMaterias, savePlanEstudio, saveNotas, materiasEfectivas } from "../lib/api";
+import { saveMaterias, savePlanDia, saveNotas, materiasEfectivas, planDelDia } from "../lib/api";
 import type { Materia } from "../lib/types";
 import { COLORES_MATERIAS } from "../lib/types";
-import { GlassButton, GlassInput, GlassModal } from "../components/glass";
+import { GlassButton, GlassInput } from "../components/glass";
 import { track } from "../lib/analytics";
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -16,6 +16,8 @@ const MAX_NOTA = 144;
 function isoKey(y: number, m: number, d: number) {
   return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
 }
+
+const claveMateria = (m: Materia) => m.nombre.trim().toLowerCase();
 
 /* Quitar examen: × con confirmación inline (regla de acciones destructivas). */
 function BtnQuitarExamen({ onConfirm }: { onConfirm: () => void }) {
@@ -34,7 +36,7 @@ function BtnQuitarExamen({ onConfirm }: { onConfirm: () => void }) {
 
 export default function Calendario() {
   const hoy = new Date();
-  const { data } = useData();
+  const { data, confirmado, error, reload } = useData();
   const materias    = data.materias;
   const planEstudio = data.planEstudio ?? {};
   const notas       = data.notas ?? [];
@@ -43,6 +45,8 @@ export default function Calendario() {
   const [modal, setModal] = useState<{ dia: number; key: string } | null>(null);
   const [planLocal, setPlanLocal] = useState<string[]>([]);
   const [guardandoPlan, setGuardandoPlan] = useState(false);
+  const guardandoRef = useRef(false);
+  const [errorPlan, setErrorPlan] = useState("");
 
   // Alta de examen desde el día seleccionado
   const [addExam, setAddExam] = useState(false);
@@ -90,8 +94,13 @@ export default function Calendario() {
   }
 
   function abrirModal(dia: number) {
+    if (!confirmado || guardandoRef.current) return;
     const key = isoKey(vista.y, vista.m, dia);
-    setPlanLocal(planEstudio[key] ?? []);
+    const ids = planDelDia(planEstudio[key] ?? [], materias, materiasUnicas);
+    // La selección pertenece a la materia, no a la fila de su próximo examen.
+    // Una revalidación puede cambiar esa fila mientras el editor está abierto.
+    setPlanLocal(materiasUnicas.filter(m => ids.includes(m.id)).map(claveMateria));
+    setErrorPlan("");
     setModal({ dia, key });
     cancelAddExam();
   }
@@ -101,17 +110,19 @@ export default function Calendario() {
   }
 
   async function guardarModal() {
-    if (!modal) return;
+    if (!modal || guardandoRef.current) return;
+    guardandoRef.current = true;
     setGuardandoPlan(true);
-    const next = { ...planEstudio, [modal.key]: planLocal };
-    if (planLocal.length === 0) delete next[modal.key];
+    setErrorPlan("");
     try {
-      await savePlanEstudio(next);
+      await savePlanDia(modal.key, materiasUnicas.filter(m => planLocal.includes(claveMateria(m))).map(m => m.id));
       track("plan_editado");
       setModal(null); // solo se cierra si guardó de verdad
     } catch (e) {
       console.error("calendario: no se pudo guardar el plan", e);
+      setErrorPlan("No se pudo guardar. Tu selección sigue acá; volvé a intentar.");
     } finally {
+      guardandoRef.current = false;
       setGuardandoPlan(false);
     }
   }
@@ -204,7 +215,10 @@ export default function Calendario() {
         </div>
       </div>
 
-      <div className="flex gap-6">
+      {error && <p role="alert" className="text-sm text-red-600">
+        {error} <button onClick={reload} className="underline">Reintentar</button>
+      </p>}
+      <div className="flex gap-6" aria-busy={!confirmado}>
         <div className="flex-1 min-w-0">
           <div className="grid grid-cols-7 mb-2">
             {DIAS.map(d => <div key={d} className="text-center text-navy/30 text-xs font-semibold uppercase tracking-wider py-2">{d}</div>)}
@@ -214,13 +228,16 @@ export default function Calendario() {
               if (dia === null) return <div key={i} />;
               const key        = isoKey(vista.y, vista.m, dia);
               const exams      = examMap[key];
-              const plan       = planEstudio[key] ?? [];
+              const plan       = planDelDia(planEstudio[key] ?? [], materias, materiasUnicas);
               const esHoy      = key === hoyStr;
               const tieneExamen = !!exams?.length;
               const examPasado = tieneExamen && exams.every(ex => new Date(ex.examen).getTime() < Date.now());
 
               return (
                 <motion.button key={i} onClick={() => abrirModal(dia)}
+                  disabled={!confirmado}
+                  aria-label={`${dia} de ${MESES[vista.m]}${plan.length ? `: ${plan.map(id => materiasUnicas.find(m => m.id === id)?.nombre).join(", ")}` : ""}`}
+                  data-fecha={key}
                   whileHover={{ scale:1.04 }} whileTap={{ scale:0.97 }}
                   initial={{ opacity:0, scale:0.94 }} animate={{ opacity:1, scale:1 }}
                   transition={{ delay: i * 0.004 }}
@@ -238,10 +255,11 @@ export default function Calendario() {
 
                   {/* Barras plan */}
                   {plan.length > 0 && (
-                    <div className="absolute left-0 top-0 bottom-0 flex flex-col" style={{ width: BAR_W }}>
-                      {plan.map(mid => (
-                        <div key={mid} className="glass-plan-bar flex-1 min-h-0"
-                          style={{ background: colorMap[mid] ?? "#aaa", opacity: tieneExamen ? 0.75 : 1 }} />
+                    <div aria-hidden="true" className="absolute left-0 top-0 bottom-0 pointer-events-none" style={{ width: BAR_W }}>
+                      {plan.map((mid, idx) => (
+                        <div key={mid} className="glass-plan-bar absolute left-0 right-0"
+                          data-materia={mid}
+                          style={{ top: `${idx * 100 / plan.length}%`, height: `${100 / plan.length}%`, background: colorMap[mid] ?? "#aaa", opacity: tieneExamen ? 0.75 : 1 }} />
                       ))}
                     </div>
                   )}
@@ -355,17 +373,15 @@ export default function Calendario() {
       </div>
 
       {/* Modal */}
-      <AnimatePresence>
         {modal && (
-          <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-            onClick={() => setModal(null)}>
+          <div key={modal.key} className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={() => { if (!guardandoRef.current) setModal(null); }}>
             <div className="absolute inset-0 bg-navy/30 backdrop-blur-sm" />
-            <GlassModal initial={{ opacity:0, scale:0.94, y:16 }} animate={{ opacity:1, scale:1, y:0 }} exit={{ opacity:0, scale:0.94 }}
+            <div role="dialog" aria-modal="true" aria-labelledby="plan-dia-titulo" data-plan-dialog
               onClick={e => e.stopPropagation()}
-              className="relative bg-canvas rounded-3xl p-7 w-full max-w-md shadow-2xl border border-navy/10 max-h-[90vh] overflow-y-auto">
+              className="glass-modal relative bg-canvas rounded-[24px] p-7 w-full max-w-md shadow-2xl border border-navy/10 max-h-[90vh] overflow-y-auto">
 
-              <h3 className="font-black text-navy text-2xl mb-5" style={{ letterSpacing:"-0.04em" }}>
+              <h3 id="plan-dia-titulo" className="font-black text-navy text-2xl mb-5" style={{ letterSpacing:"-0.04em" }}>
                 {MESES[vista.m]} {modal.dia}
               </h3>
 
@@ -441,14 +457,17 @@ export default function Calendario() {
                 <p className="text-xs text-navy/40 uppercase tracking-wider mb-3 font-semibold">Estudiar ese día:</p>
                 <div className="flex flex-wrap gap-2">
                   {materiasUnicas.map((m, i) => {
-                    const sel = planLocal.includes(m.id);
+                    const sel = planLocal.includes(claveMateria(m));
                     const color = COLORES_MATERIAS[i % COLORES_MATERIAS.length];
                     return (
-                      <button key={m.id} onClick={() => toggleMateria(m.id)}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all border"
-                        style={sel
-                          ? { background: color, color:"#fff", borderColor: color }
-                          : { background:"transparent", color:"rgba(11,31,77,0.55)", borderColor:"rgba(11,31,77,0.15)" }}>
+                      <button key={claveMateria(m)} type="button" onClick={() => toggleMateria(claveMateria(m))} disabled={guardandoPlan}
+                        aria-pressed={sel}
+                        className="calendar-subject-chip flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border"
+                        style={{
+                          "--subject-bg": sel ? color : "transparent",
+                          "--subject-fg": sel ? "#fff" : "rgba(11,31,77,0.55)",
+                          "--subject-border": sel ? color : "rgba(11,31,77,0.15)",
+                        } as CSSProperties}>
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: sel ? "#fff" : color }} />
                         {m.nombre.split(" ")[0]}
                       </button>
@@ -457,21 +476,21 @@ export default function Calendario() {
                 </div>
               </div>
 
+              {errorPlan && <p role="alert" className="mt-4 text-sm text-red-600">{errorPlan}</p>}
               <div className="flex gap-3 mt-7">
                 <GlassButton onClick={guardarModal} disabled={guardandoPlan}
                   className="flex-1 py-3 rounded-xl bg-navy text-canvas font-semibold hover:bg-navy-soft transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                   {guardandoPlan && <span className="animate-spin text-ocre">◌</span>}
                   {guardandoPlan ? "Guardando…" : "Guardar"}
                 </GlassButton>
-                <GlassButton onClick={() => setModal(null)}
+                <GlassButton onClick={() => setModal(null)} disabled={guardandoPlan}
                   className="px-5 py-3 rounded-xl border border-navy/15 text-navy/50 hover:border-navy/30 transition-colors">
                   Cerrar
                 </GlassButton>
               </div>
-            </GlassModal>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
     </section>
   );
 }

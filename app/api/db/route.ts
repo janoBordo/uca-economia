@@ -47,6 +47,10 @@ const PatchSchema = z
       )
       .refine(r => Object.keys(r).length <= 400, "demasiadas entradas"),
     notas: z.array(z.string().max(144)).max(100),
+    planDia: z.object({
+      fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      materiaIds: z.array(z.string().uuid()).max(32),
+    }).strict(),
     _delta: z.boolean(),
     _archivar: z.object({ nombre: z.string().min(1).max(100) }),
   })
@@ -181,6 +185,20 @@ export async function POST(req: Request) {
         const { error } = await sb.from("plan_estudio").insert(filas);
         if (error) throw new Error(error.message);
       }
+    }
+
+    // Editar un día no borra ni reescribe el calendario entero. El upsert es
+    // una sola operación: una lectura concurrente nunca ve un plan vacío.
+    if (body.planDia) {
+      const { fecha, materiaIds } = body.planDia;
+      const ids = Array.from(new Set(materiaIds));
+      const { error } = ids.length
+        ? await sb.from("plan_estudio").upsert(
+          { user_id: userId, fecha, materia_ids: ids },
+          { onConflict: "user_id,fecha" }
+        )
+        : await sb.from("plan_estudio").delete().eq("fecha", fecha);
+      if (error) throw new Error(error.message);
     }
 
     if (body.notas) {
