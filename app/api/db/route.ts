@@ -30,6 +30,9 @@ const MateriaSchema = z.object({
 const PatchSchema = z
   .object({
     materias: z.array(MateriaSchema).max(50),
+    materiaNueva: MateriaSchema.pick({ id: true, nombre: true }).extend({
+      nombre: z.string().trim().min(1).max(100),
+    }).strict(),
     // _delta: incrementos 1..1440 min (mismo rango que el RPC). Sin _delta solo
     // se usa para resetear ({}), pero se acepta reemplazo explícito acotado.
     // Los records llevan tope de claves (v10.9): sin él, un body podía traer
@@ -55,7 +58,8 @@ const PatchSchema = z
     _archivar: z.object({ nombre: z.string().min(1).max(100) }),
   })
   .partial()
-  .strict();
+  .strict()
+  .refine(body => !body.materiaNueva || Object.keys(body).length === 1);
 
 /** Arma el AppData del usuario en UN solo round-trip (RPC get_app_data,
     migración 0003). El RPC corre bajo RLS (security invoker) y además valida
@@ -117,6 +121,13 @@ export async function POST(req: Request) {
   } catch { return generico("Datos inválidos.", 400); }
 
   try {
+    if (body.materiaNueva) {
+      const { id, nombre } = body.materiaNueva;
+      const { data: agregada, error } = await sb.rpc("agregar_materia", { p_id: id, p_nombre: nombre });
+      if (error) throw new Error(error.message);
+      if (!agregada) return generico("Llegaste al límite de 50 materias y exámenes.", 409);
+    }
+
     // ── Cerrar semestre: snapshot + limpieza en UNA transacción (RPC) ──
     if (body._archivar) {
       const { error } = await sb.rpc("archivar_semestre", { p_nombre: body._archivar.nombre });

@@ -163,6 +163,7 @@ async function enviarPatch(body: PatchBody, sesionInicial: number): Promise<AppD
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    keepalive: !!body.materiaNueva,
   });
   if (sesionInicial !== sesion) throw new Error("La sesión cambió");
   if (r.status === 401) { sinSesion(); throw new Error("Sin sesión"); }
@@ -182,6 +183,9 @@ async function enviarPatch(body: PatchBody, sesionInicial: number): Promise<AppD
 }
 
 export async function saveMaterias(m: Materia[])                    { return patch({ materias: m }); }
+export async function agregarMateria(materiaNueva: Pick<Materia, "id" | "nombre">) {
+  return patch({ materiaNueva });
+}
 export async function addMinutos(id: string, mins: number)          { return patch({ sesiones: { [id]: mins }, _delta: true }); }
 export async function savePreparacion(p: Record<string, number>)    { return patch({ preparacion: p }); }
 export async function resetHoras()                                   { return patch({ sesiones: {}, preparacion: {} }); }

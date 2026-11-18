@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { m as motion, AnimatePresence } from "framer-motion";
 import { useData } from "../lib/useData";
-import { archivarSemestre, saveMaterias, resetHoras, clearPlanEstudio } from "../lib/api";
+import { agregarMateria, archivarSemestre, saveMaterias, resetHoras, clearPlanEstudio } from "../lib/api";
 import { type Materia, type SemestreArchivado } from "../lib/types";
 import { GlassCard, GlassButton } from "../components/glass";
 import { track } from "../lib/analytics";
@@ -149,21 +149,36 @@ function BtnEliminar({ onConfirm }: { onConfirm: () => void }) {
 }
 
 export default function Semestre() {
-  const { data } = useData({ full: true });   // única vista que necesita el historial archivado
+  const { data, confirmado } = useData({ full: true });   // única vista que necesita el historial archivado
   const [confirmCerrar, setConfirmCerrar] = useState(false);
   const [guardandoCierre, setGuardandoCierre] = useState(false);
   const [expandido,     setExpandido]     = useState<string | null>(null);
-  const [local,         setLocal]         = useState<Materia[]>([]);
-  const [guardado,      setGuardado]      = useState(false);
+  const [ediciones,     setEdiciones]     = useState<Record<string, string | null>>({});
+  const [guardado,      setGuardado]      = useState("");
   const [guardando,     setGuardando]     = useState(false);
   const [agregando,     setAgregando]     = useState(false);
-  const [nueva,         setNueva]         = useState({ nombre:"" });
+  const [nueva,         setNueva]         = useState<{ nombre: string; id?: string }>({ nombre: "" });
+  const [guardandoMateria, setGuardandoMateria] = useState(false);
+  const [errorMateria, setErrorMateria] = useState("");
+  const [errorGuardar, setErrorGuardar] = useState("");
   const [confirmHoras,  setConfirmHoras]  = useState(false);
   const [confirmPlan,   setConfirmPlan]   = useState(false);
   const [ejHoras,       setEjHoras]       = useState(false);
   const [ejPlan,        setEjPlan]        = useState(false);
 
-  useEffect(() => { if (data.materias.length) setLocal(data.materias); }, [data.materias]);
+  useEffect(() => {
+    if (!guardado) return;
+    const timer = setTimeout(() => setGuardado(""), 2500);
+    return () => clearTimeout(timer);
+  }, [guardado]);
+
+  const ocupado = guardando || guardandoMateria || guardandoCierre;
+  const hayEdiciones = Object.keys(ediciones).length > 0;
+  const local = data.materias.flatMap(m => {
+    const nombre = ediciones[m.id];
+    if (nombre === null) return [];
+    return [nombre === undefined ? m : { ...m, nombre }];
+  });
 
   const totalMins    = Object.values(data.sesiones).reduce((a, v) => a + v, 0);
   const totalHoras   = (totalMins / 60).toFixed(1);
@@ -198,25 +213,46 @@ export default function Semestre() {
 
   // Renombrar/eliminar afecta a TODAS las filas de esa materia.
   function renombrarGrupo(ids: string[], nombre: string) {
-    setLocal(ms => ms.map(m => ids.includes(m.id) ? { ...m, nombre } : m));
+    setEdiciones(cambios => ({ ...cambios, ...Object.fromEntries(ids.map(id => [id, nombre])) }));
   }
   function quitarGrupo(ids: string[]) {
-    setLocal(ms => ms.filter(m => !ids.includes(m.id)));
+    setEdiciones(cambios => ({ ...cambios, ...Object.fromEntries(ids.map(id => [id, null])) }));
   }
-  function agregar() {
+  async function agregar() {
     const nombre = nueva.nombre.trim();
-    if (!nombre) return;
-    // Sin fecha ni horas: se cargan después desde el calendario (examen vacío).
-    setLocal(ms => [...ms, { id: uid(), nombre, examen: "", metaHoras: 15 }]);
-    setNueva({ nombre:"" }); setAgregando(false);
+    if (!nombre || ocupado) return;
+    if (!nueva.id && data.materias.length >= 50) {
+      setErrorMateria("Llegaste al límite de 50 materias y exámenes.");
+      return;
+    }
+    const id = nueva.id ?? uid();
+    setNueva({ id, nombre });
+    setErrorMateria("");
+    setGuardado("");
+    setGuardandoMateria(true);
+    try {
+      await agregarMateria({ id, nombre });
+      setNueva({ nombre: "" });
+      setAgregando(false);
+      setGuardado("Materia guardada en la nube");
+    } catch {
+      setErrorMateria("No se pudo confirmar el guardado. Volvé a tocar Agregar para reintentar.");
+    } finally {
+      setGuardandoMateria(false);
+    }
   }
   async function guardar() {
+    if (!confirmado || ocupado || !hayEdiciones) return;
+    setGuardado("");
+    setErrorGuardar("");
     setGuardando(true);
     try {
       await saveMaterias(local);
-      setGuardado(true); setTimeout(() => setGuardado(false), 2500);
+      setEdiciones({});
+      setGuardado("Guardado y sincronizado");
     } catch (e) {
       console.error("semestre: no se pudieron guardar las materias", e);
+      setErrorGuardar("No se pudieron guardar los cambios. Probá de nuevo.");
     } finally {
       setGuardando(false);
     }
@@ -234,12 +270,13 @@ export default function Semestre() {
     finally { setEjPlan(false); setConfirmPlan(false); }
   }
   async function cerrarSemestre() {
+    if (ocupado || !confirmado) return;
     setGuardandoCierre(true);
     try {
       // El semestre nuevo arranca vacío: cada uno carga sus materias nuevas
       await archivarSemestre(`Semestre ${nextNumero}`, []);
       track("semestre_archivado");
-      setLocal([]); // solo se vacía la lista local si el cierre se concretó
+      setEdiciones({});
     } catch (e) {
       console.error("semestre: no se pudo cerrar el semestre", e);
     } finally {
@@ -274,9 +311,9 @@ export default function Semestre() {
                   className="p-5 rounded-2xl flex flex-col gap-4"
                   style={{ background:"#fff", border:"1px solid rgba(11,31,77,0.08)", boxShadow:"0 2px 12px rgba(11,31,77,0.06), 0 1px 3px rgba(11,31,77,0.04)" }}>
                   <div className="flex items-start justify-between gap-2">
-                    <input value={g.nombre} onChange={e => renombrarGrupo(ids, e.target.value)}
+                    <input value={g.nombre} readOnly={guardando || guardandoCierre} onChange={e => renombrarGrupo(ids, e.target.value)}
                       className="font-semibold text-navy bg-transparent border-b border-transparent hover:border-navy/20 focus:border-ocre focus:outline-none text-sm w-full pb-0.5" />
-                    <BtnEliminar onConfirm={() => quitarGrupo(ids)} />
+                    <BtnEliminar onConfirm={() => { if (!guardando && !guardandoCierre) quitarGrupo(ids); }} />
                   </div>
                   <div className="h-px bg-navy/6" />
                   {/* Todas las fechas de examen + total estudiado (se cargan desde el calendario) */}
@@ -313,16 +350,20 @@ export default function Semestre() {
                 <p className="font-semibold text-navy mb-4 text-sm uppercase tracking-wider">Nueva materia</p>
                 <div className="mb-4">
                   <label className="block text-xs text-navy/40 uppercase tracking-wider mb-1.5">Nombre</label>
-                  <input value={nueva.nombre} autoFocus
-                    onChange={e => setNueva({ nombre: e.target.value })}
-                    onKeyDown={e => { if (e.key === "Enter") agregar(); }}
+                  <input value={nueva.nombre} autoFocus maxLength={100} disabled={guardandoMateria}
+                    onChange={e => { setErrorMateria(""); setNueva({ nombre: e.target.value }); }}
+                    onKeyDown={e => { if (e.key === "Enter" && !e.nativeEvent.isComposing) void agregar(); }}
                     placeholder="Ej. Macroeconomía"
                     className="w-full min-w-0 appearance-none bg-canvas rounded-xl px-4 py-2.5 text-navy text-sm border border-navy/12 focus:outline-none focus:ring-2 focus:ring-ocre/40" />
                   <p className="text-navy/35 text-xs mt-2">La fecha de examen y las horas a estudiar se cargan después desde el calendario.</p>
+                  {errorMateria && <p role="alert" className="text-red-600 text-sm mt-2">{errorMateria}</p>}
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={agregar} className="px-6 py-2.5 rounded-full bg-navy text-canvas text-sm font-semibold hover:bg-navy-soft transition-colors">Agregar</button>
-                  <button onClick={() => setAgregando(false)} className="px-6 py-2.5 rounded-full border border-navy/15 text-navy/50 text-sm hover:border-navy/30 transition-colors">Cancelar</button>
+                  <button onClick={agregar} disabled={ocupado} className="px-6 py-2.5 rounded-full bg-navy text-canvas text-sm font-semibold hover:bg-navy-soft transition-colors disabled:opacity-60">
+                    {guardandoMateria ? "Agregando…" : "Agregar"}
+                  </button>
+                  <button onClick={() => { setErrorMateria(""); setAgregando(false); }} disabled={guardandoMateria}
+                    className="px-6 py-2.5 rounded-full border border-navy/15 text-navy/50 text-sm hover:border-navy/30 transition-colors">Cancelar</button>
                 </div>
               </motion.div>
             ) : (
@@ -336,18 +377,19 @@ export default function Semestre() {
 
         {/* Guardar */}
         <div className="flex items-center gap-4 flex-wrap mt-6">
-          <GlassButton onClick={guardar} disabled={guardando}
+          <GlassButton onClick={guardar} disabled={ocupado || !confirmado || !hayEdiciones}
             className="px-8 py-3.5 rounded-full bg-navy text-canvas font-semibold hover:bg-navy-soft transition-colors disabled:opacity-60 flex items-center gap-2">
             {guardando && <span className="animate-spin text-ocre">◌</span>}
             {guardando ? "Guardando…" : "Guardar en la nube"}
           </GlassButton>
           <AnimatePresence>
             {guardado && (
-              <motion.span initial={{ opacity:0, x:-8 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0 }} className="text-sm text-navy/50 flex items-center gap-2">
-                <span className="text-ocre">✓</span> Guardado y sincronizado
+              <motion.span role="status" initial={{ opacity:0, x:-8 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0 }} className="text-sm text-navy/50 flex items-center gap-2">
+                <span className="text-ocre">✓</span> {guardado}
               </motion.span>
             )}
           </AnimatePresence>
+          {errorGuardar && <p role="alert" className="text-red-600 text-sm">{errorGuardar}</p>}
         </div>
 
         {/* Reiniciar datos — botones con borde + hover, tipografía de la página */}
@@ -430,7 +472,7 @@ export default function Semestre() {
                   <motion.div key="confirm-cerrar" initial={{ opacity:0, scale:0.95 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0 }}
                     className="flex items-center gap-2 px-4 py-3 rounded-2xl border border-navy/20 bg-navy/5">
                     <span className="text-navy text-xs font-medium">¿Cerrar Semestre {nextNumero}?</span>
-                    <button onClick={cerrarSemestre} disabled={guardandoCierre}
+                    <button onClick={cerrarSemestre} disabled={ocupado || !confirmado}
                       className="px-4 py-1.5 rounded-full bg-navy text-canvas text-xs font-semibold hover:bg-navy-soft transition-colors disabled:opacity-50 flex items-center gap-1">
                       {guardandoCierre && <span className="animate-spin text-ocre text-xs">◌</span>}
                       {guardandoCierre ? "…" : "Sí, cerrar"}
